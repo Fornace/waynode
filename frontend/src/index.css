@@ -338,6 +338,10 @@ input, textarea {
 
 .send-btn:hover { background: var(--accent-hover); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Mobile newline affordance: sits before Send on touch devices where there's
+   no Shift+Enter. Subtler than Send so the primary action stays salient. */
+.newline-btn { background: transparent; color: var(--text-dim); border: 1px solid var(--border); font-size: 16px; line-height: 1; padding: 8px 10px; }
+.newline-btn:hover { background: var(--bg-hover); color: var(--text); }
 
 .send-dropdown-btn {
   background: var(--accent);

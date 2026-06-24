@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import type { Session, GoalStatus, ChatItem, Block } from "../types";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
+import { isTouchDevice } from "../utils/device";
 
 interface ChatTabProps {
   session: Session;
@@ -20,6 +21,25 @@ export function ChatTab({ session }: ChatTabProps) {
   // The stream lives in the module-scoped store, so navigating away does NOT
   // kill an in-flight turn — it keeps running in the background.
   useEffect(() => store.acquire(session.id), [session.id]);
+
+  // Insert a newline at the caret (mobile affordance): on touch devices the
+  // soft keyboard has no Shift, so there's no way to get a newline without a
+  // dedicated button. Enter stays bound to send; this ↵ button adds the line.
+  const insertNewline = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = input.slice(0, start) + "\n" + input.slice(end);
+    setInput(next);
+    // Restore the caret after React re-renders.
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = el.selectionEnd = start + 1;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    });
+  };
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -66,6 +86,11 @@ export function ChatTab({ session }: ChatTabProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Desktop: Enter submits (send, or queue if streaming); Shift+Enter is a
+    // newline. Mobile: Enter keeps submitting (the soft keyboard's primary
+    // action); multi-line input is reached via the newline affordance on the
+    // toolbar rather than by sacrificing the submit key. See
+    // docs/KEYBOARD-CONTRACT.md §1.2.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (streaming) handleQueue();
@@ -128,6 +153,9 @@ export function ChatTab({ session }: ChatTabProps) {
           rows={1}
         />
         <div className="send-group">
+          {isTouchDevice() && !streaming && (
+            <button className="send-btn newline-btn" onClick={insertNewline} title="New line">↵</button>
+          )}
           {streaming ? (
             <button className="send-btn send-stop" onClick={handleAbort} title="Stop">
               <StopIcon /> Stop

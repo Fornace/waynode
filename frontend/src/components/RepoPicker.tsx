@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { RepoGroup } from "../types";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface RepoPickerProps {
   onClose: () => void;
@@ -24,6 +25,10 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
   const [authToken, setAuthToken] = useState("");
   const [showAuth, setShowAuth] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  // Layer 1: Esc closes this picker; focus trapped so the terminal behind it
+  // stops receiving keystrokes while the picker is open.
+  useEscapeToClose(onClose, overlayRef);
 
   useEffect(() => {
     if (tab === "github" && githubConnected) loadGithub();
@@ -120,7 +125,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" ref={overlayRef} onClick={onClose}>
       <div className="repo-picker-modal" onClick={(e) => e.stopPropagation()}>
         <div className="repo-picker-header">
           <div className="repo-picker-title">Clone Repository</div>

@@ -21,6 +21,27 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [currentModel, setCurrentModel] = useState(session.model || "");
 
+  // Global shortcut (Layer 3): Ctrl/Cmd+Shift+T toggles Chat <-> Terminal when
+  // no input or modal is focused. Reserved chord per docs/KEYBOARD-CONTRACT.md.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const isMod = event.ctrlKey || event.metaKey;
+      if (!(isMod && event.shiftKey && (event.key === "T" || event.key === "t"))) return;
+      const target = event.target as HTMLElement | null;
+      // If the user is typing in the terminal, the terminal's own handler owns
+      // this chord (it has focus). Only handle it here when focus is NOT in an
+      // input/textarea or the xterm terminal container.
+      const tag = target?.tagName;
+      const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      const inTerminal = target?.closest(".terminal-container");
+      if (inInput || inTerminal) return;
+      event.preventDefault();
+      setActiveTab((prev) => (prev === "chat" ? "terminal" : "chat"));
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   useEffect(() => {
     fetch("/api/models", { credentials: "include" }).then(r => r.json()).then(d => setModels(d.models || [])).catch(() => {});
   }, []);
@@ -57,7 +78,7 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
         {activeTab === "chat" && <ChatTab key={session.id} session={session} />}
         {activeTab === "terminal" && (
           <Suspense fallback={<div className="empty-state">Loading terminal...</div>}>
-            <TerminalTab key={session.id} session={session} />
+            <TerminalTab key={session.id} session={session} onRequestExit={() => setActiveTab("chat")} />
           </Suspense>
         )}
       </div>

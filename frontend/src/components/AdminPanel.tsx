@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../api/client";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface AdminUser {
   id: string;
@@ -24,6 +25,8 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
+  // Esc returns from this full-page admin pane.
+  useEscapeToClose(onClose);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState({ users: 0, spaces: 0, sessions: 0, messages: 0 });
   const [loading, setLoading] = useState(true);

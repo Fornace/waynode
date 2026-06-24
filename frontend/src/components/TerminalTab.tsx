@@ -6,12 +6,20 @@ import "@xterm/xterm/css/xterm.css";
 
 interface TerminalTabProps {
   session: Session;
+  /** Fired when the user invokes the reserved "leave terminal" chord
+   *  (Ctrl/Cmd+Shift+T). The terminal swallows that key from the PTY and
+   *  hands control back to the UI (typically: switch to the Chat tab). */
+  onRequestExit?: () => void;
 }
 
-export default function TerminalTab({ session }: TerminalTabProps) {
+export default function TerminalTab({ session, onRequestExit }: TerminalTabProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  // Keep the latest exit callback in a ref so the one-time key handler
+  // (registered inside the [session.id] effect) always calls the current one.
+  const onRequestExitRef = useRef(onRequestExit);
+  onRequestExitRef.current = onRequestExit;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -34,6 +42,19 @@ export default function TerminalTab({ session }: TerminalTabProps) {
     fitAddon.fit();
 
     termRef.current = term;
+
+    // Reserved chord: Ctrl/Cmd+Shift+T leaves the terminal for the UI.
+    // Returning false from this handler stops the key reaching the PTY;
+    // every other key returns true and is forwarded to the shell unchanged.
+    // See docs/KEYBOARD-CONTRACT.md §1.1.
+    term.attachCustomKeyEventHandler((event) => {
+      const isMod = event.ctrlKey || event.metaKey;
+      if (isMod && event.shiftKey && (event.key === "T" || event.key === "t")) {
+        onRequestExitRef.current?.();
+        return false;
+      }
+      return true;
+    });
 
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(

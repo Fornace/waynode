@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Org } from "../types";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface OrgSettingsProps {
   org: Org;
@@ -12,6 +13,9 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export function OrgSettings({ org, onClose }: OrgSettingsProps) {
+  // Esc returns from this full-page settings pane (no overlay/focus trap;
+  // it's a pane, not a modal).
+  useEscapeToClose(onClose);
   const [tab, setTab] = useState<"general" | "integrations" | "members">("general");
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [members, setMembers] = useState<any[]>([]);

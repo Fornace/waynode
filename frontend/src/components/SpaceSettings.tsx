@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Space } from "../types";
 import { api } from "../api/client";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface SpaceSettingsProps {
   space: Space;
@@ -8,6 +9,10 @@ interface SpaceSettingsProps {
 }
 
 export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  // Layer 1 of the keyboard contract: Esc closes the topmost modal and focus
+  // is trapped inside so the terminal behind it stops receiving input.
+  useEscapeToClose(onClose, overlayRef);
   const [tab, setTab] = useState<"agents" | "secrets">("agents");
   const [agentsContent, setAgentsContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -55,7 +60,7 @@ export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" ref={overlayRef} onClick={onClose}>
       <div className="modal" style={{ width: 600, maxWidth: "90vw" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div className="modal-title">{space.repo_name} Settings</div>
