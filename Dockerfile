@@ -35,8 +35,29 @@ COPY server.js ./
 # Copy built frontend
 COPY --from=builder /build/frontend/dist ./frontend/dist
 
-# Install pi-codex-goal (pi itself is a private CLI — install separately if available)
-RUN npm install -g pi-codex-goal@latest 2>/dev/null || echo "pi-codex-goal not available yet, skipping"
+# Install pi CLI + pi-codex-goal extension
+RUN npm install -g @earendil-works/pi-coding-agent@latest
+RUN pi install npm:pi-codex-goal --approve || true
+
+# Configure pi with fornace-llm gateway as custom provider
+RUN mkdir -p /root/.pi/agent && echo '{\
+  "providers": {\
+    "fornace": {\
+      "baseUrl": "http://fornace-llm:4000/v1",\
+      "api": "openai-completions",\
+      "apiKey": "sk-4dea025d8aa9572a2a68b8e4126561519fec29e3cf2fc26f",\
+      "compat": {"supportsDeveloperRole": false, "supportsReasoningEffort": false},\
+      "models": [\
+        {"id": "fornace-fast", "name": "Fornace Fast"},\
+        {"id": "fornace-reasoning", "name": "Fornace Reasoning"},\
+        {"id": "fornace-max", "name": "Fornace Max"},\
+        {"id": "glm-5.2-fast", "name": "GLM 5.2 Fast"},\
+        {"id": "glm-5.2-reasoning", "name": "GLM 5.2 Reasoning"},\
+        {"id": "qwen-flash", "name": "Qwen Flash"}\
+      ]\
+    }\
+  }\
+}' > /root/.pi/agent/models.json
 
 # Data volume
 RUN mkdir -p /data/repos

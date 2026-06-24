@@ -7,7 +7,7 @@ import {
   addMessage, getMessages, autoTitle,
   createActiveChat, getActiveChat, completeActiveChat, removeActiveChat,
 } from "../lib/sessions.mjs";
-import { isPiAvailable, runPiMessage } from "../lib/pi-runner.mjs";
+import { isPiAvailable, runPiMessage, runPiMessageSync } from "../lib/pi-runner.mjs";
 import { createChatStream, isLLMConfigured } from "../lib/llm-runner.mjs";
 import { config } from "../lib/config.mjs";
 
@@ -86,30 +86,40 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
 
-    const send = (type, data) => res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-    const heartbeat = setInterval(() => { if (!res.destroyed) try { res.write(": ping\n\n"); } catch {} }, 15000);
+    const send = (type, data) => {
+      const payload = JSON.stringify({ type, ...data });
+      res.write(`data: ${payload}\n\n`);
+      if (typeof res.flush === "function") res.flush();
+    };
 
     try {
       send("start", { isGoal, engine: "pi" });
-      const child = runPiMessage({ session, prompt, isGoal });
-      chat.ac.signal.addEventListener("abort", () => { if (!child.killed) child.kill("SIGTERM"); });
 
-      let fullResponse = "";
-      child.stdout.on("data", (chunk) => { const text = chunk.toString(); fullResponse += text; send("delta", { text }); });
-      child.stderr.on("data", (chunk) => send("stderr", { text: chunk.toString() }));
-      child.on("close", (code) => {
-        clearInterval(heartbeat);
-        if (fullResponse.trim()) addMessage({ sessionId: session.id, role: "assistant", content: fullResponse });
-        send("done", { exitCode: code });
-        completeActiveChat(session.id);
-        updateSession(session.id, {});
-        try { res.write("data: [DONE]\n\n"); } catch {}
-        try { res.end(); } catch {}
-        setTimeout(() => removeActiveChat(session.id), 5 * 60 * 1000);
-      });
-      child.on("error", (err) => { clearInterval(heartbeat); send("error", { message: err.message }); try { res.end(); } catch {} });
-      req.on("close", () => { clearInterval(heartbeat); if (!res.destroyed) try { res.end(); } catch {} });
-    } catch (err) { clearInterval(heartbeat); send("error", { message: err.message }); try { res.end(); } catch {} }
+      const result = runPiMessageSync({ session, prompt, isGoal });
+
+      if (result.stdout.trim()) {
+        send("delta", { text: result.stdout });
+      }
+      if (result.stderr.trim()) {
+        console.error("[pi] stderr:", result.stderr.slice(0, 200));
+        send("stderr", { text: result.stderr });
+      }
+
+      const content = result.stdout.trim();
+      if (content) {
+        addMessage({ sessionId: session.id, role: "assistant", content });
+      }
+      send("done", { exitCode: result.status });
+      completeActiveChat(session.id);
+      updateSession(session.id, {});
+      try { res.write("data: [DONE]\n\n"); } catch {}
+      try { res.end(); } catch {}
+      setTimeout(() => removeActiveChat(session.id), 5 * 60 * 1000);
+    } catch (err) {
+      console.error("[pi] error:", err.message);
+      send("error", { message: err.message });
+      try { res.end(); } catch {}
+    }
     return;
   }
 
