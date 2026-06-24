@@ -7,6 +7,7 @@ import { SpaceSettings } from "./components/SpaceSettings";
 import { AdminPanel } from "./components/AdminPanel";
 import { OrgSettings } from "./components/OrgSettings";
 import { api } from "./api/client";
+import * as store from "./lib/sessionStore";
 import type { Space, Session, Org } from "./types";
 
 function getAuthHeaders(): Record<string, string> {
@@ -32,15 +33,15 @@ function AppContent() {
 
   useEffect(() => {
     if (user) {
-      fetch("/api/repos/status", { headers: getAuthHeaders() })
+      fetch("/api/repos/status", { headers: getAuthHeaders(), credentials: "include" })
         .then((r) => r.json())
         .then((d) => { setGithubConnected(d.github); setGitlabConnected(d.gitlab); })
         .catch(() => {});
-      fetch("/api/auth/me", { headers: getAuthHeaders() })
+      fetch("/api/auth/me", { headers: getAuthHeaders(), credentials: "include" })
         .then((r) => r.json())
         .then((d) => { if (d.user?.role === "admin") setIsAdmin(true); })
         .catch(() => {});
-      fetch("/api/orgs", { headers: getAuthHeaders() })
+      fetch("/api/orgs", { headers: getAuthHeaders(), credentials: "include" })
         .then((r) => r.json())
         .then((data: Org[]) => {
           setOrgs(data);
@@ -53,7 +54,7 @@ function AppContent() {
   const loadSpaces = useCallback(async () => {
     if (!activeOrgId) return;
     try {
-      const res = await fetch(`/api/spaces?orgId=${activeOrgId}`, { headers: getAuthHeaders() });
+      const res = await fetch(`/api/spaces?orgId=${activeOrgId}`, { headers: getAuthHeaders(), credentials: "include" });
       const data = await res.json();
       setSpaces(data);
     } catch {}
@@ -64,7 +65,7 @@ function AppContent() {
   }, [user, activeOrgId, loadSpaces]);
 
   const refreshRepoStatus = () => {
-    fetch("/api/repos/status", { headers: getAuthHeaders() })
+    fetch("/api/repos/status", { headers: getAuthHeaders(), credentials: "include" })
       .then((r) => r.json())
       .then((d) => { setGithubConnected(d.github); setGitlabConnected(d.gitlab); })
       .catch(() => {});
@@ -79,6 +80,19 @@ function AppContent() {
   const handleSessionCreated = (session: Session) => {
     setSessions((prev) => prev.some((s) => s.id === session.id) ? prev : [...prev, session]);
   };
+
+  // ── Auto-generated session titles arrive over the live stream. ──
+  useEffect(() => {
+    if (!user) return;
+    return store.onRename((sessionId, title) => {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, title } : s))
+      );
+      setActiveSession((cur) =>
+        cur && cur.id === sessionId ? { ...cur, title } : cur
+      );
+    });
+  }, [user]);
 
   const handleSpaceExpand = async (spaceId: string) => {
     const alreadyLoaded = sessions.some((s) => s.space_id === spaceId);

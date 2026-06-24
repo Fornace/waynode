@@ -20,8 +20,8 @@ export function OrgSettings({ org, onClose }: OrgSettingsProps) {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/orgs/${org.id}/settings`, { headers: getAuthHeaders() }).then(r => r.json()),
-      fetch(`/api/orgs/${org.id}/members`, { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch(`/api/orgs/${org.id}/settings`, { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
+      fetch(`/api/orgs/${org.id}/members`, { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
     ]).then(([s, m]) => {
       setSettings(s);
       setMembers(m);

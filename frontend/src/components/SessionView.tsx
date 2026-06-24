@@ -22,7 +22,7 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
   const [currentModel, setCurrentModel] = useState(session.model || "");
 
   useEffect(() => {
-    fetch("/api/models").then(r => r.json()).then(d => setModels(d.models || [])).catch(() => {});
+    fetch("/api/models", { credentials: "include" }).then(r => r.json()).then(d => setModels(d.models || [])).catch(() => {});
   }, []);
 
   const handleModelChange = async (model: string) => {

@@ -30,8 +30,8 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/admin/users", { headers: getAuthHeaders() }).then(r => r.json()),
-      fetch("/api/admin/stats", { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch("/api/admin/users", { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
+      fetch("/api/admin/stats", { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
     ]).then(([u, s]) => {
       setUsers(u);
       setStats(s);

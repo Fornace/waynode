@@ -1,0 +1,47 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync code to server
+        run: |
+          rsync -avz --delete \
+            --exclude='data/' \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='frontend/node_modules/' \
+            --exclude='frontend/dist/' \
+            --exclude='.env' \
+            ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/waynode/
+
+      - name: Rebuild and restart container
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} '
+            cd /opt/waynode &&
+            docker compose down &&
+            docker compose build --no-cache &&
+            docker compose up -d &&
+            docker image prune -f
+          '
+
+      - name: Verify deployment
+        run: |
+          sleep 5
+          curl -sf -o /dev/null -w "%{http_code}" https://waynode.fornace.net | grep -q "200\|302\|301" && echo "Deploy OK" || (echo "Deploy FAILED" && exit 1)

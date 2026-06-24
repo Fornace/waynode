@@ -35,7 +35,22 @@ export interface Session {
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  thinking?: string | null;
 }
+
+// ── Rich streaming message model (sessionStore) ──
+
+export type ToolStatus = "running" | "done" | "error";
+
+export type Block =
+  | { type: "text"; text: string }
+  | { type: "thinking"; text: string }
+  | { type: "tool"; id: string; name: string; args: any; output: string; status: ToolStatus };
+
+export type ChatItem =
+  | { id: string; role: "user"; content: string; isGoal?: boolean }
+  | { id: string; role: "assistant"; blocks: Block[]; done: boolean }
+  | { id: string; role: "system"; content: string };
 
 export interface GoalStatus {
   status: "active" | "paused" | "complete" | "budgetLimited" | null;

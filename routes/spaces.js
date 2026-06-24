@@ -17,6 +17,7 @@ router.get("/api/spaces", requireAuth, (req, res) => {
 
 router.post("/api/spaces", requireAuth, async (req, res) => {
   const { repoUrl, branch, authUser, authToken, orgId } = req.body;
+  console.log("[spaces] clone request:", { repoUrl, branch, orgId, userId: req.user.id, hasAuth: !!authUser });
   if (!repoUrl) return res.status(400).json({ error: "repoUrl required" });
 
   if (orgId) {
@@ -28,6 +29,7 @@ router.post("/api/spaces", requireAuth, async (req, res) => {
     const space = cloneRepo(repoUrl, branch || "main", req.user.id, orgId, { authUser, authToken });
     res.json(space);
   } catch (err) {
+    console.error("[spaces] clone failed:", err.message, err.stack);
     res.status(500).json({ error: "Clone failed", detail: err.message });
   }
 });

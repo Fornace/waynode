@@ -40,6 +40,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
     try {
       const res = await fetch("/api/repos/github", {
         headers: getAuthHeaders(),
+        credentials: "include",
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -57,6 +58,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
     try {
       const res = await fetch("/api/repos/gitlab", {
         headers: getAuthHeaders(),
+        credentials: "include",
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
