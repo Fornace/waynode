@@ -14,12 +14,17 @@ FROM node:26-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
+    ripgrep \
     python3 \
     make \
     g++ \
     ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install lean-ctx CLI (standalone binary for pi-lean-ctx extension)
+RUN curl -fsSL https://github.com/yvgude/lean-ctx/releases/download/v3.8.11/lean-ctx-x86_64-unknown-linux-musl.tar.gz | tar xzf - -C /tmp && \
+    mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx || echo "lean-ctx install failed, pi-lean-ctx will run without it"
 
 WORKDIR /app
 
@@ -35,9 +40,10 @@ COPY server.js ./
 # Copy built frontend
 COPY --from=builder /build/frontend/dist ./frontend/dist
 
-# Install pi CLI + pi-codex-goal extension
+# Install pi CLI
 RUN npm install -g @earendil-works/pi-coding-agent@latest
 RUN pi install npm:pi-codex-goal --approve || true
+RUN pi install npm:pi-lean-ctx --approve || true
 
 # Configure pi with fornace-llm gateway as custom provider
 RUN mkdir -p /root/.pi/agent && echo '{\

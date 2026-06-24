@@ -76,3 +76,12 @@ export interface RepoGroup {
   url: string;
   repos: RepoItem[];
 }
+
+export interface Org {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+  my_role?: string;
+  space_count?: number;
+}
