@@ -12,11 +12,15 @@
     "typecheck": "cd frontend && npx tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/openai": "3.0.74",
+    "ai": "6.0.209",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
     "dotenv": "17.4.2",
     "express": "5.2.1",
+    "express-rate-limit": "8.5.2",
     "express-session": "1.19.0",
+    "helmet": "8.2.0",
     "node-pty": "1.1.0",
     "passport": "0.7.0",
     "passport-github2": "0.1.12",

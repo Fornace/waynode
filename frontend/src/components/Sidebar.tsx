@@ -16,6 +16,8 @@ interface SidebarProps {
   onSpaceExpand: (spaceId: string) => void;
   githubConnected: boolean;
   gitlabConnected: boolean;
+  isAdmin: boolean;
+  onOpenAdmin: () => void;
   user: { name: string; avatar_url: string | null } | null;
 }
 
@@ -31,6 +33,8 @@ export function Sidebar({
   onSpaceExpand,
   githubConnected,
   gitlabConnected,
+  isAdmin,
+  onOpenAdmin,
   user,
 }: SidebarProps) {
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set([activeSpaceId].filter(Boolean) as string[]));
@@ -134,6 +138,9 @@ export function Sidebar({
           <div className="sidebar-footer">
             {user.avatar_url && <img className="user-avatar" src={user.avatar_url} alt="" />}
             <span className="user-name">{user.name}</span>
+            {isAdmin && (
+              <button onClick={onOpenAdmin} style={{ fontSize: 14, padding: "2px 6px" }} title="Admin">⚙</button>
+            )}
           </div>
         )}
       </div>

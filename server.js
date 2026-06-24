@@ -2,6 +2,8 @@ import express from "express";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import { config } from "./lib/config.mjs";
 import { passport } from "./lib/auth.mjs";
@@ -14,10 +16,33 @@ import secretsRoutes from "./routes/secrets.js";
 import settingsRoutes from "./routes/settings.js";
 import filesRoutes from "./routes/files.js";
 import reposRoutes from "./routes/repos.js";
+import adminRoutes from "./routes/admin.js";
 
 const app = express();
 app.set("trust proxy", 1);
 const server = createServer(app);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many auth attempts, try again later" },
+});
+
+app.use("/auth/", authLimiter);
+app.use("/api/", apiLimiter);
+app.use(cors({ origin: config.appUrl, credentials: true }));
 
 const sessionMiddleware = session({
   secret: config.sessionSecret,
@@ -45,6 +70,22 @@ app.use(secretsRoutes);
 app.use(settingsRoutes);
 app.use(filesRoutes);
 app.use(reposRoutes);
+app.use(adminRoutes);
+
+// Model listing endpoint
+app.get("/api/models", (req, res) => {
+  const models = [
+    { id: "fornace-fast", name: "Fornace Fast", desc: "Quick responses, lower cost" },
+    { id: "fornace-reasoning", name: "Fornace Reasoning", desc: "Balanced quality and speed" },
+    { id: "fornace-max", name: "Fornace Max", desc: "Best quality, slower" },
+    { id: "fornace-vision", name: "Fornace Vision", desc: "Image understanding" },
+    { id: "glm-5.2-fast", name: "GLM 5.2 Fast", desc: "Zhipu GLM fast" },
+    { id: "glm-5.2-reasoning", name: "GLM 5.2 Reasoning", desc: "Zhipu GLM reasoning" },
+    { id: "glm-5.2-max", name: "GLM 5.2 Max", desc: "Zhipu GLM max quality" },
+    { id: "qwen-flash", name: "Qwen Flash", desc: "Alibaba Qwen fast" },
+  ];
+  res.json({ models, configured: !!(config.llm.baseUrl && config.llm.apiKey) });
+});
 
 if (config.isProd) {
   const { existsSync } = await import("fs");

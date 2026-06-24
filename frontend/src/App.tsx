@@ -4,6 +4,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { Sidebar } from "./components/Sidebar";
 import { SessionView } from "./components/SessionView";
 import { SpaceSettings } from "./components/SpaceSettings";
+import { AdminPanel } from "./components/AdminPanel";
 import { api } from "./api/client";
 import type { Space, Session } from "./types";
 
@@ -20,8 +21,10 @@ function AppContent() {
   const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [githubConnected, setGithubConnected] = useState(false);
   const [gitlabConnected, setGitlabConnected] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -30,6 +33,12 @@ function AppContent() {
         .then((d) => {
           setGithubConnected(d.github);
           setGitlabConnected(d.gitlab);
+        })
+        .catch(() => {});
+      fetch("/api/auth/me", { headers: getAuthHeaders() })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.user?.role === "admin") setIsAdmin(true);
         })
         .catch(() => {});
     }
@@ -99,6 +108,14 @@ function AppContent() {
     return <LoginPage />;
   }
 
+  if (adminOpen && isAdmin) {
+    return (
+      <div className="app-layout">
+        <AdminPanel onClose={() => setAdminOpen(false)} />
+      </div>
+    );
+  }
+
   const activeSpace = spaces.find((s) => s.id === activeSpaceId);
 
   return (
@@ -117,6 +134,8 @@ function AppContent() {
         onSpaceExpand={handleSpaceExpand}
         githubConnected={githubConnected}
         gitlabConnected={gitlabConnected}
+        isAdmin={isAdmin}
+        onOpenAdmin={() => setAdminOpen(true)}
         user={user}
       />
       {activeSession && activeSpace ? (
@@ -127,6 +146,7 @@ function AppContent() {
             sidebarOpen={sidebarOpen}
             onToggleSidebar={handleToggleSidebar}
             onOpenSettings={() => setSettingsOpen(true)}
+            isAdmin={isAdmin}
           />
           {settingsOpen && (
             <SpaceSettings space={activeSpace} onClose={() => setSettingsOpen(false)} />
@@ -139,6 +159,9 @@ function AppContent() {
               <button className="top-bar-menu-btn" onClick={handleToggleSidebar}>
                 ☰
               </button>
+              {isAdmin && (
+                <button className="tab-btn" onClick={() => setAdminOpen(true)}>Admin</button>
+              )}
             </div>
           )}
           <div className="empty-state">
