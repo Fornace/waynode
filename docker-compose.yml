@@ -1,0 +1,17 @@
+services:
+  waynode:
+    build: .
+    container_name: waynode
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - waynode-data:/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/data
+
+volumes:
+  waynode-data:

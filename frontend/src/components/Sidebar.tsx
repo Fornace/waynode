@@ -1,0 +1,183 @@
+import { useState } from "react";
+import type { Space, Session } from "../types";
+import { api } from "../api/client";
+
+interface SidebarProps {
+  spaces: Space[];
+  sessions: Session[];
+  activeSessionId: string | null;
+  activeSpaceId: string | null;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+  onSelectSession: (session: Session) => void;
+  onSpaceCreated: () => void;
+  onSessionCreated: (session: Session) => void;
+  onSpaceExpand: (spaceId: string) => void;
+  user: { name: string; avatar_url: string | null } | null;
+}
+
+export function Sidebar({
+  spaces,
+  sessions,
+  activeSessionId,
+  activeSpaceId,
+  onToggleSidebar,
+  onSelectSession,
+  onSpaceCreated,
+  onSessionCreated,
+  onSpaceExpand,
+  user,
+}: SidebarProps) {
+  const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set([activeSpaceId].filter(Boolean) as string[]));
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [cloning, setCloning] = useState(false);
+  const [error, setError] = useState("");
+
+  const toggleSpace = (spaceId: string) => {
+    setExpandedSpaces((prev) => {
+      const next = new Set(prev);
+      if (next.has(spaceId)) {
+        next.delete(spaceId);
+      } else {
+        next.add(spaceId);
+        onSpaceExpand(spaceId);
+      }
+      return next;
+    });
+  };
+
+  const handleClone = async () => {
+    if (!repoUrl.trim()) return;
+    setCloning(true);
+    setError("");
+    try {
+      await api.spaces.create(repoUrl.trim(), branch.trim() || "main");
+      setShowCloneModal(false);
+      setRepoUrl("");
+      setBranch("main");
+      onSpaceCreated();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCloning(false);
+    }
+  };
+
+  const handleNewSession = async (spaceId: string) => {
+    try {
+      const session = await api.sessions.create(spaceId);
+      onSessionCreated(session);
+      onSelectSession(session);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <>
+      <div className="sidebar">
+        <div className="sidebar-header">
+          <span className="sidebar-logo">Waynode</span>
+          <button className="sidebar-collapse-btn" onClick={onToggleSidebar}>
+            ✕
+          </button>
+        </div>
+
+        <div className="sidebar-content">
+          <div className="new-space-btn" onClick={() => setShowCloneModal(true)}>
+            + Clone Repository
+          </div>
+
+          {spaces.length === 0 && (
+            <div style={{ padding: "20px 8px", textAlign: "center", color: "var(--text-faint)", fontSize: 12 }}>
+              No spaces yet. Clone a repo to get started.
+            </div>
+          )}
+
+          {spaces.map((space) => {
+            const expanded = expandedSpaces.has(space.id);
+            const spaceSessions = sessions.filter((s) => s.space_id === space.id);
+            return (
+              <div key={space.id} className="space-group">
+                <div
+                  className={`space-item ${activeSpaceId === space.id ? "active" : ""}`}
+                  onClick={() => toggleSpace(space.id)}
+                >
+                  <span className={`space-chevron ${expanded ? "expanded" : ""}`}>▶</span>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {space.repo_name}
+                  </span>
+                  {space.session_count ? (
+                    <span style={{ fontSize: 10, color: "var(--text-faint)" }}>{space.session_count}</span>
+                  ) : null}
+                </div>
+
+                {expanded && (
+                  <div className="space-sessions">
+                    {spaceSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className={`session-item ${activeSessionId === session.id ? "active" : ""}`}
+                        onClick={() => onSelectSession(session)}
+                      >
+                        {session.title}
+                      </div>
+                    ))}
+                    <div className="new-session-btn" onClick={() => handleNewSession(space.id)}>
+                      + New Session
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {user && (
+          <div className="sidebar-footer">
+            {user.avatar_url && <img className="user-avatar" src={user.avatar_url} alt="" />}
+            <span className="user-name">{user.name}</span>
+          </div>
+        )}
+      </div>
+
+      {showCloneModal && (
+        <div className="modal-overlay" onClick={() => setShowCloneModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">Clone Repository</div>
+            <div className="modal-field">
+              <label className="modal-label">Repository URL</label>
+              <input
+                className="modal-input"
+                placeholder="https://github.com/user/repo.git"
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="modal-field">
+              <label className="modal-label">Branch</label>
+              <input
+                className="modal-input"
+                placeholder="main"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+              />
+            </div>
+            {error && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 8 }}>{error}</div>}
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setShowCloneModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={handleClone} disabled={cloning || !repoUrl.trim()}>
+                {cloning ? "Cloning..." : "Clone"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
