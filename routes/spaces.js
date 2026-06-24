@@ -9,11 +9,11 @@ router.get("/api/spaces", requireAuth, (req, res) => {
 });
 
 router.post("/api/spaces", requireAuth, async (req, res) => {
-  const { repoUrl, branch } = req.body;
+  const { repoUrl, branch, authUser, authToken } = req.body;
   if (!repoUrl) return res.status(400).json({ error: "repoUrl required" });
 
   try {
-    const space = cloneRepo(repoUrl, branch || "main", req.user.id);
+    const space = cloneRepo(repoUrl, branch || "main", req.user.id, { authUser, authToken });
     res.json(space);
   } catch (err) {
     res.status(500).json({ error: "Clone failed", detail: err.message });

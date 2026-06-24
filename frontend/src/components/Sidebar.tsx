@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Space, Session } from "../types";
 import { api } from "../api/client";
+import { RepoPicker } from "./RepoPicker";
 
 interface SidebarProps {
   spaces: Space[];
@@ -13,6 +14,8 @@ interface SidebarProps {
   onSpaceCreated: () => void;
   onSessionCreated: (session: Session) => void;
   onSpaceExpand: (spaceId: string) => void;
+  githubConnected: boolean;
+  gitlabConnected: boolean;
   user: { name: string; avatar_url: string | null } | null;
 }
 
@@ -26,13 +29,12 @@ export function Sidebar({
   onSpaceCreated,
   onSessionCreated,
   onSpaceExpand,
+  githubConnected,
+  gitlabConnected,
   user,
 }: SidebarProps) {
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set([activeSpaceId].filter(Boolean) as string[]));
-  const [showCloneModal, setShowCloneModal] = useState(false);
-  const [repoUrl, setRepoUrl] = useState("");
-  const [branch, setBranch] = useState("main");
-  const [cloning, setCloning] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const [error, setError] = useState("");
 
   const toggleSpace = (spaceId: string) => {
@@ -48,20 +50,13 @@ export function Sidebar({
     });
   };
 
-  const handleClone = async () => {
-    if (!repoUrl.trim()) return;
-    setCloning(true);
-    setError("");
+  const handleClone = async (repoUrl: string, branch: string, authUser?: string, authToken?: string) => {
     try {
-      await api.spaces.create(repoUrl.trim(), branch.trim() || "main");
-      setShowCloneModal(false);
-      setRepoUrl("");
-      setBranch("main");
+      await api.spaces.create(repoUrl, branch, authUser, authToken);
       onSpaceCreated();
     } catch (err) {
       setError((err as Error).message);
-    } finally {
-      setCloning(false);
+      throw err;
     }
   };
 
@@ -86,7 +81,7 @@ export function Sidebar({
         </div>
 
         <div className="sidebar-content">
-          <div className="new-space-btn" onClick={() => setShowCloneModal(true)}>
+          <div className="new-space-btn" onClick={() => setShowPicker(true)}>
             + Clone Repository
           </div>
 
@@ -143,39 +138,19 @@ export function Sidebar({
         )}
       </div>
 
-      {showCloneModal && (
-        <div className="modal-overlay" onClick={() => setShowCloneModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">Clone Repository</div>
-            <div className="modal-field">
-              <label className="modal-label">Repository URL</label>
-              <input
-                className="modal-input"
-                placeholder="https://github.com/user/repo.git"
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="modal-field">
-              <label className="modal-label">Branch</label>
-              <input
-                className="modal-input"
-                placeholder="main"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-              />
-            </div>
-            {error && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 8 }}>{error}</div>}
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowCloneModal(false)}>
-                Cancel
-              </button>
-              <button className="btn-primary" onClick={handleClone} disabled={cloning || !repoUrl.trim()}>
-                {cloning ? "Cloning..." : "Clone"}
-              </button>
-            </div>
-          </div>
+      {showPicker && (
+        <RepoPicker
+          onClose={() => setShowPicker(false)}
+          onClone={handleClone}
+          githubConnected={githubConnected}
+          gitlabConnected={gitlabConnected}
+        />
+      )}
+
+      {error && !showPicker && (
+        <div style={{ position: "fixed", bottom: 16, right: 16, background: "var(--red)", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 12, zIndex: 1000 }}>
+          {error}
+          <button onClick={() => setError("")} style={{ marginLeft: 8, opacity: 0.7 }}>✕</button>
         </div>
       )}
     </>

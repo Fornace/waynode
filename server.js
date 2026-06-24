@@ -13,8 +13,10 @@ import sessionsRoutes from "./routes/sessions.js";
 import secretsRoutes from "./routes/secrets.js";
 import settingsRoutes from "./routes/settings.js";
 import filesRoutes from "./routes/files.js";
+import reposRoutes from "./routes/repos.js";
 
 const app = express();
+app.set("trust proxy", 1);
 const server = createServer(app);
 
 const sessionMiddleware = session({
@@ -24,7 +26,7 @@ const sessionMiddleware = session({
   cookie: {
     httpOnly: true,
     secure: config.isProd,
-    sameSite: config.isProd ? "none" : "lax",
+    sameSite: config.isProd ? "lax" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 });
@@ -42,6 +44,7 @@ app.use(sessionsRoutes);
 app.use(secretsRoutes);
 app.use(settingsRoutes);
 app.use(filesRoutes);
+app.use(reposRoutes);
 
 if (config.isProd) {
   const { existsSync } = await import("fs");

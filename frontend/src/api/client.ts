@@ -29,10 +29,10 @@ export const api = {
   spaces: {
     list: () => fetchJSON<Space[]>("/api/spaces"),
     get: (id: string) => fetchJSON<Space>(`/api/spaces/${id}`),
-    create: (repoUrl: string, branch?: string) =>
+    create: (repoUrl: string, branch?: string, authUser?: string, authToken?: string) =>
       fetchJSON<Space>("/api/spaces", {
         method: "POST",
-        body: JSON.stringify({ repoUrl, branch }),
+        body: JSON.stringify({ repoUrl, branch, authUser, authToken }),
       }),
     delete: (id: string) => fetchJSON(`/api/spaces/${id}`, { method: "DELETE" }),
     pull: (id: string) => fetchJSON<{ output: string }>(`/api/spaces/${id}/pull`, { method: "POST" }),

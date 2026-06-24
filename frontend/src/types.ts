@@ -53,3 +53,26 @@ export interface SSEEvent {
   exitCode?: number;
   message?: string;
 }
+
+export interface RepoItem {
+  id: number;
+  name: string;
+  full_name: string;
+  url: string;
+  ssh_url: string;
+  private: boolean;
+  fork: boolean;
+  default_branch: string;
+  description: string | null;
+  stars: number;
+  updated_at: string;
+  language: string | null;
+  html_url: string;
+}
+
+export interface RepoGroup {
+  owner: string;
+  avatar: string | null;
+  url: string;
+  repos: RepoItem[];
+}

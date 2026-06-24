@@ -7,6 +7,11 @@ import { SpaceSettings } from "./components/SpaceSettings";
 import { api } from "./api/client";
 import type { Space, Session } from "./types";
 
+function getAuthHeaders(): Record<string, string> {
+  const devToken = localStorage.getItem("waynode-dev-token");
+  return devToken ? { "x-dev-token": devToken } : {};
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -15,6 +20,30 @@ function AppContent() {
   const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [gitlabConnected, setGitlabConnected] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      fetch("/api/repos/status", { headers: getAuthHeaders() })
+        .then((r) => r.json())
+        .then((d) => {
+          setGithubConnected(d.github);
+          setGitlabConnected(d.gitlab);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const refreshRepoStatus = () => {
+    fetch("/api/repos/status", { headers: getAuthHeaders() })
+      .then((r) => r.json())
+      .then((d) => {
+        setGithubConnected(d.github);
+        setGitlabConnected(d.gitlab);
+      })
+      .catch(() => {});
+  };
 
   const loadSpaces = useCallback(async () => {
     try {
@@ -83,9 +112,11 @@ function AppContent() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
         onSelectSession={handleSelectSession}
-        onSpaceCreated={handleSpaceCreated}
+        onSpaceCreated={() => { loadSpaces(); refreshRepoStatus(); }}
         onSessionCreated={handleSessionCreated}
         onSpaceExpand={handleSpaceExpand}
+        githubConnected={githubConnected}
+        gitlabConnected={gitlabConnected}
         user={user}
       />
       {activeSession && activeSpace ? (

@@ -26,16 +26,33 @@ function resolveDevToken(req) {
 router.get("/auth/github", passport.authenticate("github"));
 
 router.get("/auth/github/callback",
-  passport.authenticate("github", { failureRedirect: "/login" }),
+  passport.authenticate("github", { failureRedirect: "/" }),
   (req, res) => res.redirect("/")
 );
 
 router.get("/auth/gitlab", passport.authenticate("gitlab"));
 
-router.get("/auth/gitlab/callback",
-  passport.authenticate("gitlab", { failureRedirect: "/login" }),
-  (req, res) => res.redirect("/")
-);
+router.get("/auth/gitlab/callback", (req, res, next) => {
+  passport.authenticate("gitlab", async (err, user, info, status) => {
+    if (err) return res.redirect("/?auth_error=" + encodeURIComponent(err.message));
+    if (!user) return res.redirect("/?auth_error=gitlab_failed");
+
+    // If already logged in via GitHub, link GitLab to the existing account
+    if (req.user && req.user.id !== user.id) {
+      db.prepare(`
+        UPDATE users SET gitlab_id = ?, gitlab_token = ?
+        WHERE id = ?
+      `).run(
+        user.gitlab_id || null,
+        user.gitlab_token || null,
+        req.user.id
+      );
+      req.login({ id: req.user.id }, () => res.redirect("/"));
+    } else {
+      req.login(user, () => res.redirect("/"));
+    }
+  })(req, res, next);
+});
 
 router.get("/api/auth/me", (req, res) => {
   const devUser = resolveDevToken(req);
