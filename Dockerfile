@@ -28,6 +28,14 @@ RUN curl -fsSL https://github.com/yvgude/lean-ctx/releases/download/v3.8.11/lean
 
 WORKDIR /app
 
+# Git identity safety net. Real attribution comes per-commit (-c flags from
+# the logged-in user) and per-pi-spawn (GIT_AUTHOR_* env from the session
+# owner); this global config only exists so a bare commit never fatals on
+# "Author identity unknown". It must never win over a real user.
+RUN git config --global user.name "Waynode" && \
+    git config --global user.email "waynode@waynode.fornace.net" && \
+    git config --global init.defaultBranch main
+
 # Install server deps
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install

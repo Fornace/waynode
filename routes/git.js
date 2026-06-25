@@ -17,6 +17,7 @@ import { requireAuth, requireSpaceAccess } from "../lib/auth.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { isSpaceBusy } from "../lib/agent-manager.mjs";
 import * as git from "../lib/git-ops.mjs";
+import { identityForUser } from "../lib/git-identity.mjs";
 import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
 
@@ -117,7 +118,7 @@ router.post("/api/spaces/:spaceId/git/commit", requireAuth, requireSpaceAccess, 
   if (!cwd) return res.status(404).json({ error: "Space not found" });
   if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
   try {
-    await git.commitSelected(cwd, req.body || {});
+    await git.commitSelected(cwd, { ...req.body || {}, identity: identityForUser(req.user) });
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
@@ -160,7 +161,7 @@ router.post("/api/spaces/:spaceId/git/pull", requireAuth, requireSpaceAccess, as
   if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
   const mode = req.body?.mode || "ff-only";
   try {
-    const result = await git.pull(cwd, { mode });
+    const result = await git.pull(cwd, { mode, identity: identityForUser(req.user) });
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, mode: result.mode, output: result.output, aborted: result.aborted, conflicts: result.conflicts, data });
@@ -192,7 +193,7 @@ router.post("/api/spaces/:spaceId/git/merge", requireAuth, requireSpaceAccess, a
   const { branchName } = req.body || {};
   if (!branchName) return res.status(400).json({ error: "branchName required" });
   try {
-    const result = await git.mergeBranch(cwd, { branchName });
+    const result = await git.mergeBranch(cwd, { branchName, identity: identityForUser(req.user) });
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, merged: result.merged, aborted: result.aborted, conflicts: result.conflicts, data });
