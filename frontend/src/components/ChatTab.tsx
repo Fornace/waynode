@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Session, GoalStatus, ChatItem, Block } from "../types";
 import { api } from "../api/client";
@@ -16,6 +16,8 @@ export function ChatTab({ session }: ChatTabProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [uploading, setUploading] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,15 +45,27 @@ export function ChatTab({ session }: ChatTabProps) {
     });
   };
 
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-    });
+  // ── Auto-scroll ──
+  // Stick to bottom while new messages arrive, but if the user scrolled up to
+  // read, don't yank them down. useLayoutEffect runs before paint so there's no
+  // "scroll up then snap" flash (the previous rAF-after-paint approach is what
+  // caused the view to jump when sending).
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+      stickToBottom.current = dist < 120; // near bottom → keep pinned
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [state.items, scrollToBottom]);
+  useLayoutEffect(() => {
+    if (stickToBottom.current && bottomRef.current) {
+      bottomRef.current.scrollIntoView({ block: "end" });
+    }
+  }, [state.items]);
 
   // ── Goal status (pi-codex-goal plugin) ──
   const refreshGoal = useCallback(async () => {
@@ -71,6 +85,14 @@ export function ChatTab({ session }: ChatTabProps) {
     if (!input.trim() || streaming) return;
     const prompt = input.trim();
     setInput("");
+    // The user just sent — they want to watch the reply, so pin to bottom even
+    // if they had scrolled up to read, and shrink the composer back to 1 row.
+    stickToBottom.current = true;
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    });
     setShowDropdown(false);
     await store.send(session.id, prompt, isGoal);
     if (isGoal) refreshGoal();
@@ -172,6 +194,7 @@ export function ChatTab({ session }: ChatTabProps) {
         {state.items.map((item) => (
           <MessageRow key={item.id} item={item} streaming={streaming} />
         ))}
+        <div ref={bottomRef} />
       </div>
 
       {state.status && <div className="chat-status">{state.status}</div>}

@@ -39,6 +39,9 @@ export const api = {
       }),
     delete: (id: string) => fetchJSON(`/api/spaces/${id}`, { method: "DELETE" }),
     pull: (id: string) => fetchJSON<{ output: string }>(`/api/spaces/${id}/pull`, { method: "POST" }),
+    /** SSE stream of git clone progress lines for a freshly cloned space. */
+    cloneStream: (id: string) =>
+      new EventSource(`/api/spaces/${id}/clone-events${DEV_TOKEN ? `?t=${encodeURIComponent(DEV_TOKEN)}` : ""}`, { withCredentials: true }),
   },
 
   sessions: {

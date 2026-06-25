@@ -80,8 +80,10 @@ function AppContent() {
       .catch(() => {});
   };
 
-  const handleSelectSession = (session: Session) => {
-    const space = spaces.find((s) => s.id === session.space_id);
+  const handleSelectSession = (session: Session, spaceArg?: Space) => {
+    // Prefer the explicitly-passed space (avoids stale-closure lookups when the
+    // space was just created and isn't in `spaces` yet — e.g. right after clone).
+    const space = spaceArg || spaces.find((s) => s.id === session.space_id);
     const spacePart = space ? slugWithId(space.repo_name, space.id) : session.space_id;
     navigate(`/${spacePart}/${slugWithId(session.title || "session", session.id)}`);
     if (window.innerWidth < 768) setSidebarOpen(false);
@@ -221,7 +223,7 @@ function AppContent() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
         onSelectSession={handleSelectSession}
-        onSpaceCreated={() => { loadSpaces(); refreshRepoStatus(); }}
+        onSpaceCreated={(space) => { setSpaces((prev) => prev.some((s) => s.id === space.id) ? prev : [...prev, space]); refreshRepoStatus(); }}
         onSessionCreated={handleSessionCreated}
         onSpaceExpand={handleSpaceExpand}
         githubConnected={githubConnected}
@@ -243,6 +245,8 @@ function AppContent() {
             onToggleSidebar={handleToggleSidebar}
             onOpenSettings={() => setSettingsOpen(true)}
             isAdmin={isAdmin}
+            gitOpen={gitSidebarOpen}
+            onToggleGit={() => setGitSidebarOpen((v) => !v)}
           />
           {settingsOpen && (
             <SpaceSettings space={activeSpace} onClose={() => setSettingsOpen(false)} />

@@ -50,7 +50,7 @@ export type Block =
 export type ChatItem =
   | { id: string; role: "user"; content: string; isGoal?: boolean }
   | { id: string; role: "assistant"; blocks: Block[]; done: boolean }
-  | { id: string; role: "system"; content: string };
+  | { id: string; role: "system"; content: string; key?: string };
 
 export interface GoalStatus {
   status: "active" | "paused" | "complete" | "budgetLimited" | null;

@@ -1,8 +1,11 @@
 import { Router } from "express";
 import multer from "multer";
 import { requireAuth, requireSpaceAccess } from "../lib/auth.mjs";
-import { cloneRepo, getSpace, listSpaces, listSpacesByOrg, deleteSpace, pullSpace, getSpacePath } from "../lib/spaces.mjs";
+import { cloneRepo, getSpace, listSpaces, listSpacesByOrg, deleteSpace, pullSpace, getSpacePath, createSpaceRecord, cloneRepoStreaming } from "../lib/spaces.mjs";
 import { isOrgMember } from "../lib/orgs.mjs";
+import { startClone, publish, finishClone, subscribe } from "../lib/clone-progress.mjs";
+import { config } from "../lib/config.mjs";
+import db from "../lib/db.mjs";
 const router = Router();
 
 const upload = multer({
@@ -41,8 +44,54 @@ router.post("/api/spaces", requireAuth, async (req, res) => {
   if (!repoUrl) return res.status(400).json({ err: "repoUrl required" });
   const member = isOrgMember(orgId, req.user.id);
   if (!member || member.role === "viewer") return res.status(403).json({ err: "Editor required" });
-  const space = cloneRepo(repoUrl, branch || "main", req.user.id, orgId, { authUser, authToken });
-  return res.json(space);
+  // Create the space row immediately so a session can reference it; clone
+  // streams in the background and clients subscribe via /clone-events.
+  const space = createSpaceRecord(repoUrl, branch || "main", req.user.id, orgId);
+  startClone(space.id);
+  (async () => {
+    try {
+      await cloneRepoStreaming(space, { authUser, authToken, onProgress: (l) => publish(space.id, l) });
+      finishClone(space.id);
+    } catch (e) {
+      finishClone(space.id, e.message);
+    }
+  })();
+  return res.json({ ...space, cloning: true });
+});
+
+// dev-token may arrive as ?t= for EventSource (can't set headers)
+function sseAuth(req, res, next) {
+  const tok = req.query.t;
+  if (config.devToken && tok && tok === config.devToken) {
+    let user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
+    if (!user) {
+      db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
+    }
+    req.user = user;
+    req.isAuthenticated = () => true;
+    return next();
+  }
+  requireAuth(req, res, next);
+}
+
+function writeSSE(res, ev) {
+  if (res.destroyed || res.writableEnded) return;
+  res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  if (typeof res.flush === "function") res.flush();
+}
+
+// Live clone progress (SSE). Replays buffered lines, then streams until done.
+router.get("/api/spaces/:spaceId/clone-events", sseAuth, requireSpaceAccess, (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+  const unsub = subscribe(req.params.spaceId, (ev) => writeSSE(res, ev));
+  const ping = setInterval(() => writeSSE(res, { type: "ping" }), 25000);
+  // If the space has no active/known clone entry, tell the client it's already done.
+  req.on("close", () => { clearInterval(ping); unsub(); });
 });
 
 router.get("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res) => {

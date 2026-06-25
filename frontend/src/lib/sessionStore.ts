@@ -295,7 +295,7 @@ async function loadHistory(sessionId: string) {
       headers: jsonHeaders,
     });
     const msgs = (await res.json()) as { role: string; content: string; thinking?: string | null }[];
-    e.state.items = msgs.map((m) => {
+    const diskItems = msgs.map((m) => {
       if (m.role === "assistant") {
         const blocks: Block[] = [];
         if (m.thinking) blocks.push({ type: "thinking", text: m.thinking });
@@ -304,6 +304,12 @@ async function loadHistory(sessionId: string) {
       }
       return { id: uid(), role: m.role as any, content: m.content };
     });
+    // Prepend persisted history, but PRESERVE any transient in-memory items that
+    // arrived during the load window (e.g. live clone-progress system messages
+    // injected right after navigation). Without this, loadHistory would wipe them.
+    e.state.items = [...diskItems, ...e.state.items];
+    e.state.loaded = true;
+    emit(e);
     e.msgIndex.clear();
     e.state.loaded = true;
     emit(e);
@@ -381,6 +387,25 @@ export async function abort(sessionId: string): Promise<void> {
 export function injectSystem(sessionId: string, content: string) {
   const e = getEntry(sessionId);
   e.state.items = [...e.state.items, { id: uid(), role: "system", content }];
+  emit(e);
+}
+
+/**
+ * Update-or-insert a keyed system message (e.g. live clone progress that
+ * refreshes in place rather than spamming one line per update). If the last
+ * item is a system message with the same key, it's replaced in place;
+ * otherwise a new one is appended.
+ */
+export function injectProgress(sessionId: string, key: string, content: string) {
+  const e = getEntry(sessionId);
+  const items = e.state.items.slice();
+  const last = items[items.length - 1];
+  if (last && last.role === "system" && (last as any).key === key) {
+    items[items.length - 1] = { ...last, content } as any;
+  } else {
+    items.push({ id: uid(), role: "system", content, key } as any);
+  }
+  e.state.items = items;
   emit(e);
 }
 

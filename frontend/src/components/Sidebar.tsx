@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Space, Session, Org } from "../types";
 import { api } from "../api/client";
+import * as store from "../lib/sessionStore";
 import { RepoPicker } from "./RepoPicker";
 
 interface SidebarProps {
@@ -10,8 +11,8 @@ interface SidebarProps {
   activeSpaceId: string | null;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  onSelectSession: (session: Session) => void;
-  onSpaceCreated: () => void;
+  onSelectSession: (session: Session, space?: Space) => void;
+  onSpaceCreated: (space: Space) => void;
   onSessionCreated: (session: Session) => void;
   onSpaceExpand: (spaceId: string) => void;
   githubConnected: boolean;
@@ -48,12 +49,47 @@ export function Sidebar({
   };
 
   const handleClone = async (repoUrl: string, branch: string, authUser?: string, authToken?: string) => {
+    let space;
     try {
-      await api.spaces.create(repoUrl, branch, authUser, authToken, activeOrgId || undefined);
-      onSpaceCreated();
+      space = await api.spaces.create(repoUrl, branch, authUser, authToken, activeOrgId || undefined);
     } catch (err) {
       setError((err as Error).message);
       throw err;
+    }
+    onSpaceCreated(space);
+
+    // Land the user in a fresh session immediately and stream the clone progress
+    // into its chat as a single updating system message (the clone is now running
+    // in the background server-side).
+    try {
+      const session = await api.sessions.create(space.id, { title: "Clone" });
+      onSessionCreated(session);
+      onSelectSession(session, space);
+
+      const PROG = "clone-progress";
+      store.injectProgress(session.id, PROG, `📦 Cloning \`${repoUrl}\` (branch \`${branch || "main"}\`)…`);
+      const es = api.spaces.cloneStream(space.id);
+      let lastLine = "";
+      es.onmessage = (ev) => {
+        try {
+          const m = JSON.parse(ev.data);
+          if (m.type === "progress") {
+            // git clone progress lines can be noisy; show the latest meaningful one.
+            lastLine = m.line;
+            store.injectProgress(session.id, PROG, `📦 Cloning… ${m.line}`);
+          } else if (m.type === "done") {
+            store.injectProgress(session.id, PROG, `✅ Cloned \`${space.repo_name}\` — ready to go.`);
+            es.close();
+          } else if (m.type === "error") {
+            store.injectProgress(session.id, PROG, `✗ Clone failed: ${m.error || "unknown error"}`);
+            es.close();
+          }
+        } catch {}
+      };
+      es.onerror = () => store.injectProgress(session.id, PROG, `✗ Lost clone progress stream.`);
+    } catch (err) {
+      // Session/nav failed but the space cloned fine — surface the error.
+      setError((err as Error).message);
     }
   };
 
