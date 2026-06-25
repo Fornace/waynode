@@ -25,6 +25,8 @@ interface SidebarProps {
   user: { name: string; avatar_url: string | null } | null;
 }
 
+import { WaynodeMark } from "./Brand";
+
 export function Sidebar({
   spaces, sessions, activeSessionId, activeSpaceId,
   onToggleSidebar, onSelectSession, onSpaceCreated, onSessionCreated, onSpaceExpand,
@@ -73,11 +75,12 @@ export function Sidebar({
         <div className="sidebar-header">
           <div style={{ flex: 1, position: "relative" }}>
             <button
-              style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 6, width: "100%" }}
+              style={{ fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 8, width: "100%", letterSpacing: "-0.3px", color: "var(--text)" }}
               onClick={() => setShowOrgSwitcher(!showOrgSwitcher)}
             >
+              <WaynodeMark size={20} />
               <span>{activeOrg?.name || "Waynode"}</span>
-              <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{orgs.length > 1 ? "▾" : ""}</span>
+              <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{orgs.length > 1 ? "▾" : ""}</span>
             </button>
             {showOrgSwitcher && orgs.length > 1 && (
               <div className="send-dropdown" style={{ position: "absolute", top: "100%", left: 0, marginTop: 4 }}>
@@ -100,12 +103,14 @@ export function Sidebar({
 
         <div className="sidebar-content">
           <div className="new-space-btn" onClick={() => setShowPicker(true)}>
-            + Clone Repository
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 6, verticalAlign: "-2px"}}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Clone Repository
           </div>
 
           {orgs.length > 0 && (
-            <div className="new-space-btn" style={{ marginTop: 4 }} onClick={onOpenOrgSettings}>
-              ⚙ Org Settings
+            <div className="new-space-btn" style={{ marginTop: 0 }} onClick={onOpenOrgSettings}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 6, verticalAlign: "-2px"}}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              Org Settings
             </div>
           )}
 
@@ -124,12 +129,14 @@ export function Sidebar({
                   className={`space-item ${activeSpaceId === space.id ? "active" : ""}`}
                   onClick={() => toggleSpace(space.id)}
                 >
-                  <span className={`space-chevron ${expanded ? "expanded" : ""}`}>▶</span>
+                  <span className={`space-chevron ${expanded ? "expanded" : ""}`}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                  </span>
                   <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {space.repo_name}
                   </span>
                   {space.session_count ? (
-                    <span style={{ fontSize: 10, color: "var(--text-faint)" }}>{space.session_count}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-faint)", background: "var(--bg-elevated)", padding: "1px 6px", borderRadius: "10px" }}>{space.session_count}</span>
                   ) : null}
                 </div>
                 {expanded && (
@@ -144,7 +151,8 @@ export function Sidebar({
                       </div>
                     ))}
                     <div className="new-session-btn" onClick={() => handleNewSession(space.id)}>
-                      + New Session
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 6, verticalAlign: "-2px"}}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      New Session
                     </div>
                   </div>
                 )}
