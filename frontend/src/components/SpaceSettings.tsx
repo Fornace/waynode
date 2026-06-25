@@ -61,58 +61,60 @@ export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
 
   return (
     <div className="modal-overlay" ref={overlayRef} onClick={onClose}>
-      <div className="modal" style={{ width: 600, maxWidth: "90vw" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div className="modal-title">{space.repo_name} Settings</div>
+      <div className="modal" style={{ width: 640, maxWidth: "90vw", padding: 0 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)" }}>
+          <div className="modal-title" style={{ margin: 0 }}>{space.repo_name} Settings</div>
           <div className="tabs">
             <button className={`tab-btn ${tab === "agents" ? "active" : ""}`} onClick={() => setTab("agents")}>AGENTS.md</button>
             <button className={`tab-btn ${tab === "secrets" ? "active" : ""}`} onClick={() => setTab("secrets")}>Secrets</button>
           </div>
         </div>
 
-        {loading ? (
-          <div style={{ color: "var(--text-dim)", textAlign: "center", padding: 40 }}>Loading...</div>
-        ) : tab === "agents" ? (
-          <div>
-            <textarea
-              className="composer-input"
-              style={{ minHeight: 300, fontFamily: "var(--mono)", fontSize: 12 }}
-              value={agentsContent}
-              onChange={(e) => setAgentsContent(e.target.value)}
-              placeholder="# AGENTS.md — pi reads this on every session"
-            />
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={onClose}>Close</button>
-              <button className="btn-primary" onClick={saveAgents} disabled={saving}>
-                {saving ? "Saving..." : "Save"}
-              </button>
+        <div style={{ padding: 24 }}>
+          {loading ? (
+            <div style={{ color: "var(--text-dim)", textAlign: "center", padding: 40 }}>Loading...</div>
+          ) : tab === "agents" ? (
+            <div>
+              <textarea
+                className="form-input"
+                style={{ width: "100%", minHeight: 300, fontFamily: "var(--mono)", fontSize: 13, resize: "vertical" }}
+                value={agentsContent}
+                onChange={(e) => setAgentsContent(e.target.value)}
+                placeholder="# AGENTS.md — pi reads this on every session"
+              />
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={onClose}>Close</button>
+                <button className="btn-primary" onClick={saveAgents} disabled={saving}>
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div>
-            <div style={{ marginBottom: 16 }}>
-              {secrets.length === 0 && (
-                <div style={{ color: "var(--text-faint)", fontSize: 12, padding: "20px 0" }}>
-                  No secrets. Add API keys below — they'll be injected as env vars when pi runs.
-                </div>
-              )}
-              {secrets.map((s) => (
-                <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-                  <code style={{ fontSize: 12 }}>{s.key_name}</code>
-                  <button className="btn-secondary" style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => deleteSecret(s.id)}>Delete</button>
-                </div>
-              ))}
+          ) : (
+            <div>
+              <div style={{ marginBottom: 20 }}>
+                {secrets.length === 0 && (
+                  <div style={{ color: "var(--text-faint)", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+                    No secrets. Add API keys below — they'll be injected as env vars when pi runs.
+                  </div>
+                )}
+                {secrets.map((s) => (
+                  <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <code style={{ fontSize: 13, color: "var(--text)" }}>{s.key_name}</code>
+                    <button className="btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => deleteSecret(s.id)}>Delete</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input className="form-input" style={{ flex: 1 }} placeholder="KEY_NAME" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} />
+                <input className="form-input" style={{ flex: 1 }} placeholder="value" type="password" value={newValue} onChange={(e) => setNewValue(e.target.value)} />
+                <button className="btn-primary" onClick={addSecret} disabled={!newKeyName.trim() || !newValue.trim()}>Add</button>
+              </div>
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={onClose}>Close</button>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input className="modal-input" placeholder="KEY_NAME" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} />
-              <input className="modal-input" placeholder="value" type="password" value={newValue} onChange={(e) => setNewValue(e.target.value)} />
-              <button className="btn-primary" onClick={addSecret}>Add</button>
-            </div>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={onClose}>Close</button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

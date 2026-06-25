@@ -127,32 +127,38 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
   return (
     <div className="modal-overlay" ref={overlayRef} onClick={onClose}>
       <div className="repo-picker-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="repo-picker-header">
+        <div className="repo-picker-header" style={{ background: "rgba(0,0,0,0.2)", padding: "16px 20px" }}>
           <div className="repo-picker-title">Clone Repository</div>
           <button className="repo-picker-close" onClick={onClose}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
 
-        <div className="repo-picker-tabs">
-          <button
-            className={`repo-tab ${tab === "github" ? "active" : ""}`}
-            onClick={() => setTab("github")}
-          >
-            <GitHubIcon /> GitHub
-          </button>
-          <button
-            className={`repo-tab ${tab === "gitlab" ? "active" : ""}`}
-            onClick={() => setTab("gitlab")}
-          >
-            <GitLabIcon /> GitLab
-          </button>
-          <button
-            className={`repo-tab ${tab === "url" ? "active" : ""}`}
-            onClick={() => setTab("url")}
-          >
-            🔗 URL
-          </button>
+        <div className="repo-picker-tabs" style={{ display: "flex", justifyContent: "center", padding: "12px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <div className="tabs">
+            <button
+              className={`tab-btn ${tab === "github" ? "active" : ""}`}
+              onClick={() => setTab("github")}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <GitHubIcon /> GitHub
+            </button>
+            <button
+              className={`tab-btn ${tab === "gitlab" ? "active" : ""}`}
+              onClick={() => setTab("gitlab")}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <GitLabIcon /> GitLab
+            </button>
+            <button
+              className={`tab-btn ${tab === "url" ? "active" : ""}`}
+              onClick={() => setTab("url")}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> 
+              URL
+            </button>
+          </div>
         </div>
 
         {error && <div className="repo-picker-error">{error}</div>}
