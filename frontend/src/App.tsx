@@ -7,6 +7,7 @@ import { SessionView } from "./components/SessionView";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { AdminPanel } from "./components/AdminPanel";
 import { OrgSettings } from "./components/OrgSettings";
+import { GitSidebar } from "./components/GitSidebar";
 import { api } from "./api/client";
 import * as store from "./lib/sessionStore";
 import { slugWithId, parseSlugSegment } from "./lib/slugs";
@@ -245,6 +246,7 @@ function AppContent() {
           {settingsOpen && (
             <SpaceSettings space={activeSpace} onClose={() => setSettingsOpen(false)} />
           )}
+          {/* <GitSidebar /> */}
         </>
       ) : (
         <div className="main-content">

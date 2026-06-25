@@ -1,3 +1,5 @@
+@import "./components/GitSidebar.css";
+
 :root {
   --bg: #0a0a0b;
   --bg-surface: #111113;
@@ -1473,14 +1475,39 @@ input, textarea {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 6px 8px 6px 16px;
+  padding: 6px 8px 6px 12px;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
   transition: border-color 0.2s, box-shadow 0.2s;
   align-items: flex-end;
+  gap: 8px;
 }
 .composer-inner:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), inset 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2), inset 0 1px 2px rgba(0,0,0,0.1);
+}
+.attach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-faint);
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  margin-bottom: 3px;
+}
+.attach-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+.attach-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.spin {
+  animation: wn-spin 1s linear infinite;
 }
 .composer-input {
   flex: 1;
@@ -1497,7 +1524,7 @@ input, textarea {
 }
 .composer-input::placeholder { color: var(--text-faint); }
 
-.send-group { display: flex; gap: 4px; align-items: center; position: relative; padding-bottom: 2px; }
+.send-group { display: flex; gap: 4px; align-items: center; position: relative; padding-bottom: 3px; }
 .send-btn, .send-caret {
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent); color: #fff;
@@ -1555,3 +1582,4 @@ input, textarea {
 
 /* login card: give the brand mark breathing room */
 .login-card .login-title { margin-top: 6px; }
+/* Git Sidebar */

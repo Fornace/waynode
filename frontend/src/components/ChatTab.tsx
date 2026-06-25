@@ -14,8 +14,10 @@ export function ChatTab({ session }: ChatTabProps) {
   const [input, setInput] = useState("");
   const [goal, setGoal] = useState<GoalStatus | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Acquire the session stream on mount; release on unmount. ──
   // The stream lives in the module-scoped store, so navigating away does NOT
@@ -105,6 +107,42 @@ export function ChatTab({ session }: ChatTabProps) {
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach(f => formData.append("files", f));
+      
+      const res = await fetch(`/api/spaces/${session.space_id}/upload`, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        const fileNames = data.files.map((f: string) => f).join(", ");
+        setInput(prev => {
+          const sep = prev.trim() ? "\n" : "";
+          return prev + sep + `[Uploaded files: ${fileNames}]\n`;
+        });
+        autosize();
+      } else {
+        alert("Upload failed: " + (data.err || "Unknown error"));
+      }
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="chat-tab">
       {goal && goal.status && (
@@ -137,6 +175,26 @@ export function ChatTab({ session }: ChatTabProps) {
 
       <div className="composer">
         <div className="composer-inner">
+          <input 
+            type="file" 
+            multiple 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            style={{ display: "none" }} 
+          />
+          <button 
+            className="attach-btn" 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || streaming}
+            title="Upload files"
+          >
+            {uploading ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="spin"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            )}
+          </button>
+          
           <textarea
             ref={inputRef}
             className="composer-input"
