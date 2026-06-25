@@ -116,12 +116,15 @@ export function ChatTab({ session }: ChatTabProps) {
       const formData = new FormData();
       Array.from(files).forEach(f => formData.append("files", f));
       
+      const headers: Record<string, string> = {};
+      const devToken = localStorage.getItem("waynode-dev-token");
+      if (devToken) headers["x-dev-token"] = devToken;
+
       const res = await fetch(`/api/spaces/${session.space_id}/upload`, {
         method: "POST",
         body: formData,
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        }
+        credentials: "include",
+        headers,
       });
       const data = await res.json();
       
