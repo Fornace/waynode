@@ -3,13 +3,84 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <!-- PWA / mobile web app -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="dark-content" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Waynode" />
     <meta name="theme-color" content="#0a0a0a" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Favicons -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="mask-icon" href="/favicon.svg" color="#3b82f6" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Social / share -->
     <title>Waynode AI</title>
+    <meta name="description" content="Open-source, self-hosted coding-agent workspace. Each space is a real cloned repo. pi is the engine." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Waynode AI" />
+    <meta property="og:description" content="Open-source, self-hosted coding-agent workspace. pi is the engine." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Waynode AI" />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <style>
+      /* ── Boot screen: no white flash; branded loader until React mounts ── */
+      html, body { height: 100%; margin: 0; background: #0a0a0a; }
+      #boot {
+        position: fixed; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 18px; background: #0a0a0a; color: #888;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        z-index: 9999;
+      }
+      #boot-mark { width: 56px; height: 56px; animation: boot-pulse 1.6s ease-in-out infinite; }
+      #boot-mark .hub { transform-origin: center; animation: boot-spin 6s linear infinite; }
+      #boot-label { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: #555; }
+      @keyframes boot-pulse { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Branded boot screen (removed once React mounts) -->
+    <div id="boot">
+      <svg id="boot-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <g fill="#3b82f6" class="hub">
+          <rect x="29" y="11" width="6" height="15" rx="3"/>
+          <rect x="29" y="38" width="6" height="15" rx="3"/>
+          <rect x="11" y="29" width="15" height="6" rx="3"/>
+          <rect x="38" y="29" width="15" height="6" rx="3"/>
+          <rect x="25" y="25" width="14" height="14" rx="4"/>
+        </g>
+        <g fill="#e0f2fe">
+          <circle cx="32" cy="11" r="5"/><circle cx="32" cy="53" r="5"/>
+          <circle cx="11" cy="32" r="5"/><circle cx="53" cy="32" r="5"/>
+        </g>
+      </svg>
+      <div id="boot-label">Waynode</div>
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remove the boot screen once the app has rendered.
+      window.addEventListener("load", () => {
+        const remove = () => {
+          const b = document.getElementById("boot");
+          if (b && document.getElementById("root")?.hasChildNodes()) b.remove();
+          else requestAnimationFrame(remove);
+        };
+        requestAnimationFrame(remove);
+      });
+    </script>
   </body>
 </html>

@@ -1,0 +1,20 @@
+{
+  "name": "Waynode AI",
+  "short_name": "Waynode",
+  "description": "Open-source, self-hosted coding-agent workspace. Each space is a real cloned repo. pi is the engine.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/favicon-32x32.png", "type": "image/png", "sizes": "32x32", "purpose": "any" },
+    { "src": "/icon-192x192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/icon-512x512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/icon-maskable-192.png", "type": "image/png", "sizes": "192x192", "purpose": "maskable" },
+    { "src": "/icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}

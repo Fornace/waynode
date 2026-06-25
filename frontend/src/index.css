@@ -1382,3 +1382,9 @@ input, textarea {
   .send-btn { flex: 1; justify-content: center; padding: 10px; }
   .send-menu { right: 0; left: 0; min-width: 0; }
 }
+
+/* ── Brand mark ── */
+@keyframes wn-spin { to { transform: rotate(360deg); } }
+
+/* login card: give the brand mark breathing room */
+.login-card .login-title { margin-top: 6px; }

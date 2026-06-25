@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { WaynodeMark } from "../components/Brand";
 
 export function LoginPage() {
   const { user } = useAuth();
@@ -14,6 +15,7 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
+        <WaynodeMark size={48} spin />
         <div className="login-title">Waynode AI</div>
         <div className="login-subtitle">Sign in to your workspace</div>
 
