@@ -62,13 +62,21 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
           </button>
         )}
         <div className="top-bar-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{color: "var(--text-dim)"}}>{space.repo_name}</span>
+          <span style={{color: "var(--text-dim)", fontWeight: 500}}>{space.repo_name}</span>
           <span style={{color: "var(--border)"}}>/</span>
-          <span>{session.title}</span>
+          <span style={{fontWeight: 600}}>{session.title}</span>
         </div>
-        <select className="model-select" value={currentModel} onChange={(e) => handleModelChange(e.target.value)}>
-          {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+        
+        {/* Modern Model Selector */}
+        <div style={{ position: "relative" }}>
+          <select className="model-select" value={currentModel} onChange={(e) => handleModelChange(e.target.value)}>
+            {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--text-dim)" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+
         <button className="tab-btn" onClick={onOpenSettings} title="Space settings">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         </button>

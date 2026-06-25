@@ -136,61 +136,63 @@ export function ChatTab({ session }: ChatTabProps) {
       {state.status && <div className="chat-status">{state.status}</div>}
 
       <div className="composer">
-        <textarea
-          ref={inputRef}
-          className="composer-input"
-          placeholder={
-            streaming
-              ? "Type a follow-up… (Enter to queue)"
-              : "Message the agent… (Enter to send, Shift+Enter for newline)"
-          }
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-            autosize();
-          }}
-          onKeyDown={handleKeyDown}
-          rows={1}
-        />
-        <div className="send-group">
-          {isTouchDevice() && !streaming && (
-            <button className="send-btn newline-btn" onClick={insertNewline} title="New line">↵</button>
-          )}
-          {streaming ? (
-            <button className="send-btn send-stop" onClick={handleAbort} title="Stop">
-              <StopIcon /> Stop
-            </button>
-          ) : (
-            <>
-              <button
-                className="send-btn"
-                onClick={() => sendMessage(false)}
-                disabled={!input.trim()}
-                title="Send"
-              >
-                <SendIcon /> Send
+        <div className="composer-inner">
+          <textarea
+            ref={inputRef}
+            className="composer-input"
+            placeholder={
+              streaming
+                ? "Type a follow-up… (Enter to queue)"
+                : "Message the agent… (Enter to send, Shift+Enter for newline)"
+            }
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              autosize();
+            }}
+            onKeyDown={handleKeyDown}
+            rows={1}
+          />
+          <div className="send-group">
+            {isTouchDevice() && !streaming && (
+              <button className="send-btn newline-btn" onClick={insertNewline} title="New line">↵</button>
+            )}
+            {streaming ? (
+              <button className="send-btn send-stop" onClick={handleAbort} title="Stop">
+                <StopIcon />
               </button>
-              <button
-                className="send-caret"
-                onClick={() => setShowDropdown((v) => !v)}
-                title="More options"
-              >
-                ▾
-              </button>
-              {showDropdown && (
-                <div className="send-menu">
-                  <button className="send-menu-item" onClick={() => sendMessage(false)}>
-                    <span className="send-menu-label">Send</span>
-                    <span className="send-menu-desc">Normal conversation</span>
-                  </button>
-                  <button className="send-menu-item goal" onClick={() => sendMessage(true)}>
-                    <span className="send-menu-label">🎯 Send as Goal</span>
-                    <span className="send-menu-desc">Autonomous: creates goal, runs until complete</span>
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+            ) : (
+              <>
+                <button
+                  className="send-btn"
+                  onClick={() => sendMessage(false)}
+                  disabled={!input.trim()}
+                  title="Send"
+                >
+                  <SendIcon />
+                </button>
+                <button
+                  className="send-caret"
+                  onClick={() => setShowDropdown((v) => !v)}
+                  title="More options"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                {showDropdown && (
+                  <div className="send-menu">
+                    <button className="send-menu-item" onClick={() => sendMessage(false)}>
+                      <span className="send-menu-label">Send</span>
+                      <span className="send-menu-desc">Normal conversation</span>
+                    </button>
+                    <button className="send-menu-item goal" onClick={() => sendMessage(true)}>
+                      <span className="send-menu-label">🎯 Send as Goal</span>
+                      <span className="send-menu-desc">Autonomous: creates goal, runs until complete</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
