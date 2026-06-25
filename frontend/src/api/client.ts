@@ -56,6 +56,15 @@ export const api = {
     getMessages: (id: string) => fetchJSON<ChatMessage[]>(`/api/sessions/${id}/messages`),
   },
 
+  /** Resolve pretty-URL short ids to full records (used for deep links). */
+  resolve: (spaceShort: string, sessionShort?: string) =>
+    fetchJSON<{
+      space: Space;
+      session: Session | null;
+      spaceSlug: string;
+      sessionSlug: string | null;
+    }>(`/api/resolve?space=${encodeURIComponent(spaceShort)}${sessionShort ? `&session=${encodeURIComponent(sessionShort)}` : ""}`),
+
   sendMessage: (sessionId: string, prompt: string, isGoal: boolean) => {
     return new EventSource(
       `/api/sessions/${sessionId}/message?prompt=${encodeURIComponent(prompt)}&isGoal=${isGoal}`,

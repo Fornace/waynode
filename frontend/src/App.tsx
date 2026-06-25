@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useParams, useNavigate, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
 import { Sidebar } from "./components/Sidebar";
@@ -8,6 +9,7 @@ import { AdminPanel } from "./components/AdminPanel";
 import { OrgSettings } from "./components/OrgSettings";
 import { api } from "./api/client";
 import * as store from "./lib/sessionStore";
+import { slugWithId, parseSlugSegment } from "./lib/slugs";
 import type { Space, Session, Org } from "./types";
 
 function getAuthHeaders(): Record<string, string> {
@@ -21,9 +23,14 @@ function AppContent() {
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSession, setActiveSession] = useState<Session | null>(null);
-  const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  // Pretty URLs: "/<spaceSlug>-<shortId>/<sessionSlug>-<shortId>".
+  // The short id (last 8 hex) is authoritative; the slug is cosmetic.
+  const { spaceSeg, sessionSeg } = useParams<{ spaceSeg?: string; sessionSeg?: string }>();
+  const urlSpaceShort = parseSlugSegment(spaceSeg);
+  const urlSessionShort = parseSlugSegment(sessionSeg);
+  const navigate = useNavigate();
+  const sidebarOpenInitial = useMemo(() => window.innerWidth >= 768, []);
+  const [sidebarOpen, setSidebarOpen] = useState(sidebarOpenInitial);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [orgSettingsOpen, setOrgSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -71,9 +78,10 @@ function AppContent() {
       .catch(() => {});
   };
 
-  const handleSelectSession = async (session: Session) => {
-    setActiveSession(session);
-    setActiveSpaceId(session.space_id);
+  const handleSelectSession = (session: Session) => {
+    const space = spaces.find((s) => s.id === session.space_id);
+    const spacePart = space ? slugWithId(space.repo_name, space.id) : session.space_id;
+    navigate(`/${spacePart}/${slugWithId(session.title || "session", session.id)}`);
     if (window.innerWidth < 768) setSidebarOpen(false);
   };
 
@@ -88,11 +96,73 @@ function AppContent() {
       setSessions((prev) =>
         prev.map((s) => (s.id === sessionId ? { ...s, title } : s))
       );
-      setActiveSession((cur) =>
-        cur && cur.id === sessionId ? { ...cur, title } : cur
-      );
     });
   }, [user]);
+
+  // ── Resolve the active space/session from the pretty URL. ──
+  // 1. Match against already-loaded lists by short id (cheap, no fetch).
+  // 2. Otherwise hit /api/resolve for deep links; also rewrites stale slugs.
+  const [resolvedSpace, setResolvedSpace] = useState<Space | null>(null);
+  const [resolvedSession, setResolvedSession] = useState<Session | null>(null);
+
+  const activeSpace = useMemo(() => {
+    if (!urlSpaceShort) return null;
+    return (
+      spaces.find((s) => parseSlugSegment(slugWithId(s.repo_name, s.id)) === urlSpaceShort) ||
+      (resolvedSpace && parseSlugSegment(slugWithId(resolvedSpace.repo_name, resolvedSpace.id)) === urlSpaceShort ? resolvedSpace : null)
+    );
+  }, [urlSpaceShort, spaces, resolvedSpace]);
+
+  const activeSession = useMemo(() => {
+    if (!urlSessionShort) return null;
+    return (
+      sessions.find((s) => parseSlugSegment(slugWithId(s.title || "session", s.id)) === urlSessionShort) ||
+      (resolvedSession && parseSlugSegment(slugWithId(resolvedSession.title || "session", resolvedSession.id)) === urlSessionShort ? resolvedSession : null)
+    );
+  }, [urlSessionShort, sessions, resolvedSession]);
+
+  const activeSpaceId = activeSpace?.id ?? activeSession?.space_id ?? null;
+
+  useEffect(() => {
+    if (!user || !urlSpaceShort) { setResolvedSpace(null); setResolvedSession(null); return; }
+    // Already resolvable from loaded data — no fetch needed.
+    const spaceKnown = spaces.some((s) => parseSlugSegment(slugWithId(s.repo_name, s.id)) === urlSpaceShort);
+    const sessionKnown = !urlSessionShort || sessions.some((s) => parseSlugSegment(slugWithId(s.title || "session", s.id)) === urlSessionShort);
+    if (spaceKnown && sessionKnown) { setResolvedSpace(null); setResolvedSession(null); return; }
+
+    let cancelled = false;
+    api.resolve(urlSpaceShort, urlSessionShort || undefined)
+      .then(({ space, session, spaceSlug, sessionSlug }) => {
+        if (cancelled) return;
+        setResolvedSpace(space);
+        setResolvedSession(session);
+        // Inject into the loaded lists so downstream components see them.
+        setSpaces((prev) => prev.some((s) => s.id === space.id) ? prev : [...prev, space]);
+        if (session) setSessions((prev) => prev.some((s) => s.id === session.id) ? prev : [...prev, session]);
+        // Rewrite a stale/mismatched slug silently (replace, not push).
+        const wantSession = sessionSlug && urlSessionShort;
+        if ((spaceSeg && spaceSeg !== spaceSlug) || (wantSession && sessionSeg !== sessionSlug)) {
+          navigate(`/${spaceSlug}${wantSession ? `/${sessionSlug}` : ""}`, { replace: true });
+        }
+      })
+      .catch(() => { if (!cancelled) { setResolvedSpace(null); setResolvedSession(null); } });
+    return () => { cancelled = true; };
+  }, [user, urlSpaceShort, urlSessionShort, spaceSeg, sessionSeg, spaces, sessions, navigate]);
+
+  // ── Keep the URL slug fresh when the active session/space gets renamed ──
+  // (e.g. the AI auto-generates a title mid-conversation). The resolver matches
+  // on the ID suffix so a stale slug still works; this just keeps it pretty.
+  useEffect(() => {
+    if (!activeSession || !urlSessionShort) return;
+    const canonical = slugWithId(activeSession.title || "session", activeSession.id);
+    const canonicalShort = parseSlugSegment(canonical);
+    if (canonicalShort !== urlSessionShort || sessionSeg !== canonical) {
+      const spaceCanonical = activeSpace
+        ? slugWithId(activeSpace.repo_name, activeSpace.id)
+        : activeSession.space_id;
+      navigate(`/${spaceCanonical}/${canonical}`, { replace: true });
+    }
+  }, [activeSession, activeSpace, urlSessionShort, sessionSeg, navigate]);
 
   const handleSpaceExpand = async (spaceId: string) => {
     const alreadyLoaded = sessions.some((s) => s.space_id === spaceId);
@@ -137,7 +207,6 @@ function AppContent() {
     );
   }
 
-  const activeSpace = spaces.find((s) => s.id === activeSpaceId);
 
   return (
     <div className={`app-layout ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -161,7 +230,7 @@ function AppContent() {
         user={user}
         orgs={orgs}
         activeOrgId={activeOrgId}
-        onSelectOrg={(id) => { setActiveOrgId(id); setActiveSession(null); setSessions([]); }}
+        onSelectOrg={(id) => { setActiveOrgId(id); setSessions([]); navigate("/"); }}
       />
       {activeSession && activeSpace ? (
         <>
@@ -199,7 +268,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <Routes>
+        <Route path="/" element={<AppContent />} />
+        <Route path="/:spaceSeg" element={<AppContent />} />
+        <Route path="/:spaceSeg/:sessionSeg" element={<AppContent />} />
+      </Routes>
     </AuthProvider>
   );
 }
