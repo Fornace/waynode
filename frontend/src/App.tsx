@@ -7,7 +7,6 @@ import { SessionView } from "./components/SessionView";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { AdminPanel } from "./components/AdminPanel";
 import { OrgSettings } from "./components/OrgSettings";
-import { GitSidebar } from "./components/GitSidebar";
 import { api } from "./api/client";
 import * as store from "./lib/sessionStore";
 import { slugWithId, parseSlugSegment } from "./lib/slugs";
@@ -35,6 +34,7 @@ function AppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [orgSettingsOpen, setOrgSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [gitSidebarOpen, setGitSidebarOpen] = useState(false);
   const [githubConnected, setGithubConnected] = useState(false);
   const [gitlabConnected, setGitlabConnected] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -242,11 +242,13 @@ function AppContent() {
             onToggleSidebar={handleToggleSidebar}
             onOpenSettings={() => setSettingsOpen(true)}
             isAdmin={isAdmin}
+            gitOpen={gitSidebarOpen}
+            onToggleGit={() => setGitSidebarOpen((v) => !v)}
           />
           {settingsOpen && (
             <SpaceSettings space={activeSpace} onClose={() => setSettingsOpen(false)} />
           )}
-          {/* <GitSidebar /> */}
+          <GitSidebar space={activeSpace} open={gitSidebarOpen} onClose={() => setGitSidebarOpen(false)} />
         </>
       ) : (
         <div className="main-content">
