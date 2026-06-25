@@ -1,4 +1,4 @@
-import type { User, Space, Session, GoalStatus, ChatMessage } from "../types";
+import type { User, Space, Session, GoalStatus, ChatMessage, GitSnapshot } from "../types";
 
 const base = "";
 
@@ -15,7 +15,10 @@ async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || `HTTP ${res.status}`);
+    const e: any = new Error(body.error || `HTTP ${res.status}`);
+    e.body = body;
+    e.status = res.status;
+    throw e;
   }
   return res.json();
 }
@@ -88,5 +91,48 @@ export const api = {
     get: () => fetchJSON<Record<string, string>>("/api/settings"),
     patch: (settings: Record<string, string>) =>
       fetchJSON("/api/settings", { method: "PATCH", body: JSON.stringify(settings) }),
+  },
+
+  git: {
+    status: (spaceId: string) => fetchJSON<GitSnapshot>(`/api/spaces/${spaceId}/git`),
+    /** Live SSE stream — pushes a snapshot whenever the tree changes. */
+    stream: (spaceId: string) =>
+      new EventSource(`/api/spaces/${spaceId}/git/sse${DEV_TOKEN ? `?t=${encodeURIComponent(DEV_TOKEN)}` : ""}`, {
+        withCredentials: true,
+      }),
+    diff: (spaceId: string, path: string) =>
+      fetchJSON<{ path: string; diff: string }>(
+        `/api/spaces/${spaceId}/git/diff?path=${encodeURIComponent(path)}`
+      ),
+    commit: (spaceId: string, body: { files: string[]; summary: string; description?: string }) =>
+      fetchJSON<{ ok: boolean; data: GitSnapshot }>(`/api/spaces/${spaceId}/git/commit`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    switchBranch: (spaceId: string, body: { branchName: string; mode: "stash" | "carry" | "clean" }) =>
+      fetchJSON<{ ok: boolean; data: GitSnapshot }>(`/api/spaces/${spaceId}/git/switch-branch`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    createBranch: (spaceId: string, body: { branchName: string; baseBranch?: string }) =>
+      fetchJSON<{ ok: boolean; data: GitSnapshot }>(`/api/spaces/${spaceId}/git/create-branch`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    pull: (spaceId: string, mode: "ff-only" | "merge" | "rebase" = "ff-only") =>
+      fetchJSON<{ ok: boolean; mode: string; output: string; aborted?: boolean; conflicts?: string[]; data: GitSnapshot }>(
+        `/api/spaces/${spaceId}/git/pull`,
+        { method: "POST", body: JSON.stringify({ mode }) }
+      ),
+    push: (spaceId: string, setUpstream = false) =>
+      fetchJSON<{ ok: boolean; pushed: boolean; data: GitSnapshot }>(
+        `/api/spaces/${spaceId}/git/push`,
+        { method: "POST", body: JSON.stringify({ setUpstream }) }
+      ),
+    merge: (spaceId: string, branchName: string) =>
+      fetchJSON<{ ok: boolean; merged?: string; aborted?: boolean; conflicts?: string[]; data: GitSnapshot }>(
+        `/api/spaces/${spaceId}/git/merge`,
+        { method: "POST", body: JSON.stringify({ branchName }) }
+      ),
   },
 };

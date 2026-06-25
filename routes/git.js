@@ -1,0 +1,204 @@
+/**
+ * routes/git.js — git sidebar API for a space.
+ *
+ *  GET    /api/spaces/:spaceId/git               full snapshot (+ piBusy flag)
+ *  GET    /api/spaces/:spaceId/git/sse           live SSE: pushes snapshot when it changes (poll ~5s)
+ *  GET    /api/spaces/:spaceId/git/diff?path=    inline diff for one file
+ *  POST   /api/spaces/:spaceId/git/commit        { files, summary, description }
+ *  POST   /api/spaces/:spaceId/git/switch-branch { branchName, mode: 'stash'|'carry'|'clean' }
+ *  POST   /api/spaces/:spaceId/git/create-branch { branchName, baseBranch }
+ *  POST   /api/spaces/:spaceId/git/pull          fast-forward only
+ *
+ * The user is the owner of the repo; pi being busy is surfaced as `piBusy`
+ * (informational) and never hard-blocks writes here — the UI soft-warns.
+ */
+import { Router } from "express";
+import { requireAuth, requireSpaceAccess } from "../lib/auth.mjs";
+import { getSpace } from "../lib/spaces.mjs";
+import { isSpaceBusy } from "../lib/agent-manager.mjs";
+import * as git from "../lib/git-ops.mjs";
+import { config } from "../lib/config.mjs";
+import db from "../lib/db.mjs";
+
+const router = Router();
+
+function spacePath(req) {
+  const space = getSpace(req.params.spaceId);
+  return space?.local_path || null;
+}
+
+// Snapshot (REST)
+router.get("/api/spaces/:spaceId/git", requireAuth, requireSpaceAccess, (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  try {
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Single-file diff
+router.get("/api/spaces/:spaceId/git/diff", requireAuth, requireSpaceAccess, (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  const path = req.query.path;
+  if (!path) return res.status(400).json({ error: "path required" });
+  try {
+    const diff = git.getFileDiff(cwd, path);
+    res.json({ path, diff });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── SSE live stream ──
+// EventSource can't set headers, so the dev token comes through ?t=.
+function sseAuth(req, res, next) {
+  const tok = req.query.t;
+  if (config.devToken && tok && tok === config.devToken) {
+    let user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
+    if (!user) {
+      db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
+    }
+    req.user = user;
+    req.isAuthenticated = () => true;
+    return next();
+  }
+  requireAuth(req, res, next);
+}
+
+function writeSSE(res, ev) {
+  if (res.destroyed || res.writableEnded) return;
+  res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  if (typeof res.flush === "function") res.flush();
+}
+
+router.get("/api/spaces/:spaceId/git/sse", sseAuth, requireSpaceAccess, (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).end();
+  const spaceId = req.params.spaceId;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+  let lastSig = "";
+  const poll = () => {
+    try {
+      const data = git.getSnapshot(cwd);
+      data.piBusy = isSpaceBusy(spaceId);
+      const sig = JSON.stringify(data);
+      if (sig !== lastSig) {
+        lastSig = sig;
+        writeSSE(res, { type: "snapshot", data });
+      }
+    } catch (e) {
+      writeSSE(res, { type: "error", message: e.message });
+    }
+  };
+  poll(); // immediate
+  const interval = setInterval(poll, 5000);
+  const ping = setInterval(() => writeSSE(res, { type: "ping" }), 25000);
+  req.on("close", () => {
+    clearInterval(interval);
+    clearInterval(ping);
+  });
+});
+
+// ── Writes ──
+router.post("/api/spaces/:spaceId/git/commit", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  try {
+    await git.commitSelected(cwd, req.body || {});
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, data });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+router.post("/api/spaces/:spaceId/git/switch-branch", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  try {
+    await git.switchBranch(cwd, req.body || {});
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, data });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+router.post("/api/spaces/:spaceId/git/create-branch", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  try {
+    await git.createBranch(cwd, req.body || {});
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, data });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+router.post("/api/spaces/:spaceId/git/pull", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  const mode = req.body?.mode || "ff-only";
+  try {
+    const result = await git.pull(cwd, { mode });
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, mode: result.mode, output: result.output, aborted: result.aborted, conflicts: result.conflicts, data });
+  } catch (e) {
+    // Divergence is not a hard failure — tell the UI it needs a choice.
+    if (e.diverged) return res.status(409).json({ error: e.message, diverged: true });
+    res.status(400).json({ error: e.message });
+  }
+});
+
+router.post("/api/spaces/:spaceId/git/push", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  try {
+    const result = await git.push(cwd, { setUpstream: !!req.body?.setUpstream });
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, pushed: result.pushed, data });
+  } catch (e) {
+    res.status(400).json({ error: e.message, pushRejected: !!e.pushRejected, noUpstream: !!e.noUpstream });
+  }
+});
+
+router.post("/api/spaces/:spaceId/git/merge", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  const { branchName } = req.body || {};
+  if (!branchName) return res.status(400).json({ error: "branchName required" });
+  try {
+    const result = await git.mergeBranch(cwd, { branchName });
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, merged: result.merged, aborted: result.aborted, conflicts: result.conflicts, data });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+export default router;

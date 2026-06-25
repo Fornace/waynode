@@ -372,6 +372,18 @@ export async function abort(sessionId: string): Promise<void> {
   });
 }
 
+/**
+ * Drop a transient system message into the chat (e.g. a git-conflict notice).
+ * Frontend-only — not persisted to disk, consistent with how errors/queued
+ * notices are surfaced today. Used by the Git sidebar to tell the user about
+ * merge/pull/push issues and that pi has been asked to resolve them.
+ */
+export function injectSystem(sessionId: string, content: string) {
+  const e = getEntry(sessionId);
+  e.state.items = [...e.state.items, { id: uid(), role: "system", content }];
+  emit(e);
+}
+
 export function onRename(cb: (sessionId: string, title: string) => void): () => void {
   renameListeners.add(cb);
   return () => renameListeners.delete(cb);

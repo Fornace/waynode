@@ -3,7 +3,6 @@ import multer from "multer";
 import { requireAuth, requireSpaceAccess } from "../lib/auth.mjs";
 import { cloneRepo, getSpace, listSpaces, listSpacesByOrg, deleteSpace, pullSpace, getSpacePath } from "../lib/spaces.mjs";
 import { isOrgMember } from "../lib/orgs.mjs";
-import { GitOps } from "../lib/git-ops.mjs";
 const router = Router();
 
 const upload = multer({
@@ -52,68 +51,9 @@ router.get("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res) =
   return res.json(space);
 });
 
-// Git operations
-router.get("/api/spaces/:spaceId/git", requireAuth, requireSpaceAccess, async (req, res) => {
-  const space = getSpace(req.params.spaceId);
-  const gitOps = new GitOps(space.local_path);
-  
-  try {
-    const [status, commits, currentBranch, branches] = await Promise.all([
-      gitOps.getStatus(),
-      gitOps.getRecentCommits(10),
-      gitOps.getCurrentBranch(),
-      gitOps.getBranches()
-    ]);
-    
-    return res.json({
-      status,
-      commits,
-      currentBranch,
-      branches,
-      hasUncommittedChanges: gitOps.hasUncommittedChanges()
-    });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-router.post("/api/spaces/:spaceId/git/switch-branch", requireAuth, requireSpaceAccess, async (req, res) => {
-  const { branchName, stashChanges } = req.body;
-  const space = getSpace(req.params.spaceId);
-  const gitOps = new GitOps(space.local_path);
-  
-  try {
-    await gitOps.switchBranch(branchName, stashChanges);
-    return res.json({ success: true });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-router.post("/api/spaces/:spaceId/git/create-branch", requireAuth, requireSpaceAccess, async (req, res) => {
-  const { branchName, baseBranch } = req.body;
-  const space = getSpace(req.params.spaceId);
-  const gitOps = new GitOps(space.local_path);
-  
-  try {
-    await gitOps.createBranch(branchName, baseBranch);
-    return res.json({ success: true });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-router.post("/api/spaces/:spaceId/git/pull", requireAuth, requireSpaceAccess, async (req, res) => {
-  const space = getSpace(req.params.spaceId);
-  const gitOps = new GitOps(space.local_path);
-  
-  try {
-    await gitOps.pull();
-    return res.json({ success: true });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
+// Git operations are handled in routes/git.js (snapshot, SSE, commit,
+// switch/create branch, merge, push, pull) — all with --no-optional-locks and
+// the per-space write mutex. This file keeps only space CRUD.
 
 router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, async (req, res) => {
   const output = await pullSpace(req.params.spaceId);
@@ -126,48 +66,7 @@ router.delete("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res
   return res.json({ ok: true });
 });
 
-// SSE endpoint for real-time git status updates
-router.get("/api/spaces/:spaceId/git/sse", requireAuth, requireSpaceAccess, (req, res) => {
-  const space = getSpace(req.params.spaceId);
-  const gitOps = new GitOps(space.local_path);
-  
-  // Set SSE headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  
-  // Send initial status
-  const sendStatus = async () => {
-    try {
-      const [status, commits, currentBranch, branches] = await Promise.all([
-        gitOps.getStatus(),
-        gitOps.getRecentCommits(10),
-        gitOps.getCurrentBranch(),
-        gitOps.getBranches()
-      ]);
-      
-      res.write(`data: ${JSON.stringify({
-        status,
-        commits,
-        currentBranch,
-        branches,
-        hasUncommittedChanges: gitOps.hasUncommittedChanges()
-      })}\\n\\n`);
-    } catch (error) {
-      res.write(`data: ${JSON.stringify({ error: error.message })}\\n\\n`);
-    }
-  };
-  
-  sendStatus();
-  
-  // Set up interval to send updates every 5 seconds
-  const interval = setInterval(sendStatus, 5000);
-  
-  // Clean up on client disconnect
-  req.on('close', () => {
-    clearInterval(interval);
-    res.end();
-  });
-});
+// SSE git status is handled in routes/git.js (/api/spaces/:spaceId/git/sse)
+// with --no-optional-locks and change-diffing (only pushes on actual change).
 
 export default router;

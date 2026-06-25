@@ -100,3 +100,42 @@ export interface Org {
   my_role?: string;
   space_count?: number;
 }
+
+// ── Git sidebar ──
+export interface GitFile {
+  path: string;
+  staged: string;   // porcelain X char (' ' = clean, M/A/D/R/C/U)
+  worktree: string; // porcelain Y char
+  status: "modified" | "added" | "deleted" | "renamed" | "copied" | "conflict" | "untracked";
+  additions: number | null;
+  deletions: number | null;
+}
+export interface GitBranch {
+  name: string;
+  shortName: string;
+  sha: string;
+  date: string;
+  upstream?: string;
+  isRemote: boolean;
+  isDefault: boolean;
+}
+export interface GitCommit {
+  hash: string;
+  shortHash: string;
+  author: string;
+  date: string;
+  subject: string;
+}
+export interface GitSnapshot {
+  currentBranch: string | null;
+  detached: boolean;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  hasUncommittedChanges: boolean;
+  files: GitFile[];
+  commits: GitCommit[];
+  branches: GitBranch[];
+  defaultBranch: string | null;
+  piBusy: boolean;
+}

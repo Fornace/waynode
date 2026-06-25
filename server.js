@@ -19,6 +19,7 @@ import reposRoutes from "./routes/repos.js";
 import adminRoutes from "./routes/admin.js";
 import orgRoutes from "./routes/orgs.js";
 import resolveRoutes from "./routes/resolve.js";
+import gitRoutes from "./routes/git.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -75,6 +76,7 @@ app.use(reposRoutes);
 app.use(adminRoutes);
 app.use(orgRoutes);
 app.use(resolveRoutes);
+app.use(gitRoutes);
 
 // Model listing endpoint
 app.get("/api/models", (req, res) => {
