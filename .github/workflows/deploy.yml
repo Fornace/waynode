@@ -35,8 +35,7 @@ jobs:
         run: |
           ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} '
             cd /opt/waynode &&
-            docker compose down &&
-            docker compose build --no-cache &&
+            docker compose build &&
             docker compose up -d &&
             docker image prune -f
           '
