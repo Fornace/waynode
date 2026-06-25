@@ -242,8 +242,6 @@ function AppContent() {
             onToggleSidebar={handleToggleSidebar}
             onOpenSettings={() => setSettingsOpen(true)}
             isAdmin={isAdmin}
-            gitOpen={gitSidebarOpen}
-            onToggleGit={() => setGitSidebarOpen((v) => !v)}
           />
           {settingsOpen && (
             <SpaceSettings space={activeSpace} onClose={() => setSettingsOpen(false)} />
