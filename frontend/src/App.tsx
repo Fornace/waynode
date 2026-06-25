@@ -248,7 +248,7 @@ function AppContent() {
           {settingsOpen && (
             <SpaceSettings space={activeSpace} onClose={() => setSettingsOpen(false)} />
           )}
-          <GitSidebar space={activeSpace} open={gitSidebarOpen} onClose={() => setGitSidebarOpen(false)} />
+          {/* <GitSidebar space={activeSpace} open={gitSidebarOpen} onClose={() => setGitSidebarOpen(false)} /> */}
         </>
       ) : (
         <div className="main-content">
