@@ -49,10 +49,14 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
   }, []);
 
   const handleModelChange = async (model: string) => {
-    setCurrentModel(model);
+    const prev = currentModel;
+    setCurrentModel(model); // optimistic — reverts below if the live agent rejects it
     try {
-      await api.sessions.patch(session.id, { model } as any);
-    } catch {}
+      await api.sessions.setModel(session.id, model);
+    } catch (err) {
+      setCurrentModel(prev);
+      console.error("[model] switch failed:", (err as Error).message);
+    }
   };
 
   return (

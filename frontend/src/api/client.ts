@@ -58,6 +58,12 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(updates),
       }),
+    /** Switch model on the live agent (RPC set_model) + persist for next spawn. */
+    setModel: (id: string, model: string) =>
+      fetchJSON<{ ok: boolean; model: string; live: boolean }>(`/api/sessions/${id}/model`, {
+        method: "POST",
+        body: JSON.stringify({ model }),
+      }),
     getGoal: (id: string) => fetchJSON<{ goal: GoalStatus | null }>(`/api/sessions/${id}/goal`),
     getMessages: (id: string) => fetchJSON<ChatMessage[]>(`/api/sessions/${id}/messages`),
   },

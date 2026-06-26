@@ -62,6 +62,34 @@ router.patch("/api/sessions/:sessionId", requireAuth, (req, res) => {
   if (session) res.json(updateSession(req.params.sessionId, req.body));
 });
 
+// Switch the model and push it to the LIVE agent. Unlike a generic PATCH
+// (which only persists to the DB for the next spawn), this also sends pi's RPC
+// `set_model` command to a running agent so the change takes effect
+// immediately on the next LLM call. If no agent process is currently alive,
+// the DB write is enough — getAgent() will spawn with the new model on demand.
+router.post("/api/sessions/:sessionId/model", requireAuth, async (req, res) => {
+  const session = ownSession(req, res);
+  if (!session) return;
+  const { model } = req.body;
+  if (!model || typeof model !== "string") return res.status(400).json({ error: "model required" });
+
+  const handle = getAgentIfActive(session.id);
+  if (handle) {
+    // Validate against the LIVE agent first: if it rejects the model, return 400
+    // WITHOUT touching the DB, so the stored model and the running process never
+    // desync. (When no agent is running, there's nothing to validate against —
+    // the next spawn will catch an unknown id.)
+    try {
+      await handle.setModel("fornace", model);
+    } catch (err) {
+      return res.status(400).json({ error: `Model not applied: ${err.message}` });
+    }
+  }
+
+  updateSession(session.id, { model });
+  res.json({ ok: true, model, live: !!handle });
+});
+
 router.delete("/api/sessions/:sessionId", requireAuth, (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
