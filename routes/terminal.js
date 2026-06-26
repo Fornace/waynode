@@ -2,16 +2,40 @@ import { Router } from "express";
 import { WebSocketServer } from "ws";
 import { getSession } from "../lib/sessions.mjs";
 import { runPiTerminal } from "../lib/pi-runner.mjs";
+import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
 import { randomUUID } from "crypto";
 
 const router = Router();
+
+let allowedOrigin = null;
+try {
+  if (config.appUrl) allowedOrigin = new URL(config.appUrl).origin;
+} catch {}
 
 export function attachTerminalWebSocket(server, sessionMiddleware) {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on("upgrade", (req, socket, head) => {
     if (!req.url.startsWith("/ws/terminal")) return;
+
+    // CSWSH guard: browsers send an Origin header on WebSocket handshakes and
+    // attach cookies cross-site, so a malicious page could otherwise open a
+    // terminal WS as the logged-in user. Reject anything that isn't our own
+    // origin. (Non-browser clients send no Origin; they still need the session
+    // cookie below, so they're unaffected.)
+    const origin = req.headers.origin;
+    if (origin && allowedOrigin) {
+      try {
+        if (new URL(origin).origin !== allowedOrigin) {
+          socket.destroy();
+          return;
+        }
+      } catch {
+        socket.destroy();
+        return;
+      }
+    }
 
     sessionMiddleware(req, {}, async () => {
       if (!req.session || !req.session.passport?.user) {

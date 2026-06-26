@@ -1,10 +1,11 @@
 import { Router } from "express";
 import multer from "multer";
 import { requireAuth, requireSpaceAccess } from "../lib/auth.mjs";
-import { cloneRepo, getSpace, listSpaces, listSpacesByOrg, deleteSpace, pullSpace, getSpacePath, createSpaceRecord, cloneRepoStreaming } from "../lib/spaces.mjs";
+import { cloneRepo, getSpace, listSpaces, listSpacesByOrg, deleteSpace, pullSpace, getSpacePath, createSpaceRecord, cloneRepoStreaming, assertSafeRepoUrl } from "../lib/spaces.mjs";
 import { isOrgMember } from "../lib/orgs.mjs";
 import { startClone, publish, finishClone, subscribe } from "../lib/clone-progress.mjs";
 import { config } from "../lib/config.mjs";
+import path from "path";
 import db from "../lib/db.mjs";
 const router = Router();
 
@@ -15,7 +16,9 @@ const upload = multer({
       cb(null, getSpacePath(req.params.spaceId));
     },
     filename: (req, file, cb) => {
-      cb(null, file.originalname);
+      // Strip any directory components from the user-supplied name so an
+      // originalname like "../../app/server.js" can't escape the space dir.
+      cb(null, path.basename(file.originalname) || `upload-${Date.now()}`);
     }
   })
 });
@@ -41,12 +44,18 @@ router.get("/api/spaces", requireAuth, (req, res) => {
 router.post("/api/spaces", requireAuth, async (req, res) => {
   const { repoUrl, branch, authUser, authToken, orgId } = req.body;
   console.log("[spaces] clone req:", { repoUrl, branch, orgId, userId: req.user.id, hasAuth: !!authUser });
-  if (!repoUrl) return res.status(400).json({ err: "repoUrl required" });
+  if (!repoUrl) return res.status(400).json({ error: "repoUrl required" });
+  let safeUrl;
+  try {
+    safeUrl = assertSafeRepoUrl(repoUrl);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
   const member = isOrgMember(orgId, req.user.id);
   if (!member || member.role === "viewer") return res.status(403).json({ err: "Editor required" });
   // Create the space row immediately so a session can reference it; clone
   // streams in the background and clients subscribe via /clone-events.
-  const space = createSpaceRecord(repoUrl, branch || "main", req.user.id, orgId);
+  const space = createSpaceRecord(safeUrl, branch || "main", req.user.id, orgId);
   startClone(space.id);
   (async () => {
     try {

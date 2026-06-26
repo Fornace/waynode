@@ -71,16 +71,5 @@
     </div>
 
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Remove the boot screen once the app has rendered.
-      window.addEventListener("load", () => {
-        const remove = () => {
-          const b = document.getElementById("boot");
-          if (b && document.getElementById("root")?.hasChildNodes()) b.remove();
-          else requestAnimationFrame(remove);
-        };
-        requestAnimationFrame(remove);
-      });
-    </script>
   </body>
 </html>

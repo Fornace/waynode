@@ -26,7 +26,24 @@ app.set("trust proxy", 1);
 const server = createServer(app);
 
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      // Inline styles: the boot-screen <style> block in index.html + React
+      // inline style attributes. Styles are not an XSS escalation vector.
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      // Avatars come from GitHub/GitLab over https; allow data: URIs too.
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      fontSrc: ["'self'"],
+      // All API, SSE (EventSource) and WebSocket traffic is same-origin.
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
 
