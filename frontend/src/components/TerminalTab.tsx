@@ -66,8 +66,12 @@ export default function TerminalTab({ session, onRequestExit }: TerminalTabProps
     });
 
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    // Append the dev-token as ?t= when present, mirroring the SSE streams
+    // (clone/git), so the terminal WS authenticates in automated E2E / dev the
+    // same way those do (the WS can't set the x-dev-token header).
+    const devToken = localStorage.getItem("waynode-dev-token") || "";
     const ws = new WebSocket(
-      `${proto}//${location.host}/ws/terminal?sessionId=${session.id}`
+      `${proto}//${location.host}/ws/terminal?sessionId=${session.id}${devToken ? `&t=${encodeURIComponent(devToken)}` : ""}`
     );
     wsRef.current = ws;
 

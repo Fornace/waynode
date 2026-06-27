@@ -37,13 +37,33 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
       }
     }
 
+    // Resolve the URL early so the dev-token (?t=) path can short-circuit
+    // before the session-cookie requirement — mirrors the sseAuth helper on
+    // the chat/clone/git SSE routes, so the terminal WS is drivable in
+    // automated E2E the same way those streams are.
+    const url = new URL(req.url, "http://localhost");
+    const tok = url.searchParams.get("t");
+
     sessionMiddleware(req, {}, async () => {
-      if (!req.session || !req.session.passport?.user) {
+      let authedUserId = null;
+
+      // Dev-token path (?t= == config.devToken): log in as dev-user. Used by
+      // automated E2E (and dev). Same privilege model as the REST dev-token.
+      if (config.devToken && tok && tok === config.devToken) {
+        let devUser = db.prepare("SELECT id FROM users WHERE id = ?").get("dev-user");
+        if (!devUser) {
+          db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
+        }
+        authedUserId = "dev-user";
+      } else if (req.session?.passport?.user) {
+        authedUserId = req.session.passport.user;
+      }
+
+      if (!authedUserId) {
         socket.destroy();
         return;
       }
 
-      const url = new URL(req.url, "http://localhost");
       const sessionId = url.searchParams.get("sessionId");
       if (!sessionId) {
         socket.destroy();
@@ -56,7 +76,7 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
         return;
       }
 
-      const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.session.passport.user);
+      const user = db.prepare("SELECT * FROM users WHERE id = ?").get(authedUserId);
       if (!user || session.owner_id !== user.id) {
         socket.destroy();
         return;
