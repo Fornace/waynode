@@ -86,8 +86,14 @@ input, textarea {
   transform: translateX(0);
 }
 
-.app-layout.sidebar-open .sidebar-overlay {
-  display: block;
+/* The dimming overlay only matters on mobile, where the sidebar slides over
+   the content (position: fixed). On desktop the sidebar is docked in-flow,
+   so showing the overlay there would intercept pointer events across the
+   whole main content (top-bar tabs, composer, etc.). Scope it to mobile. */
+@media (max-width: 768px) {
+  .app-layout.sidebar-open .sidebar-overlay {
+    display: block;
+  }
 }
 
 .sidebar-overlay {
