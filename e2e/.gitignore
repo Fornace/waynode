@@ -1,0 +1,7 @@
+# E2E artifacts — don't commit
+node_modules/
+package-lock.json
+shots/
+last-result.json
+_*.mjs
+_probe-*.mjs
