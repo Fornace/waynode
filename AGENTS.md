@@ -57,3 +57,28 @@ ALWAYS check and use the latest stable version of every package. Never guess ver
 - Always use timeouts on any fetch, page.wait, or CDP operation.
 - Always make things observable — log state at each step.
 - Always clean up — close PTYs, abort streams, release locks in finally blocks.
+
+### Standard prod E2E
+
+The canonical way to test waynode in prod as the authenticated user is
+`e2e/run-rest.mjs`, driving the Playwright-backed hosted browser at
+`browser.fornace.net` over its REST action API (`/tool/<name>`, Bearer
+`fnc_…` key). No local browser install, no CDP, no MCP client. See
+`e2e/README.md` for full details.
+
+```bash
+cd e2e && npm install
+DEV=$(ssh root@49.12.9.255 'docker exec $(docker ps -q --filter name=waynode) printenv DEV_AUTH_TOKEN')
+BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs   # ONLY=auth,chat for a subset
+```
+
+Covers 7 flows: auth, open-session, chat-send, model-switch, terminal-open,
+terminal-survival (proves the server pty survives a browser close), mutex.
+`BROWSER_TOKEN` = the browser.fornace.net api-key (`~/.agent_credentials/tokens/browser-mcp-tomasipromo.env`).
+`DEV_TOKEN` = waynode `DEV_AUTH_TOKEN` (injected into `localStorage` so REST +
+SSE + the terminal WS all run authed). The `call()` helper is rate-limit-aware
+(browser.fornace.net throttles sustained call volume) — keep polling intervals
+≥2.5s when adding flows. Always create + pin an isolated `sessionId`; the
+shared default session is multi-tenant and gets hijacked.
+
+`e2e/run.mjs` (local Playwright) is kept as an offline fallback.

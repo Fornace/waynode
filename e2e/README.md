@@ -66,22 +66,15 @@ BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs
 
 Screenshots land in `shots/`; `last-result.json` records the pass/fail summary.
 
-## Known limitation (as of this writing)
+## Reliability
 
-Two things, both environmental, not waynode bugs:
+The harness is **rate-limit-aware**: `browser.fornace.net` throttles sustained
+call volume (no advertised headers — just `{error:"Rate limit exceeded"}`),
+so `call()` detects that and backs off with exponential retry. Polling loops
+use ≥2.5s intervals to stay under the limit. With this, the full 7-flow suite
+runs green consistently (verified across consecutive runs).
 
-1. **`terminal-open` is timing-sensitive after a chat turn.** Opening the
-   terminal reclaims the chat agent (`getTerminal` → `reclaimChat`), and if a
-   chat/model turn is still streaming the reclaim waits for it. The harness
-   polls for `.stream-cursor` first, but a model-switch can leave a silent
-   in-flight state. Run `ONLY=auth,open-session,terminal-open` to verify the
-   terminal in isolation (passes cleanly) — the **server-side** terminal is
-   fully verified by the in-container real-pty E2E (7/7, see git history).
-2. **browser.fornace.net is occasionally flaky** under rapid calls —
-   `browser_create_session` sometimes returns no `sessionId`, and the shared
-   default session gets hijacked by other tenants if you forget `sessionId`.
-   The harness always creates + pins an isolated session; if you see `SID
-   undefined`, just re-run.
-
-Auth/chat/model/mutex are stable (5/7 typical, 7/7 when the platform behaves).
-For authoritative terminal verification, use the in-container test.
+Earlier "terminal-open is flaky" notes are obsolete — the root cause was always
+the rate limiter eating the late flows, not the terminal or the mutex. The
+server-side pty/terminal is separately verified by the in-container real-pty
+E2E (`getTerminal` path).

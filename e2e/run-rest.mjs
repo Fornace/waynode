@@ -33,7 +33,8 @@ if (!TOKEN) { console.error("✗ BROWSER_TOKEN (browser.fornace.net api-key) req
 if (!DEV_TOKEN) { console.error("✗ DEV_TOKEN (waynode DEV_AUTH_TOKEN) required."); process.exit(2); }
 
 let SID = null;
-function call(name, args) {
+// Raw single HTTP call to a /tool/<name> action.
+function callOnce(name, args) {
   return new Promise((resolve, reject) => {
     const payload = { ...args };
     if (SID) payload.sessionId = SID;
@@ -44,6 +45,25 @@ function call(name, args) {
     req.setTimeout(60000, () => req.destroy(new Error(`${name} timeout`)));
     req.on("error", reject); req.write(data); req.end();
   });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Rate-limit-aware call: browser.fornace.net throttles sustained call volume
+// (no advertised headers, just {error:"Rate limit exceeded"}). Detect it and
+// back off + retry so the harness stays consistent instead of failing late.
+async function call(name, args) {
+  let lastErr = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const r = await callOnce(name, args);
+    // detect throttle: HTTP 200 but body says Rate limit, OR 429
+    const throttled = r.status === 429 || (typeof r.body === "string" && r.body.includes("Rate limit exceeded"));
+    if (!throttled) return r;
+    lastErr = r;
+    // exponential backoff: 3s, 6s, 12s, 24s, 48s
+    await sleep(3000 * 2 ** attempt);
+  }
+  return lastErr;
 }
 // Extract the text value from a tool result (MCP content envelope).
 const val = (r) => {
@@ -118,7 +138,7 @@ try {
     // poll for assistant reply containing E2E-OK (.msg is the message row)
     let got = false;
     for (let i = 0; i < 30; i++) {
-      await call("browser_wait", { time: 2000 });
+      await call("browser_wait", { time: 3000 });
       const v = await jval(await call("browser_evaluate", { script: "return [...document.querySelectorAll('.msg, .msg-text, .chat-message-content')].some(e => /E2E-OK/i.test(e.textContent||''))" }));
       if (v) { got = true; break; }
     }
@@ -134,7 +154,7 @@ try {
     const target = opts.find((o) => /reasoning|max/i.test(o));
     if (!target) { console.log("   (no reasoning/max model — skipping)"); return; }
     await call("browser_evaluate", { script: `const s=document.querySelector('.model-select'); [...s.options].find(o=>o.textContent.trim()===${JSON.stringify(target)}).selected=true; s.dispatchEvent(new Event('change',{bubbles:true}));` });
-    await call("browser_wait", { time: 1500 });
+    await call("browser_wait", { time: 2500 });
     await shot("04-model");
     console.log(`   → ${target}`);
   });
@@ -146,7 +166,7 @@ try {
     for (let i = 0; i < 20; i++) {
       const busy = await jval(await call("browser_evaluate", { script: "return !!document.querySelector('.stream-cursor, .msg-typing')" }));
       if (!busy) break;
-      await call("browser_wait", { time: 2000 });
+      await call("browser_wait", { time: 3000 });
     }
     // The tab-btn texts are "Chat"/"Terminal" but the icon-only settings/git
     // buttons also carry .tab-btn. Scope the Terminal click precisely via text.
@@ -155,7 +175,7 @@ try {
     // wait until xterm has rendered rows (pi TUI painted)
     let ok = false;
     for (let i = 0; i < 20; i++) {
-      await call("browser_wait", { time: 1500 });
+      await call("browser_wait", { time: 2500 });
       const v = await jval(await call("browser_evaluate", { script: "return (document.querySelector('.xterm-rows')?.textContent||'').trim().length > 2 || !!document.querySelector('.terminal-container canvas')" }));
       if (v) { ok = true; break; }
     }
@@ -169,7 +189,7 @@ try {
     const marker = `E2E-${Date.now().toString(36)}`;
     await call("browser_evaluate", { script: "document.querySelector('.terminal-container').click()" });
     await call("browser_type", { selector: ".terminal-container", text: `/name ${marker}\n`, delay: 8 });
-    await call("browser_wait", { time: 1500 });
+    await call("browser_wait", { time: 2500 });
     await shot("06-before");
     // simulate browser-close: tear down the WS by clearing session state + a fresh
     // navigation. The server pty must survive and re-attach (buffer replay + redraw).
@@ -180,7 +200,7 @@ try {
     await call("browser_wait", { selector: ".terminal-container", timeout: 12000 });
     let ok = false;
     for (let i = 0; i < 14; i++) {
-      await call("browser_wait", { time: 1500 });
+      await call("browser_wait", { time: 2500 });
       const v = await jval(await call("browser_evaluate", { script: "return (document.querySelector('.xterm-rows')?.textContent||'').trim().length > 2" }));
       if (v) { ok = true; break; }
     }
