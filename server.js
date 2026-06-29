@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import { config } from "./lib/config.mjs";
 import { passport } from "./lib/auth.mjs";
+import { ensureGitAskpass } from "./lib/git-creds.mjs";
 import { attachTerminalWebSocket } from "./routes/terminal.js";
 
 import authRoutes from "./routes/auth.js";
@@ -24,6 +25,9 @@ import gitRoutes from "./routes/git.js";
 const app = express();
 app.set("trust proxy", 1);
 const server = createServer(app);
+
+// Write the portable git credential helper (provider-aware token routing).
+ensureGitAskpass();
 
 app.use(helmet({
   contentSecurityPolicy: {
