@@ -26,3 +26,7 @@ Thumbs.db
 # Pi runtime
 .pi/
 graphify-out/
+
+# Waynode runtime (per-space session/workspace state)
+.waynode/
+_tmp/
