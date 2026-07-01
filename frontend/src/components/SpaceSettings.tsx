@@ -93,7 +93,9 @@ export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
             <>
               <div className="settings-hint" style={{ marginBottom: 12 }}>
                 Secrets are encrypted and injected as environment variables when pi runs in this space.
-                Values are never shown again after you add them.
+                Values are never shown again after you add them. Add a <code>GITHUB_TOKEN</code> or{" "}
+                <code>GITLAB_TOKEN</code> secret to use a scoped token for git operations in this space
+                instead of your personal login token.
               </div>
               {secrets.length === 0 ? (
                 <div className="kv-empty">No secrets yet. Add API keys below.</div>
