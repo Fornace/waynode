@@ -26,3 +26,6 @@ Thumbs.db
 # Pi runtime
 .pi/
 graphify-out/
+
+# Scratch / local verification artifacts
+_tmp/

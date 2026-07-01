@@ -83,6 +83,17 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
       }
 
       wss.handleUpgrade(req, socket, head, async (ws) => {
+        // The 101 handshake response can still be in flight on the underlying
+        // socket right when this callback runs — sending/closing immediately
+        // raced real browsers (though not Node's own `ws` client) into
+        // "Connection closed before receiving a handshake response", so the
+        // graceful-rejection payload below never arrived. Waiting for the
+        // 'open' readyState guarantees the handshake has actually completed
+        // client-side first.
+        if (ws.readyState !== ws.OPEN) {
+          await new Promise((resolve) => ws.once("open", resolve));
+        }
+
         // Acquire the SERVER-OWNED pty for this session. getTerminal reclaims
         // any chat rpc agent first (mutual exclusion), then returns the live
         // pty — spawning one only if none exists yet.
@@ -90,7 +101,17 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
         try {
           handle = await getTerminal(session);
         } catch (err) {
-          ws.send(JSON.stringify({ type: "error", message: err.message }));
+          // Mirror the existing terminalDisabled (sandboxed-mode) pattern:
+          // tag the payload so the frontend can distinguish "agent busy, try
+          // again shortly" from "sandboxed mode, terminal permanently
+          // unavailable" instead of treating both as the same hard error.
+          if (err.agentBusy) {
+            ws.send(JSON.stringify({ type: "error", agentBusy: true, message: err.message }));
+          } else if (err.terminalDisabled) {
+            ws.send(JSON.stringify({ type: "error", terminalDisabled: true, message: err.message }));
+          } else {
+            ws.send(JSON.stringify({ type: "error", message: err.message }));
+          }
           ws.close();
           return;
         }
