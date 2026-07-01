@@ -8,6 +8,7 @@ import { createServer } from "http";
 import { config } from "./lib/config.mjs";
 import { passport } from "./lib/auth.mjs";
 import { ensureGitAskpass } from "./lib/git-creds.mjs";
+import { ensurePiProviderConfig } from "./lib/pi-config.mjs";
 import { attachTerminalWebSocket } from "./routes/terminal.js";
 
 import authRoutes from "./routes/auth.js";
@@ -21,6 +22,7 @@ import adminRoutes from "./routes/admin.js";
 import orgRoutes from "./routes/orgs.js";
 import resolveRoutes from "./routes/resolve.js";
 import gitRoutes from "./routes/git.js";
+import billingRoutes, { webhookRouter as billingWebhookRoutes } from "./routes/billing.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -28,6 +30,10 @@ const server = createServer(app);
 
 // Write the portable git credential helper (provider-aware token routing).
 ensureGitAskpass();
+
+// Write pi's fornace LLM provider config from runtime env (LLM_API_KEY),
+// never baked into the Docker image — see lib/pi-config.mjs.
+ensurePiProviderConfig();
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -81,6 +87,16 @@ const sessionMiddleware = session({
 });
 
 app.use(cors({ origin: config.appUrl, credentials: true }));
+
+// Stripe webhook needs the raw, untouched request body for signature
+// verification — must be mounted BEFORE express.json() and scoped to this
+// exact path only (raw parsing must not swallow the body of every other
+// route). No-ops with 404 when billing isn't configured (routes/billing.js).
+app.use((req, res, next) => {
+  if (req.path === "/api/billing/webhook") return express.raw({ type: "application/json" })(req, res, next);
+  next();
+}, billingWebhookRoutes);
+
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(sessionMiddleware);
@@ -98,6 +114,7 @@ app.use(adminRoutes);
 app.use(orgRoutes);
 app.use(resolveRoutes);
 app.use(gitRoutes);
+app.use(billingRoutes);
 
 // Model listing endpoint
 app.get("/api/models", (req, res) => {

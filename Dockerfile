@@ -61,29 +61,12 @@ RUN npm install -g @earendil-works/pi-coding-agent@latest
 RUN pi install npm:pi-codex-goal --approve || true
 RUN pi install npm:pi-lean-ctx --approve || true
 
-# Configure pi with fornace-llm gateway as custom provider.
-# LLM_BASE_URL build arg: docker-DNS name when waynode is co-located with
-# fornace-llm (49.12.9.255), or the WireGuard tunnel IP (10.200.0.1) when
-# waynode runs on the sandbox host (ffrapposerver).
-ARG LLM_BASE_URL=fornace-llm:4000
-RUN mkdir -p /root/.pi/agent && echo '{\
-  "providers": {\
-    "fornace": {\
-      "baseUrl": "http://${LLM_BASE_URL}/v1",\
-      "api": "openai-completions",\
-      "apiKey": "sk-4dea025d8aa9572a2a68b8e4126561519fec29e3cf2fc26f",\
-      "compat": {"supportsDeveloperRole": false, "supportsReasoningEffort": false},\
-      "models": [\
-        {"id": "fornace-fast", "name": "Fornace Fast"},\
-        {"id": "fornace-reasoning", "name": "Fornace Reasoning"},\
-        {"id": "fornace-max", "name": "Fornace Max"},\
-        {"id": "glm-5.2-fast", "name": "GLM 5.2 Fast"},\
-        {"id": "glm-5.2-reasoning", "name": "GLM 5.2 Reasoning"},\
-        {"id": "qwen-flash", "name": "Qwen Flash"}\
-      ]\
-    }\
-  }\
-}' > /root/.pi/agent/models.json
+# pi's fornace-llm provider config (including the API key) is written at
+# CONTAINER STARTUP by lib/pi-config.mjs, from the LLM_BASE_URL / LLM_API_KEY
+# runtime env vars (see docker-compose.yml env_file: .env) — never baked into
+# an image layer here. Unlike sandbox/Dockerfile, this image's egress isn't
+# network-scoped to the LLM host, so a build-time RUN/ENV secret would be
+# recoverable by anyone with the image (e.g. `docker history`).
 
 # Data volume
 RUN mkdir -p /data/repos

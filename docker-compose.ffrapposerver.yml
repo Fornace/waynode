@@ -4,14 +4,18 @@
 # code executes inside hardware-isolated microVMs. The LLM is reached over the
 # WireGuard tunnel to 49.12.9.255 (10.200.0.1:4000), NOT a shared docker network.
 #
-# Usage on ffrapposerver:
-#   LLM_BASE_URL=10.200.0.1:4000 docker compose -f docker-compose.ffrapposerver.yml up -d --build
+# LLM_BASE_URL/LLM_API_KEY are supplied at container RUNTIME via .env (see
+# lib/pi-config.mjs) — NOT as a Docker build arg. The main waynode image's
+# egress isn't network-scoped the way sandbox/Dockerfile's is, so the key
+# must never be baked into an image layer here.
+#
+# Usage on ffrapposerver: set LLM_BASE_URL=10.200.0.1:4000 and LLM_API_KEY=...
+# in .env, then:
+#   docker compose -f docker-compose.ffrapposerver.yml up -d --build
 services:
   waynode:
     build:
       context: .
-      args:
-        LLM_BASE_URL: ${LLM_BASE_URL:-10.200.0.1:4000}
     container_name: waynode
     restart: unless-stopped
     ports:
