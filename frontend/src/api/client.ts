@@ -1,4 +1,4 @@
-import type { User, Space, Session, GoalStatus, ChatMessage, GitSnapshot } from "../types";
+import type { User, Space, Session, GoalStatus, ChatMessage, GitSnapshot, Org } from "../types";
 
 const base = "";
 
@@ -29,6 +29,11 @@ export const api = {
     logout: () => fetchJSON("/auth/logout", { method: "POST" }),
   },
 
+  orgs: {
+    list: () => fetchJSON<Org[]>("/api/orgs"),
+    create: (name: string) => fetchJSON<Org>("/api/orgs", { method: "POST", body: JSON.stringify({ name }) }),
+  },
+
   spaces: {
     list: () => fetchJSON<Space[]>("/api/spaces"),
     get: (id: string) => fetchJSON<Space>(`/api/spaces/${id}`),
@@ -45,7 +50,8 @@ export const api = {
   },
 
   sessions: {
-    list: (spaceId: string) => fetchJSON<Session[]>(`/api/spaces/${spaceId}/sessions`),
+    list: (spaceId: string, opts?: { includeArchived?: boolean }) =>
+      fetchJSON<Session[]>(`/api/spaces/${spaceId}/sessions${opts?.includeArchived ? "?includeArchived=true" : ""}`),
     get: (id: string) => fetchJSON<Session>(`/api/sessions/${id}`),
     create: (spaceId: string, opts?: { title?: string; model?: string }) =>
       fetchJSON<Session>(`/api/spaces/${spaceId}/sessions`, {
@@ -53,6 +59,11 @@ export const api = {
         body: JSON.stringify(opts || {}),
       }),
     delete: (id: string) => fetchJSON(`/api/sessions/${id}`, { method: "DELETE" }),
+    archive: (id: string, archived = true) =>
+      fetchJSON<Session>(`/api/sessions/${id}/archive`, {
+        method: "POST",
+        body: JSON.stringify({ archived }),
+      }),
     patch: (id: string, updates: Partial<Session>) =>
       fetchJSON<Session>(`/api/sessions/${id}`, {
         method: "PATCH",

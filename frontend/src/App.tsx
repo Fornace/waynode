@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { LoginPage } from "./pages/LoginPage";
+import { LandingPage } from "./pages/LandingPage";
+import { InvitePage } from "./pages/InvitePage";
 import { Sidebar } from "./components/Sidebar";
 import { SessionView } from "./components/SessionView";
 import { SpaceSettings } from "./components/SpaceSettings";
@@ -19,7 +20,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -42,6 +43,12 @@ function AppContent() {
 
   useEffect(() => {
     if (user) {
+      const pendingInvite = localStorage.getItem("waynode-pending-invite");
+      if (pendingInvite) {
+        localStorage.removeItem("waynode-pending-invite");
+        navigate(`/invite/${pendingInvite}`);
+        return;
+      }
       fetch("/api/repos/status", { headers: getAuthHeaders(), credentials: "include" })
         .then((r) => r.json())
         .then((d) => { setGithubConnected(d.github); setGitlabConnected(d.gitlab); })
@@ -91,6 +98,14 @@ function AppContent() {
 
   const handleSessionCreated = (session: Session) => {
     setSessions((prev) => prev.some((s) => s.id === session.id) ? prev : [...prev, session]);
+  };
+
+  const handleSessionArchived = (session: Session) => {
+    setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
+  };
+
+  const handleSessionDeleted = (sessionId: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
   };
 
   // ── Auto-generated session titles arrive over the live stream. ──
@@ -193,7 +208,7 @@ function AppContent() {
     );
   }
 
-  if (!user) return <LoginPage />;
+  if (!user) return <LandingPage />;
 
   if (adminOpen && isAdmin) {
     return (
@@ -206,7 +221,16 @@ function AppContent() {
   if (orgSettingsOpen && activeOrg) {
     return (
       <div className="app-layout">
-        <OrgSettings org={activeOrg} onClose={() => setOrgSettingsOpen(false)} />
+        <OrgSettings
+          org={activeOrg}
+          onClose={() => setOrgSettingsOpen(false)}
+          onRenamed={(updated) => setOrgs((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)))}
+          onDeleted={(deleted) => {
+            setOrgs((prev) => prev.filter((o) => o.id !== deleted.id));
+            setActiveOrgId((prev) => (prev === deleted.id ? null : prev));
+            setOrgSettingsOpen(false);
+          }}
+        />
       </div>
     );
   }
@@ -225,6 +249,8 @@ function AppContent() {
         onSelectSession={handleSelectSession}
         onSpaceCreated={(space) => { setSpaces((prev) => prev.some((s) => s.id === space.id) ? prev : [...prev, space]); refreshRepoStatus(); }}
         onSessionCreated={handleSessionCreated}
+        onSessionArchived={handleSessionArchived}
+        onSessionDeleted={handleSessionDeleted}
         onSpaceExpand={handleSpaceExpand}
         githubConnected={githubConnected}
         gitlabConnected={gitlabConnected}
@@ -232,9 +258,11 @@ function AppContent() {
         onOpenAdmin={() => setAdminOpen(true)}
         onOpenOrgSettings={() => setOrgSettingsOpen(true)}
         user={user}
+        onLogout={logout}
         orgs={orgs}
         activeOrgId={activeOrgId}
         onSelectOrg={(id) => { setActiveOrgId(id); setSessions([]); navigate("/"); }}
+        onOrgCreated={(org) => setOrgs((prev) => [...prev, org])}
       />
       {activeSession && activeSpace ? (
         <>
@@ -276,6 +304,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/" element={<AppContent />} />
         <Route path="/:spaceSeg" element={<AppContent />} />
         <Route path="/:spaceSeg/:sessionSeg" element={<AppContent />} />

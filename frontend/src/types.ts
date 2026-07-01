@@ -28,6 +28,7 @@ export interface Session {
   pi_session_dir: string;
   model: string | null;
   provider: string | null;
+  archived?: number | boolean;
   created_at: string;
   updated_at: string;
 }
