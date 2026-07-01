@@ -27,6 +27,7 @@
     "passport": "0.7.0",
     "passport-github2": "0.1.12",
     "passport-gitlab2": "5.0.0",
+    "stripe": "^18.5.0",
     "uuid": "14.0.1",
     "ws": "8.21.0"
   },
