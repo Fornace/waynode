@@ -44,6 +44,9 @@ RUN npm ci || npm install
 # the container to boot hardware-isolated microVMs. No-op on hosts without
 # /dev/kvm (isSandboxAvailable() returns false, falls back to direct pi).
 RUN npx microsandbox install || echo "msb runtime install failed (KVM sandboxing disabled)"
+# Put msb on PATH so the microsandbox Node SDK can find it at runtime
+# (npm ci installs it to node_modules/.bin, which isn't on PATH by default).
+RUN ln -sf /app/node_modules/.bin/msb /usr/local/bin/msb
 
 # Copy server code
 COPY lib/ ./lib/
