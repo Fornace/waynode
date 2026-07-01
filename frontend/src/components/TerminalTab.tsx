@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Session } from "../types";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -16,6 +16,7 @@ export default function TerminalTab({ session, onRequestExit }: TerminalTabProps
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [disabledReason, setDisabledReason] = useState<string | null>(null);
   // Keep the latest exit callback in a ref so the one-time key handler
   // (registered inside the [session.id] effect) always calls the current one.
   const onRequestExitRef = useRef(onRequestExit);
@@ -87,7 +88,13 @@ export default function TerminalTab({ session, onRequestExit }: TerminalTabProps
         } else if (msg.type === "exit") {
           term.write(`\r\n[pi exited with code ${msg.exitCode}]\r\n`);
         } else if (msg.type === "error") {
-          term.write(`\r\n[error: ${msg.message}]\r\n`);
+          // A disabled-mode error is shown as a dedicated banner rather than
+          // a raw line in the dead terminal.
+          if (/unavailable in sandboxed mode/i.test(msg.message)) {
+            setDisabledReason(msg.message);
+          } else {
+            term.write(`\r\n[error: ${msg.message}]\r\n`);
+          }
         }
       } catch {}
     };
@@ -125,6 +132,21 @@ export default function TerminalTab({ session, onRequestExit }: TerminalTabProps
       wsRef.current = null;
     };
   }, [session.id]);
+
+  if (disabledReason) {
+    return (
+      <div className="terminal-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ maxWidth: 480, textAlign: "center", color: "var(--text-dim)", fontSize: 13, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
+          <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Terminal unavailable</div>
+          <div>{disabledReason}</div>
+          <div style={{ marginTop: 16, fontSize: 12, color: "var(--text-faint)" }}>
+            Agent chat still works — it runs in an isolated microVM. Use the Chat tab.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return <div className="terminal-container" ref={containerRef} />;
 }

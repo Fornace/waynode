@@ -31,14 +31,17 @@ jobs:
             --exclude='.env' \
             ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/waynode/
 
-      - name: Rebuild and restart container
+      - name: Rebuild and restart container (sandboxed host)
         run: |
           ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} '
             cd /opt/waynode &&
-            docker compose build &&
-            docker compose up -d &&
+            docker compose -f docker-compose.ffrapposerver.yml build &&
+            docker compose -f docker-compose.ffrapposerver.yml up -d &&
             docker image prune -f
           '
+        env:
+          # pi reaches fornace-llm over the WireGuard tunnel (not docker DNS)
+          LLM_BASE_URL: 10.200.0.1:4000
 
       - name: Verify deployment
         run: |
