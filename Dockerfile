@@ -40,6 +40,11 @@ RUN git config --global user.name "Waynode" && \
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 
+# microsandbox runtime: libkrunfw + msb binary (platform package). Needed for
+# the container to boot hardware-isolated microVMs. No-op on hosts without
+# /dev/kvm (isSandboxAvailable() returns false, falls back to direct pi).
+RUN npx microsandbox install || echo "msb runtime install failed (KVM sandboxing disabled)"
+
 # Copy server code
 COPY lib/ ./lib/
 COPY routes/ ./routes/
@@ -53,11 +58,15 @@ RUN npm install -g @earendil-works/pi-coding-agent@latest
 RUN pi install npm:pi-codex-goal --approve || true
 RUN pi install npm:pi-lean-ctx --approve || true
 
-# Configure pi with fornace-llm gateway as custom provider
+# Configure pi with fornace-llm gateway as custom provider.
+# LLM_BASE_URL build arg: docker-DNS name when waynode is co-located with
+# fornace-llm (49.12.9.255), or the WireGuard tunnel IP (10.200.0.1) when
+# waynode runs on the sandbox host (ffrapposerver).
+ARG LLM_BASE_URL=fornace-llm:4000
 RUN mkdir -p /root/.pi/agent && echo '{\
   "providers": {\
     "fornace": {\
-      "baseUrl": "http://fornace-llm:4000/v1",\
+      "baseUrl": "http://${LLM_BASE_URL}/v1",\
       "api": "openai-completions",\
       "apiKey": "sk-4dea025d8aa9572a2a68b8e4126561519fec29e3cf2fc26f",\
       "compat": {"supportsDeveloperRole": false, "supportsReasoningEffort": false},\

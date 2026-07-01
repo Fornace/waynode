@@ -1,0 +1,28 @@
+# docker-compose.ffrapposerver.yml — overlay for the sandbox-execution host.
+#
+# Usage (on ffrapposerver, alongside the base docker-compose.yml):
+#   LLM_BASE_URL=10.200.0.1:4000 docker compose -f docker-compose.yml -f docker-compose.ffrapposerver.yml up -d
+#
+# Differences from the base (49.12.9.255) deploy:
+#  - /dev/kvm + /dev/net/tun passed in so the container can boot microVMs
+#  - NET_ADMIN cap (microsandbox networking for the guest)
+#  - /root/.microsandbox mounted so the `waynode-sandbox` image (cached on the
+#    host) is visible inside the container without reloading
+#  - No fornace-net (the LLM is reached over the WireGuard tunnel, not a shared
+#    docker network)
+services:
+  waynode:
+    build:
+      args:
+        LLM_BASE_URL: ${LLM_BASE_URL:-10.200.0.1:4000}
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - waynode-data:/data
+      - /root/.microsandbox:/root/.microsandbox
+    networks: []
+
+networks: {}
