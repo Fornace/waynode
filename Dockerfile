@@ -20,11 +20,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     ca-certificates \
     curl \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
+# GitHub CLI — needed for `gh run watch`, PR ops, etc.
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list && \
+    apt-get update && apt-get install -y gh && rm -rf /var/lib/apt/lists/*
+
 # Install lean-ctx CLI (standalone binary for pi-lean-ctx extension)
-RUN curl -fsSL https://github.com/yvgude/lean-ctx/releases/download/v3.8.11/lean-ctx-x86_64-unknown-linux-musl.tar.gz | tar xzf - -C /tmp && \
-    mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx || echo "lean-ctx install failed, pi-lean-ctx will run without it"
+ARG LEAN_CTX_VERSION=v3.8.12
+RUN curl -fsSL https://github.com/yvgude/lean-ctx/releases/download/${LEAN_CTX_VERSION}/lean-ctx-x86_64-unknown-linux-musl.tar.gz \
+      | tar xzf - -C /tmp && \
+    mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx && \
+    lean-ctx --version
 
 WORKDIR /app
 
@@ -58,8 +70,8 @@ COPY --from=builder /build/frontend/dist ./frontend/dist
 
 # Install pi CLI
 RUN npm install -g @earendil-works/pi-coding-agent@latest
-RUN pi install npm:pi-codex-goal --approve || true
-RUN pi install npm:pi-lean-ctx --approve || true
+RUN pi install npm:pi-codex-goal --approve
+RUN pi install npm:pi-lean-ctx --approve
 
 # pi's fornace-llm provider config (including the API key) is written at
 # CONTAINER STARTUP by lib/pi-config.mjs, from the LLM_BASE_URL / LLM_API_KEY

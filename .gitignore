@@ -27,5 +27,8 @@ Thumbs.db
 .pi/
 graphify-out/
 
+# Waynode runtime (per-space session/workspace state)
+.waynode/
+
 # Scratch / local verification artifacts
 _tmp/
