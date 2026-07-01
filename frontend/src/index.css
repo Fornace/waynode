@@ -130,14 +130,22 @@ input, textarea {
   letter-spacing: -0.3px;
 }
 
+/* Shared trigger row for the org-switcher (sidebar header) and user menu
+   (sidebar footer) — both open a .send-dropdown and should feel like the
+   same kind of control: full-width, same padding/radius, same hover tint. */
+.menu-trigger-row {
+  padding: 6px 8px;
+  margin: -6px -8px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+.menu-trigger-row:hover { background: var(--bg-hover); }
+
+/* Sizing/hover come from .icon-btn-ghost (shared small icon-trigger
+   convention); this rule only sets the glyph's font-size. */
 .sidebar-collapse-btn {
-  padding: 4px 8px;
-  border-radius: 4px;
-  color: var(--text-dim);
   font-size: 13px;
 }
-
-.sidebar-collapse-btn:hover { background: var(--bg-hover); color: var(--text); }
 
 .sidebar-content {
   flex: 1;
@@ -185,6 +193,9 @@ input, textarea {
 }
 
 .session-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 6px 8px 6px 12px;
   border-radius: var(--radius);
   cursor: pointer;
@@ -192,15 +203,83 @@ input, textarea {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   transition: all 0.2s ease;
   margin-top: 2px;
   position: relative;
 }
 
+.session-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .session-item:hover { background: rgba(255, 255, 255, 0.03); color: var(--text-dim); }
 .session-item.active { background: transparent; color: var(--accent); }
+.session-item.archived { opacity: 0.6; cursor: default; }
+
+/* Compact icon-trigger variant for controls embedded in an already-small row
+   (session list item). Same visual language as .icon-btn-ghost (transparent
+   at rest, --bg-hover tint on hover, 8px radius) but sized down to fit a
+   28px-tall row instead of forcing a full 36px target that would overflow it. */
+.session-menu-btn {
+  opacity: 0;
+  color: var(--text-faint);
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.session-item:hover .session-menu-btn,
+.session-item:focus-within .session-menu-btn { opacity: 1; }
+.session-menu-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+/* Compound selector (not just .session-menu) so this wins over the later
+   .send-dropdown rule regardless of stylesheet order — both have class-level
+   specificity, so source order would otherwise let .send-dropdown's
+   bottom:100% clobber this and collapse the menu (seen when the trigger sits
+   near the bottom of the sidebar, e.g. the last session in a space). */
+.send-dropdown.session-menu {
+  position: absolute;
+  top: 100%;
+  bottom: auto;
+  right: 0;
+  left: auto;
+  z-index: 20;
+  margin-top: 2px;
+  margin-bottom: 0;
+  min-width: 160px;
+}
+
+.session-unarchive-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.session-unarchive-btn:hover { background: rgba(255, 255, 255, 0.06); }
+
+.archived-toggle {
+  margin-top: 4px;
+  padding: 5px 8px 5px 12px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.archived-toggle:hover { color: var(--text-dim); }
+
+.space-git-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--amber);
+  background: rgba(245, 158, 11, 0.12);
+  padding: 1px 6px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
 .session-item.active::before {
   content: "";
   position: absolute;
@@ -266,24 +345,16 @@ input, textarea {
   font-size: 13px;
   font-weight: 600;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Sizing/colors come from .icon-btn (shared small icon-trigger convention);
+   this rule only controls the mobile-only visibility. */
 .top-bar-menu-btn {
   display: none;
-  padding: 6px;
-  border-radius: 6px;
-  color: var(--text-dim);
-  transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.top-bar-menu-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text);
 }
 
 .tabs {
@@ -305,11 +376,50 @@ input, textarea {
 }
 
 .tab-btn:hover:not(.active) { color: var(--text); }
-.tab-btn.active { 
-  background: rgba(255, 255, 255, 0.15); 
-  color: var(--text); 
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1); 
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1);
 }
+
+/* Shared "small icon-trigger" convention: any button whose only content is an
+   icon or a 1-2 char glyph (hamburger, settings, git, sidebar collapse,
+   session "⋯" menu, org/user menu carets). Fixed 36x36 hit target on both
+   mobile and desktop — comfortably tappable and consistent everywhere a bare
+   icon opens/toggles something, independent of the text-tab styling above. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.icon-btn:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+.icon-btn.active { background: rgba(255, 255, 255, 0.15); color: var(--text); }
+
+/* Bare/borderless variant for icon-triggers that sit inside already-chrome'd
+   rows (sidebar header, sidebar footer) where a bordered chip would be too
+   heavy — same 36x36 hit target and hover tint, no border/background at rest. */
+.icon-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.icon-btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
 
 .session-area {
   flex: 1;
@@ -368,45 +478,6 @@ input, textarea {
 
 
 
-.send-button-group {
-  display: flex;
-  position: relative;
-}
-
-.send-btn {
-  background: var(--accent);
-  color: #fff;
-  padding: 8px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.send-btn:hover { background: var(--accent-hover); }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-/* Mobile newline affordance: sits before Send on touch devices where there's
-   no Shift+Enter. Subtler than Send so the primary action stays salient. */
-.newline-btn { background: transparent; color: var(--text-dim); border: 1px solid var(--border); font-size: 16px; line-height: 1; padding: 8px 10px; }
-.newline-btn:hover { background: var(--bg-hover); color: var(--text); }
-
-.send-dropdown-btn {
-  background: var(--accent);
-  color: #fff;
-  width: 24px;
-  border-left: 1px solid rgba(255,255,255,0.2);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-}
-
-.send-dropdown-btn:hover { background: var(--accent-hover); }
-
 .send-dropdown {
   position: absolute;
   bottom: 100%;
@@ -423,6 +494,7 @@ input, textarea {
 }
 
 .send-dropdown-item {
+  display: block;
   padding: 10px 14px;
   font-size: 13.5px;
   width: 100%;
@@ -526,29 +598,39 @@ input, textarea {
 .empty-state-title { font-size: 18px; color: var(--text); font-weight: 600; margin-bottom: 8px; }
 .empty-state-desc { font-size: 14.5px; color: var(--text-dim); max-width: 320px; line-height: 1.5; }
 
+/* Sidebar-level actions (Clone Repository, Org Settings) — deliberately
+   heavier than a .space-item row so they read as actions, not content:
+   left-aligned like the list below them but with their own border/shadow
+   chrome and an accent-tinted hover/active state instead of the neutral
+   gray .space-item:hover tint. */
 .new-space-btn {
-  margin: 12px 12px 4px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+  margin: 4px 8px;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   font-size: 13px;
   color: var(--text);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: calc(100% - 24px);
+  justify-content: flex-start;
+  gap: 8px;
+  width: calc(100% - 16px);
   cursor: pointer;
   transition: all 0.15s ease;
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
-.new-space-btn:hover { 
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.1);
+.new-space-btn svg { color: var(--accent); flex-shrink: 0; }
+
+.new-space-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text);
 }
+
+.new-space-btn:active { background: rgba(59, 130, 246, 0.12); }
 
 .new-session-btn {
   margin-top: 4px;
@@ -571,18 +653,15 @@ input, textarea {
 
 .terminal-container {
   flex: 1;
-  padding: 8px 12px;
+  padding: 4px;
   overflow: hidden;
   background: var(--bg);
 }
 
 .terminal-container .xterm {
   height: 100%;
-  padding: 12px;
+  padding: 8px;
   background: #0f0f11;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .modal-overlay {
@@ -701,7 +780,56 @@ input, textarea {
     display: block;
   }
 
-  .composer { padding: 8px; }
+  .top-bar {
+    /* Solid, not translucent — on mobile there's nothing but the plain
+       --bg body behind the safe-area strip, so a blurred translucent
+       background made the status-bar inset read as a different shade than
+       the bar itself. A flat color that matches --bg-surface removes the
+       seam and doubles as a lighter, more "native" bar. */
+    background: var(--bg-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 8px 12px;
+    padding-top: calc(8px + var(--safe-top));
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .top-bar-title {
+    font-size: 12.5px;
+    flex-shrink: 1;
+  }
+
+  /* Model select shrinks to an icon-sized affordance instead of pushing the
+     tab switcher off-screen; the dropdown itself still opens full width. */
+  .model-select {
+    max-width: 84px;
+    padding: 6px 22px 6px 8px;
+    font-size: 12px;
+  }
+
+  /* Settings/git/menu icon buttons keep their fixed .icon-btn hit target on
+     mobile too; just make sure they never get squeezed by flex. */
+  .top-bar .icon-btn {
+    flex-shrink: 0;
+  }
+
+  /* Chat/Terminal segmented switcher: shrink text/padding rather than clip —
+     stays fully visible and tappable down to 375px. */
+  .tabs {
+    flex-shrink: 0;
+  }
+  .tabs .tab-btn {
+    padding: 4px 10px;
+    font-size: 12.5px;
+  }
+
+  .composer {
+    padding: 8px;
+    /* The base rule's safe-bottom handling gets clobbered by this override —
+       reapply it here so the composer isn't cropped by the home indicator. */
+    padding-bottom: calc(8px + var(--safe-bottom));
+  }
   .composer-input { font-size: 16px; }
   .chat-messages { padding: 10px; }
 
@@ -1397,19 +1525,22 @@ input, textarea {
 .msg-text th,.msg-text td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
 .msg-text th { background: var(--bg-surface); font-weight: 600; color: #fff; }
 
-/* streaming cursor */
+/* streaming cursor — appears only at the end of the single message currently
+   being generated (scoped in ChatTab.tsx via streaming && idx === last). */
 .stream-cursor {
   display: inline-block;
   width: 7px; height: 15px;
   background: var(--accent);
   margin-left: 2px;
   vertical-align: text-bottom;
-  animation: blink 1s steps(2) infinite;
+  animation: blink 0.9s ease-in-out infinite;
   border-radius: 1px;
 }
-@keyframes blink { 50% { opacity: 0; } }
+@keyframes blink { 0%, 45% { opacity: 1; } 50%, 95% { opacity: 0; } 100% { opacity: 1; } }
 
-/* typing indicator (tool-only turn) */
+/* typing indicator — shown only before the first token of the live message
+   arrives (blocks.length === 0); once text starts streaming this is replaced
+   by .stream-cursor, so the two never render at the same time. */
 .msg-typing { display: flex; gap: 4px; padding: 6px 0; }
 .msg-typing span {
   width: 6px; height: 6px; border-radius: 50%;
@@ -1569,22 +1700,78 @@ input, textarea {
   outline: none;
   max-height: 250px;
 }
-.composer-input::placeholder { color: var(--text-faint); }
+.composer-input::placeholder {
+  color: var(--text-faint);
+  /* Keep the prompt on a single line at common mobile widths (375-430px). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-.send-group { display: flex; gap: 4px; align-items: center; position: relative; padding-bottom: 3px; }
-.send-btn, .send-caret {
+/* Buttons sit in the same flex row as the textarea (align-items: flex-end on
+   .composer-inner), so their own block height must equal one textarea
+   line-height (14.5px * 1.5 ≈ 22px) with matching vertical padding — that's
+   what actually centers them against the first/last line of text, at both
+   1-line and multi-line textarea heights. */
+.send-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  position: relative;
+  height: 36px;
+}
+.send-btn, .send-caret, .newline-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--accent); color: #fff;
-  border: none; border-radius: 10px;
-  padding: 8px 12px; cursor: pointer;
+  border: none;
+  cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.send-btn, .send-caret {
+  background: var(--accent); color: #fff;
+  padding: 8px 12px;
+}
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.send-stop { border-radius: 10px; box-shadow: var(--shadow-md); background: var(--red); }
+.send-stop:hover { background: #dc2626; transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+
+/* Split-button: .send-btn (main action) + .send-caret (dropdown handle) share
+   one visual pill. The container clips to a shared rounded rect and each
+   button rounds only its own outer corner, so together they read as a single
+   iOS/macOS-style split button (e.g. Safari's share button, "Save ▾"). */
+.send-split {
+  display: flex;
+  align-items: stretch;
+  border-radius: 10px;
+  overflow: hidden;
   box-shadow: var(--shadow-md);
 }
-.send-btn:hover, .send-caret:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: var(--shadow-md); }
-.send-caret { padding: 8px 8px; border-radius: 8px; margin-left: 2px; }
-.send-stop { background: var(--red); }
-.send-stop:hover { background: #dc2626; }
+.send-split:hover { box-shadow: var(--shadow-lg); }
+.send-split .send-btn,
+.send-split .send-caret {
+  border-radius: 0;
+}
+.send-split .send-caret {
+  padding: 8px 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+.send-split .send-btn:hover,
+.send-split .send-caret:hover {
+  background: var(--accent-hover);
+}
+
+/* Newline/return button — a secondary, muted affordance (touch devices only)
+   that must read as distinct from the primary send action, not a second
+   send button. */
+.newline-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.newline-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+}
 
 .send-menu {
   position: absolute;
@@ -1620,7 +1807,8 @@ input, textarea {
 @media (max-width: 768px) {
   .chat-messages { padding: 14px 12px 8px; }
   .msg-bubble { max-width: 88%; }
-  .send-btn { flex: 1; justify-content: center; padding: 10px; }
+  .send-split { flex: 1; }
+  .send-split .send-btn { flex: 1; justify-content: center; padding: 10px; }
   .send-menu { right: 0; left: 0; min-width: 0; }
 }
 
@@ -1758,6 +1946,51 @@ input, textarea {
 .add-kv-row { display: flex; gap: 8px; align-items: center; }
 .add-kv-row .form-input { flex: 1; min-width: 0; }
 
+/* Billing: usage progress bars + plan comparison cards. */
+.usage-bar-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent, #6366f1);
+  transition: width 0.3s ease;
+}
+.usage-bar-fill.usage-bar-warn { background: var(--amber, #f59e0b); }
+.usage-bar-fill.usage-bar-over { background: var(--red, #ef4444); }
+.usage-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.plan-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plan-card.plan-card-current { border-color: var(--accent, #6366f1); box-shadow: 0 0 0 1px var(--accent, #6366f1); }
+.plan-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.plan-card-price { font-size: 20px; font-weight: 700; color: var(--text); }
+.plan-card-price span { font-size: 11px; font-weight: 500; color: var(--text-faint); }
+.plan-card-specs { font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+
 .role-select {
   background: rgba(255,255,255,0.05);
   border: 1px solid var(--border);
@@ -1823,4 +2056,279 @@ input, textarea {
   font-size: 13px;
   line-height: 1.55;
   resize: vertical;
+}
+
+/* ── Landing page ── */
+
+.landing-page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.landing-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.3px;
+}
+
+.landing-nav-link {
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.landing-nav-link:hover { color: var(--text); }
+
+.landing-hero {
+  position: relative;
+  padding: 64px 24px 80px;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(59,130,246,0.16) 0%, transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(99,102,241,0.12) 0%, transparent 50%),
+    var(--bg);
+  text-align: center;
+}
+
+.landing-hero-copy {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.landing-hero h1 {
+  font-size: 44px;
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  margin: 20px 0 16px;
+}
+
+.landing-hero-sub {
+  color: var(--text-dim);
+  font-size: 17px;
+  line-height: 1.6;
+  max-width: 520px;
+  margin: 0 0 24px;
+}
+
+.landing-hero-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.landing-badge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.landing-cta {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 13px 28px;
+  border-radius: var(--radius);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.landing-cta:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.landing-features {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 24px 72px;
+}
+
+.landing-features h2,
+.landing-showcase h2,
+.landing-auth h2 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  text-align: center;
+  margin: 0 0 32px;
+}
+
+.landing-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.landing-feature-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+
+.landing-feature-card h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.landing-feature-card p {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.landing-showcase {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+.landing-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.browser-frame {
+  margin: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.browser-frame-chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 10px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.browser-frame-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.browser-frame-dot-red { background: #ff5f57; }
+.browser-frame-dot-amber { background: #febc2e; }
+.browser-frame-dot-green { background: #28c840; }
+
+.browser-frame-url {
+  margin-left: 8px;
+  flex: 1;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.browser-frame-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: top;
+}
+
+.browser-frame figcaption {
+  padding: 12px 14px 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.landing-auth {
+  padding: 8px 24px 88px;
+}
+
+.landing-auth .login-page {
+  height: auto;
+  background: none;
+  padding: 0;
+}
+
+.landing-auth .login-card {
+  margin: 0 auto;
+  box-shadow: none;
+}
+
+.landing-footer {
+  border-top: 1px solid var(--border);
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.landing-footer-links {
+  display: flex;
+  gap: 18px;
+}
+
+.landing-footer-links a {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.landing-footer-links a:hover { color: var(--text); }
+
+@media (max-width: 860px) {
+  .landing-features-grid { grid-template-columns: repeat(2, 1fr); }
+  .landing-showcase-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .landing-hero { padding: 48px 18px 56px; }
+  .landing-hero h1 { font-size: 32px; }
+  .landing-hero-sub { font-size: 15.5px; }
+  .landing-features-grid { grid-template-columns: 1fr; }
+  .landing-features { padding: 12px 18px 56px; }
+  .landing-showcase { padding: 0 18px 56px; }
+  .landing-auth { padding: 4px 18px 64px; }
+  .landing-nav { padding: 16px 18px; }
+  .landing-footer { padding: 20px 18px; flex-direction: column; align-items: flex-start; }
 }

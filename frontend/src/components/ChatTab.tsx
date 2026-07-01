@@ -191,9 +191,34 @@ export function ChatTab({ session }: ChatTabProps) {
           </div>
         )}
 
-        {state.items.map((item) => (
-          <MessageRow key={item.id} item={item} streaming={streaming} />
+        {state.items.map((item, idx) => (
+          <MessageRow
+            key={item.id}
+            item={item}
+            // The stream flag is global to the session, not per-message — only
+            // the very last item in the list can be the one currently being
+            // generated. Without this guard, every historical assistant
+            // message would re-show the typing dots / blinking cursor
+            // whenever ANY turn (even a later, unrelated one) is streaming.
+            streaming={streaming && idx === state.items.length - 1}
+          />
         ))}
+        {/* Between sending and the server's `message_start` event, the last
+            item is still the user's own just-sent message (no assistant item
+            exists yet to host the dots inside MessageRow). Without this,
+            there's a multi-second window — agent boot + model latency —
+            where NOTHING indicates the app is working. Render the same
+            three-dot affordance as a standalone placeholder in that gap. */}
+        {streaming && state.items[state.items.length - 1]?.role === "user" && (
+          <div className="msg msg-assistant">
+            <div className="msg-avatar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+            </div>
+            <div className="msg-body">
+              <div className="msg-typing"><span /><span /><span /></div>
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -224,11 +249,7 @@ export function ChatTab({ session }: ChatTabProps) {
           <textarea
             ref={inputRef}
             className="composer-input"
-            placeholder={
-              streaming
-                ? "Type a follow-up… (Enter to queue)"
-                : "Message the agent… (Enter to send, Shift+Enter for newline)"
-            }
+            placeholder={streaming ? "Type a follow-up…" : "Message the agent…"}
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
@@ -239,7 +260,9 @@ export function ChatTab({ session }: ChatTabProps) {
           />
           <div className="send-group">
             {isTouchDevice() && !streaming && (
-              <button className="send-btn newline-btn" onClick={insertNewline} title="New line">↵</button>
+              <button className="newline-btn" onClick={insertNewline} title="New line">
+                <NewlineIcon />
+              </button>
             )}
             {streaming ? (
               <button className="send-btn send-stop" onClick={handleAbort} title="Stop">
@@ -247,21 +270,23 @@ export function ChatTab({ session }: ChatTabProps) {
               </button>
             ) : (
               <>
-                <button
-                  className="send-btn"
-                  onClick={() => sendMessage(false)}
-                  disabled={!input.trim()}
-                  title="Send"
-                >
-                  <SendIcon />
-                </button>
-                <button
-                  className="send-caret"
-                  onClick={() => setShowDropdown((v) => !v)}
-                  title="More options"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-                </button>
+                <div className="send-split">
+                  <button
+                    className="send-btn"
+                    onClick={() => sendMessage(false)}
+                    disabled={!input.trim()}
+                    title="Send"
+                  >
+                    <SendIcon />
+                  </button>
+                  <button
+                    className="send-caret"
+                    onClick={() => setShowDropdown((v) => !v)}
+                    title="More options"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                  </button>
+                </div>
                 {showDropdown && (
                   <div className="send-menu">
                     <button className="send-menu-item" onClick={() => sendMessage(false)}>
@@ -327,7 +352,6 @@ function MessageRow({ item, streaming }: { item: ChatItem; streaming: boolean })
   }
 
   // assistant
-  const isLast = false; // determined by parent via key; cursor handled below
   return (
     <div className="msg msg-assistant">
       <div className="msg-avatar">
@@ -428,6 +452,17 @@ function StopIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
       <rect x="5" y="5" width="14" height="14" rx="2" />
+    </svg>
+  );
+}
+
+function NewlineIcon() {
+  // Standard "return/newline" glyph (corner-down-left arrow), distinct from
+  // the send paper-plane so it doesn't read as a second submit action.
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 10 4 15 9 20" />
+      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
     </svg>
   );
 }

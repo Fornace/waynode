@@ -6,6 +6,7 @@ import {
   listSessions,
   updateSession,
   deleteSession,
+  archiveSession,
   getMessagesFromDisk,
   touchSession,
 } from "../lib/sessions.mjs";
@@ -13,27 +14,50 @@ import { isPiAvailable } from "../lib/pi-runner.mjs";
 import { readGoalStatus } from "../lib/pi-runner.mjs";
 import { getAgent, getAgentIfActive } from "../lib/agent-manager.mjs";
 import { config } from "../lib/config.mjs";
+import { getSpace } from "../lib/spaces.mjs";
+import { getOrgSetting } from "../lib/orgs.mjs";
+import db from "../lib/db.mjs";
 
 const router = Router();
 
-// dev-token may arrive as header (fetch) or query (EventSource can't set headers)
-function devToken(req) {
-  return req.headers["x-dev-token"] || req.query.t;
+// dev-token may arrive as ?t= for EventSource (can't set headers) — mirrors
+// sseAuth in routes/spaces.js and routes/git.js. Without this, the /stream
+// SSE route 401s for every dev-token client, since EventSource can't send
+// the x-dev-token header requireAuth checks.
+function sseAuth(req, res, next) {
+  const tok = req.query.t;
+  if (config.devToken && tok && tok === config.devToken) {
+    let user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
+    if (!user) {
+      db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
+    }
+    req.user = user;
+    req.isAuthenticated = () => true;
+    return next();
+  }
+  requireAuth(req, res, next);
 }
 
 // ── Session CRUD ──
 
 router.get("/api/spaces/:spaceId/sessions", requireAuth, (req, res) => {
-  res.json(listSessions(req.params.spaceId));
+  const includeArchived = req.query.includeArchived === "true" || req.query.includeArchived === "1";
+  res.json(listSessions(req.params.spaceId, { includeArchived }));
 });
 
 router.post("/api/spaces/:spaceId/sessions", requireAuth, (req, res) => {
   const { title, model, provider } = req.body;
+
+  // Precedence: explicit request body > org's default_model setting > global env default.
+  const space = getSpace(req.params.spaceId);
+  const orgDefaultModel = space?.org_id ? getOrgSetting(space.org_id, "default_model") : null;
+
   const session = createSession({
     spaceId: req.params.spaceId,
     userId: req.user.id,
     title,
-    model: model || config.pi.defaultModel,
+    model: model || orgDefaultModel || config.pi.defaultModel,
     provider: provider || config.pi.defaultProvider,
   });
   res.json(session);
@@ -97,6 +121,13 @@ router.delete("/api/sessions/:sessionId", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+router.post("/api/sessions/:sessionId/archive", requireAuth, (req, res) => {
+  const session = ownSession(req, res);
+  if (!session) return;
+  const { archived = true } = req.body || {};
+  res.json(archiveSession(session.id, !!archived));
+});
+
 // ── Messages (re-hydrated from pi JSONL on disk) ──
 
 router.get("/api/sessions/:sessionId/messages", requireAuth, (req, res) => {
@@ -125,7 +156,7 @@ function writeSSE(res, ev) {
   } catch {}
 }
 
-router.get("/api/sessions/:sessionId/stream", requireAuth, async (req, res) => {
+router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
 
