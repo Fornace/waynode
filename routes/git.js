@@ -28,6 +28,15 @@ function spacePath(req) {
   return space?.local_path || null;
 }
 
+// Shared error mapper: a space row can outlive its on-disk directory (deleted
+// outside the app, or a stale/orphaned row). git-ops throws a tagged
+// SpaceDirMissingError for this case (see lib/git-ops.mjs) instead of letting
+// git's raw "fatal: cannot change to '...'" stderr propagate as a 500.
+function sendGitError(res, e, fallbackStatus = 500) {
+  if (e.spaceDirMissing) return res.status(409).json({ error: e.message, spaceDirMissing: true });
+  return res.status(fallbackStatus).json({ error: e.message });
+}
+
 // Snapshot (REST)
 router.get("/api/spaces/:spaceId/git", requireAuth, requireSpaceAccess, (req, res) => {
   const cwd = spacePath(req);
@@ -37,7 +46,7 @@ router.get("/api/spaces/:spaceId/git", requireAuth, requireSpaceAccess, (req, re
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json(data);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendGitError(res, e);
   }
 });
 
@@ -51,7 +60,7 @@ router.get("/api/spaces/:spaceId/git/diff", requireAuth, requireSpaceAccess, (re
     const diff = git.getFileDiff(cwd, path);
     res.json({ path, diff });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendGitError(res, e);
   }
 });
 
@@ -100,7 +109,10 @@ router.get("/api/spaces/:spaceId/git/sse", sseAuth, requireSpaceAccess, (req, re
         writeSSE(res, { type: "snapshot", data });
       }
     } catch (e) {
-      writeSSE(res, { type: "error", message: e.message });
+      writeSSE(res, { type: "error", message: e.message, spaceDirMissing: !!e.spaceDirMissing });
+      // The directory isn't coming back on its own — stop hammering it every
+      // 5s with a doomed git invocation.
+      if (e.spaceDirMissing) clearInterval(interval);
     }
   };
   poll(); // immediate
@@ -123,7 +135,7 @@ router.post("/api/spaces/:spaceId/git/commit", requireAuth, requireSpaceAccess, 
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    sendGitError(res, e, 400);
   }
 });
 
@@ -137,7 +149,7 @@ router.post("/api/spaces/:spaceId/git/switch-branch", requireAuth, requireSpaceA
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    sendGitError(res, e, 400);
   }
 });
 
@@ -151,7 +163,7 @@ router.post("/api/spaces/:spaceId/git/create-branch", requireAuth, requireSpaceA
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    sendGitError(res, e, 400);
   }
 });
 
@@ -168,7 +180,7 @@ router.post("/api/spaces/:spaceId/git/pull", requireAuth, requireSpaceAccess, as
   } catch (e) {
     // Divergence is not a hard failure — tell the UI it needs a choice.
     if (e.diverged) return res.status(409).json({ error: e.message, diverged: true });
-    res.status(400).json({ error: e.message });
+    sendGitError(res, e, 400);
   }
 });
 
@@ -182,6 +194,7 @@ router.post("/api/spaces/:spaceId/git/push", requireAuth, requireSpaceAccess, as
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, pushed: result.pushed, data });
   } catch (e) {
+    if (e.spaceDirMissing) return sendGitError(res, e);
     res.status(400).json({ error: e.message, pushRejected: !!e.pushRejected, noUpstream: !!e.noUpstream });
   }
 });
@@ -198,7 +211,7 @@ router.post("/api/spaces/:spaceId/git/merge", requireAuth, requireSpaceAccess, a
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, merged: result.merged, aborted: result.aborted, conflicts: result.conflicts, data });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    sendGitError(res, e, 400);
   }
 });
 

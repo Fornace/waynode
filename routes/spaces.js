@@ -114,8 +114,13 @@ router.get("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res) =
 // the per-space write mutex. This file keeps only space CRUD.
 
 router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, async (req, res) => {
-  const output = await pullSpace(req.params.spaceId);
-  return res.json({ output });
+  try {
+    const output = await pullSpace(req.params.spaceId);
+    return res.json({ output });
+  } catch (e) {
+    if (e.spaceDirMissing) return res.status(409).json({ error: e.message, spaceDirMissing: true });
+    return res.status(400).json({ error: e.message });
+  }
 });
 
 router.delete("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res) => {

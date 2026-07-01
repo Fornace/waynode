@@ -161,7 +161,22 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
   const [committing, setCommitting] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [pushing, setPushing] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; kind: "success" | "error" } | null>(null);
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Success messages auto-dismiss after a few seconds; errors stick around
+  // until the user dismisses them or triggers another action.
+  const showMsg = (text: string, kind: "success" | "error") => {
+    if (msgTimerRef.current) { clearTimeout(msgTimerRef.current); msgTimerRef.current = null; }
+    setMsg({ text, kind });
+    if (kind === "success") {
+      msgTimerRef.current = setTimeout(() => setMsg(null), 3500);
+    }
+  };
+
+  useEffect(() => {
+    return () => { if (msgTimerRef.current) clearTimeout(msgTimerRef.current); };
+  }, []);
 
   // Keep selection valid as the file list changes
   useEffect(() => {
@@ -212,9 +227,9 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
       setDescription("");
       setSelected(new Set());
       setExpanded(null);
-      setMsg(`Committed ${selected.size} file${selected.size > 1 ? "s" : ""} to ${snap.currentBranch}`);
+      showMsg(`Committed ${selected.size} file${selected.size > 1 ? "s" : ""} to ${snap.currentBranch}`, "success");
     } catch (e: any) {
-      setMsg(`✗ ${e.message}`);
+      showMsg(e.message, "error");
     } finally {
       setCommitting(false);
     }
@@ -229,11 +244,11 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
       if (r.conflicts && r.conflicts.length) {
         raiseRebaseConflict(r.conflicts, r.output);
       } else {
-        setMsg("Up to date");
+        showMsg("Up to date", "success");
       }
     } catch (e: any) {
       if (e.body?.diverged) raiseDiverged();
-      else setMsg(`✗ ${e.message}`);
+      else showMsg(e.message, "error");
     } finally {
       setPulling(false);
     }
@@ -245,12 +260,12 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
     try {
       const r = await api.git.push(space.id, false);
       onChange(r.data);
-      setMsg("Pushed");
+      showMsg("Pushed", "success");
     } catch (e: any) {
       const b = e.body || {};
       if (b.pushRejected) raisePushRejected();
       else if (b.noUpstream) raiseNoUpstream();
-      else setMsg(`✗ ${e.message}`);
+      else showMsg(e.message, "error");
     } finally {
       setPushing(false);
     }
@@ -307,7 +322,7 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
       title: "Push — no upstream",
       detail: `${cur} has no upstream. Set it and push to origin?`,
       actions: [
-        { id: "up", label: "Push & set upstream", primary: true, run: async () => { const r = await api.git.push(space.id, true); onChange(r.data); onIssue(null); setMsg("Pushed & upstream set"); } },
+        { id: "up", label: "Push & set upstream", primary: true, run: async () => { const r = await api.git.push(space.id, true); onChange(r.data); onIssue(null); showMsg("Pushed & upstream set", "success"); } },
         { id: "ignore", label: "Cancel", run: async () => onIssue(null) },
       ],
     });
@@ -319,9 +334,9 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
       const r = await api.git.pull(space.id, mode);
       onChange(r.data);
       if (r.conflicts && r.conflicts.length) raiseRebaseConflict(r.conflicts, r.output);
-      else { onIssue(null); setMsg(mode === "merge" ? "Merged & pulled" : "Rebased & pulled"); }
+      else { onIssue(null); showMsg(mode === "merge" ? "Merged & pulled" : "Rebased & pulled", "success"); }
     } catch (e: any) {
-      setMsg(`✗ ${e.message}`);
+      showMsg(e.message, "error");
     } finally {
       setPulling(false);
     }
@@ -393,7 +408,17 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
         </>
       )}
 
-      {msg && <div className="git-msg">{msg}</div>}
+      {msg && (
+        <div className={`git-msg git-msg-${msg.kind}`}>
+          {msg.kind === "success" ? <CheckIcon /> : <WarnIcon />}
+          <span className="git-msg-text">{msg.text}</span>
+          {msg.kind === "error" && (
+            <button className="git-msg-dismiss" onClick={() => setMsg(null)} title="Dismiss">
+              <CloseIcon />
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="git-commit-form">
         {snap.piBusy && (
@@ -886,6 +911,20 @@ function CloseIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+function WarnIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
   );
 }
