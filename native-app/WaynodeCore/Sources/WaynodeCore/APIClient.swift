@@ -279,9 +279,12 @@ public actor APIClient {
     }
 
     public struct CommitBody: Encodable, Sendable {
-        public var message: String
+        public var summary: String
+        public var description: String?
         public var files: [String]
-        public init(message: String, files: [String]) { self.message = message; self.files = files }
+        public init(summary: String, description: String? = nil, files: [String]) {
+            self.summary = summary; self.description = description; self.files = files
+        }
     }
 
     public struct CommitResponse: Decodable, Sendable {
@@ -292,27 +295,27 @@ public actor APIClient {
 
     public func commitFiles(_ spaceId: String, message: String, files: [String]) async throws -> CommitResponse {
         try await request("/api/spaces/\(spaceId)/git/commit", method: "POST",
-                          body: CommitBody(message: message, files: files))
+                          body: CommitBody(summary: message, description: nil, files: files))
     }
 
     public struct SwitchBranchBody: Encodable, Sendable {
-        public var branch: String
+        public var branchName: String
         public var mode: String // "stash" | "carry" | "clean"
-        public init(branch: String, mode: String) { self.branch = branch; self.mode = mode }
+        public init(branchName: String, mode: String) { self.branchName = branchName; self.mode = mode }
     }
 
     public func switchBranch(_ spaceId: String, branch: String, mode: String = "stash") async throws {
         struct Resp: Decodable { let ok: Bool; let error: String? }
         let r: Resp = try await request("/api/spaces/\(spaceId)/git/switch-branch", method: "POST",
-                                        body: SwitchBranchBody(branch: branch, mode: mode))
+                                        body: SwitchBranchBody(branchName: branch, mode: mode))
         if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Failed to switch branch") }
     }
 
     public func createBranch(_ spaceId: String, name: String) async throws {
-        struct Body: Encodable { let name: String }
+        struct Body: Encodable { let branchName: String }
         struct Resp: Decodable { let ok: Bool; let error: String? }
         let r: Resp = try await request("/api/spaces/\(spaceId)/git/create-branch", method: "POST",
-                                        body: Body(name: name))
+                                        body: Body(branchName: name))
         if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Failed to create branch") }
     }
 
