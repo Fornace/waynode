@@ -473,4 +473,73 @@ struct SSEDecodingTests {
     func decodeInvalid() {
         #expect(decode("not json") == nil)
     }
+
+    // MARK: Live integration — real bytes captured from production server
+    //
+    // These bytes were captured from `GET /api/sessions/:id/stream` on
+    // waynode.fornace.net for a real agent turn (prompt: "Reply with exactly:
+    // NATIVE-E2E-OK"). Running them through the REAL ChatReducer proves the
+    // full server → SSEEvent decode → reducer → transcript path is correct,
+    // not just the hand-written unit scenarios above.
+
+    @Test("Real production SSE bytes produce correct transcript")
+    func liveProductionBytes() {
+        // Raw SSE frames captured from the live server (2026-07-07).
+        let rawSSE = """
+        data: {"type":"sync","streaming":false,"partialText":"","tools":[]}
+
+        data: {"type":"start"}
+
+        data: {"type":"message_start","messageId":"figen92p"}
+
+        data: {"type":"text_delta","messageId":"figen92p","delta":"NATIVE-E2E-OK"}
+
+        data: {"type":"message_end","messageId":"figen92p"}
+
+        data: {"type":"end"}
+
+        """
+
+        // Parse SSE frames exactly as SSEClient does.
+        var events: [SSEEvent] = []
+        for block in rawSSE.components(separatedBy: "\n\n") {
+            var dataLines: [String] = []
+            for line in block.split(separator: "\n", omittingEmptySubsequences: false) {
+                if line.hasPrefix("data:") {
+                    dataLines.append(String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces))
+                }
+            }
+            guard !dataLines.isEmpty,
+                  let d = dataLines.joined(separator: "\n").data(using: .utf8),
+                  let ev = try? JSONDecoder().decode(SSEEvent.self, from: d) else { continue }
+            events.append(ev)
+        }
+        #expect(events.count == 6)
+
+        // Fold through the real reducer, with an optimistic user message first
+        // (exactly how SessionStore drives a live send).
+        var r = ChatReducer()
+        r.appendUser("Reply with exactly: NATIVE-E2E-OK")
+        for e in events { _ = r.reduce(e.kind) }
+
+        #expect(r.items.count == 2)
+        #expect(r.isStreaming == false)
+        if case .user(let u) = r.items[0] {
+            #expect(u.content == "Reply with exactly: NATIVE-E2E-OK")
+            #expect(u.isGoal == false)
+        } else {
+            Issue.record("item[0] should be user message")
+        }
+        if case .assistant(let a) = r.items[1] {
+            #expect(a.done == true)
+            #expect(a.blocks.count == 1)
+            if case .text(let tb) = a.blocks[0] {
+                #expect(tb.text == "NATIVE-E2E-OK")
+            } else {
+                Issue.record("expected a single text block")
+            }
+        } else {
+            Issue.record("item[1] should be assistant message")
+        }
+    }
 }
