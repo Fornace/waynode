@@ -16,6 +16,7 @@ struct SessionsList: View {
     @State private var sessionError: String?
     @State private var sessionToDelete: Session?
     @State private var searchText = ""
+    @State private var pushedSession: Session?
 
     private var sessions: [Session] {
         let all = appModel.sessions(forSpace: spaceId)
@@ -28,10 +29,7 @@ struct SessionsList: View {
     }
 
     var body: some View {
-        List(selection: Binding(
-            get: { appModel.selectedSessionId },
-            set: { appModel.selectedSessionId = $0 }
-        )) {
+        List {
             if sessions.isEmpty {
                 if appModel.isLoadingSessions {
                     HStack { Spacer(); ProgressView(); Spacer() }
@@ -51,29 +49,41 @@ struct SessionsList: View {
                     ContentUnavailableView.search(text: searchText)
                         .listRowBackground(Color.clear)
                 } else {
-                    ContentUnavailableView(
-                        "No Sessions",
-                        systemImage: "plus.bubble",
-                        description: Text("Create a session to start a conversation.")
-                    )
+                    ContentUnavailableView {
+                        Label("No Sessions", systemImage: "plus.bubble")
+                    } description: {
+                        Text("Create a session to start a conversation.")
+                    } actions: {
+                        Button("New Session") {
+                            Haptics.light()
+                            showingNewSession = true
+                        }
+                        .buttonStyle(.glassProminent)
+                    }
                     .listRowBackground(Color.clear)
                 }
             } else {
                 ForEach(sessions) { session in
-                    SessionRow(session: session)
-                        .tag(session.id)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                sessionToDelete = session
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                    NavigationLink {
+                        SessionDetail(sessionId: session.id, spaceId: spaceId)
+                    } label: {
+                        SessionRow(session: session)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            sessionToDelete = session
+                        } label: {
+                            Label("Delete", systemImage: "trash")
                         }
+                    }
                 }
             }
         }
         .navigationTitle(spaceName)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $pushedSession) { session in
+            SessionDetail(sessionId: session.id, spaceId: spaceId)
+        }
         .searchable(text: $searchText, prompt: "Search sessions")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -97,10 +107,11 @@ struct SessionsList: View {
                                 spaceId: spaceId,
                                 title: newSessionTitle.isEmpty ? nil : newSessionTitle
                             )
-                            appModel.selectedSessionId = session.id
                             newSessionTitle = ""
                             showingNewSession = false
                             Haptics.success()
+                            // Auto-navigate into the new session
+                            pushedSession = session
                         } catch {
                             sessionError = error.localizedDescription
                             Haptics.error()

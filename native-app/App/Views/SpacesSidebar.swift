@@ -1,15 +1,15 @@
 import SwiftUI
 import WaynodeCore
 
-// MARK: - SpacesSidebar
+// MARK: - SpacesScene
 //
-// The leftmost column: a list of spaces (cloned repos). Tapping a space
-// selects it, which drives the SessionsList in the content column.
+// The root of the Spaces tab. A list of cloned repos. Tapping a space
+// pushes the SessionsList (sessions within that repo) onto the nav stack.
 //
-// Swipe-to-delete on spaces. "Clone Repo" button at the bottom opens the
-// CloneSheet.
+// Swipe-to-delete on spaces. "Clone Repo" button in the toolbar opens the
+// CloneSheet. Search filters by repo name.
 
-struct SpacesSidebar: View {
+struct SpacesScene: View {
     @Environment(AppModel.self) private var appModel
     @State private var showingCloneSheet = false
     @State private var spaceToDelete: Space?
@@ -26,10 +26,7 @@ struct SpacesSidebar: View {
     }
 
     var body: some View {
-        List(selection: Binding(
-            get: { appModel.selectedSpaceId },
-            set: { appModel.selectedSpaceId = $0 }
-        )) {
+        List {
             if filteredSpaces.isEmpty {
                 if appModel.isLoadingSpaces {
                     HStack { Spacer(); ProgressView(); Spacer() }
@@ -58,15 +55,18 @@ struct SpacesSidebar: View {
                 }
             } else {
                 ForEach(filteredSpaces) { space in
-                    SpaceRow(space: space)
-                        .tag(space.id)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                spaceToDelete = space
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                    NavigationLink {
+                        SessionsList(spaceId: space.id)
+                    } label: {
+                        SpaceRow(space: space)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            spaceToDelete = space
+                        } label: {
+                            Label("Delete", systemImage: "trash")
                         }
+                    }
                 }
             }
         }

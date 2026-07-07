@@ -132,6 +132,19 @@ public final class AuthStore {
         keychain.deleteToken()
     }
 
+    /// DEBUG: synchronously mark as authenticated with a pre-validated token.
+    /// Used by the launch-argument debug hook for testing post-login flows.
+    public func markAuthenticated(token: String) {
+        self.token = token
+        // Set a minimal user so isAuthenticated returns true immediately.
+        if self.user == nil {
+            self.user = User(id: "dev-user", name: "Francesco", role: "admin")
+        }
+        self.error = nil
+        self.isLoading = false
+        self.hasCompletedLaunchCheck = true
+    }
+
     // MARK: - Change server
 
     public func setServerURL(_ url: URL) {

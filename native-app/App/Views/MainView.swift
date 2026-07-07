@@ -3,19 +3,20 @@ import WaynodeCore
 
 // MARK: - MainView
 //
-// The authenticated app shell. Uses TabView with .sidebarAdaptable so it
-// becomes a bottom tab bar on iPhone and a sidebar on iPad/Mac — one
-// codebase, platform-correct navigation (per Apple's Liquid Glass guidance
-// §2.8).
+// The authenticated app shell. A TabView with bottom tabs (iPhone) that
+// adapts to a sidebar on iPad/Mac via `.sidebarAdaptable`.
 //
-// Two top-level sections:
-//   • Spaces — the main work area (NavigationSplitView: Spaces | Sessions | Chat)
+// Two tabs:
+//   • Spaces — the main work area (NavigationStack drill-down: Spaces → Sessions → Chat)
 //   • Account — tokens, server config, logout
+//
+// Uses NavigationStack (NOT NavigationSplitView) for the Spaces tab so that
+// taps always work and the drill-down is natural on mobile: tap a repo → see
+// its sessions → tap a session → chat. This is the Mail/Messages pattern.
 
 struct MainView: View {
     @Environment(AppModel.self) private var appModel
     @State private var selection: TopLevelTab? = .spaces
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
 
     enum TopLevelTab: String, Hashable, CaseIterable {
         case spaces, account
@@ -37,29 +38,9 @@ struct MainView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                SpacesSidebar()
-            } content: {
-                if let spaceId = appModel.selectedSpaceId {
-                    SessionsList(spaceId: spaceId)
-                } else {
-                    ContentUnavailableView(
-                        "No Space Selected",
-                        systemImage: "folder",
-                        description: Text("Select a space or create a new one.")
-                    )
-                }
-            } detail: {
-                if let sessionId = appModel.selectedSessionId,
-                   let spaceId = appModel.selectedSpaceId {
-                    SessionDetail(sessionId: sessionId, spaceId: spaceId)
-                } else {
-                    ContentUnavailableView(
-                        "No Session Selected",
-                        systemImage: "bubble.left.and.bubble.right",
-                        description: Text("Select a session to start chatting.")
-                    )
-                }
+            // Spaces tab: drill-down navigation (Spaces → Sessions → Chat)
+            NavigationStack {
+                SpacesScene()
             }
             .tabItem {
                 Label(TopLevelTab.spaces.label, systemImage: TopLevelTab.spaces.systemImage)
@@ -75,9 +56,6 @@ struct MainView: View {
             }
             .tag(TopLevelTab.account)
         }
-        .tabViewStyle(.sidebarAdaptable)
-        // sidebarAdaptable → bottom tab bar on iPhone, sidebar on iPad/Mac.
-        // This is the Apple-blessed Liquid Glass navigation pattern (HIG §2.8).
     }
 }
 
