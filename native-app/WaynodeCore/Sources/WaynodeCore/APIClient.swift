@@ -362,7 +362,7 @@ public actor APIClient {
     // MARK: - Models
 
     public func listModels() async throws -> ModelsResponse {
-        try await request("/api/settings")
+        try await request("/api/models")
     }
 
     // MARK: - Repos (GitHub / GitLab browse)
