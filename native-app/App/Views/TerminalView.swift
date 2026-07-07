@@ -192,7 +192,16 @@ struct TerminalView: View {
         outputLines = []
         hasExited = false
 
-        let url = api.makeURL("/api/sessions/\(sessionId)/terminal")
+        // The server's terminal WebSocket lives at /ws/terminal and takes
+        // the session ID as a query param (see routes/terminal.js). It is
+        // NOT a REST path under /api/sessions/:id/.
+        var components = URLComponents(
+            url: api.makeURL("/ws/terminal"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "sessionId", value: sessionId)]
+        let url = components.url ?? api.makeURL("/ws/terminal")
+
         let token = await api.currentToken()
         let client = WSClient(url: url, token: token)
         wsClient = client

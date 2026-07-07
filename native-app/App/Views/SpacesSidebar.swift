@@ -219,6 +219,11 @@ struct CloneSheet: View {
             }
             .navigationTitle("Clone Repository")
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: error) { _, newError in
+                // A failed clone arrives async via the binding; reset the
+                // spinner so the user can retry or edit the URL.
+                if newError != nil { isCloning = false }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

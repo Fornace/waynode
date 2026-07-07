@@ -43,6 +43,10 @@ public actor WSClient {
 
     public func connect() {
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        // URLSessionWebSocketTask expects ws:// or wss:// schemes.
+        // Convert https/http so callers can pass the REST baseURL directly.
+        if components.scheme == "https" { components.scheme = "wss" }
+        else if components.scheme == "http" { components.scheme = "ws" }
         if let token {
             let existing = components.queryItems ?? []
             components.queryItems = existing + [URLQueryItem(name: "t", value: token)]
