@@ -146,11 +146,13 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case "tool_start":
             let name = try c.decodeIfPresent(String.self, forKey: .toolName) ?? ""
             let id = try c.decodeIfPresent(String.self, forKey: .toolCallId) ?? ""
-            let input = try c.decodeIfPresent(String.self, forKey: .toolInput)
+            // Server sends `args` for the tool input; fall back to `toolInput`.
+            let input = try c.decodeIfPresent(String.self, forKey: .args) ?? c.decodeIfPresent(String.self, forKey: .toolInput)
             kind = .toolStart(toolName: name, toolCallId: id, toolInput: input)
         case "tool_delta":
             let id = try c.decodeIfPresent(String.self, forKey: .toolCallId) ?? ""
-            let delta = try c.decodeIfPresent(String.self, forKey: .delta) ?? ""
+            // Server sends `text` for tool delta (partial result); fall back to `delta`.
+            let delta = try c.decodeIfPresent(String.self, forKey: .text) ?? c.decodeIfPresent(String.self, forKey: .delta) ?? ""
             kind = .toolDelta(toolCallId: id, delta: delta)
         case "tool_end":
             let id = try c.decodeIfPresent(String.self, forKey: .toolCallId) ?? ""
@@ -164,8 +166,19 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
             let text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
             kind = .status(text: text)
         case "sync":
-            let snap = try c.decodeIfPresent(SyncSnapshot.self, forKey: .snapshot) ?? SyncSnapshot(items: [])
-            kind = .sync(snapshot: snap)
+            // Server wire format: { type: "sync", streaming: Bool, partialText: String, tools: [...] }
+            // We build a SyncSnapshot from the flat fields. partialText becomes an assistant item.
+            let streaming = try c.decodeIfPresent(Bool.self, forKey: .streaming) ?? false
+            var items: [SyncSnapshot.WireItem] = []
+            if let partial = try c.decodeIfPresent(String.self, forKey: .partialText), !partial.isEmpty {
+                items.append(SyncSnapshot.WireItem(role: "assistant", content: nil, id: nil, isGoal: nil, text: partial, thinking: nil, blocks: nil))
+            }
+            // tools are currently never populated server-side (liveTools is always []),
+            // but decode defensively if present.
+            if let tools = try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .tools) {
+                items.append(contentsOf: tools)
+            }
+            kind = .sync(snapshot: SyncSnapshot(items: items))
         case "session_renamed":
             let title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
             kind = .sessionRenamed(title: title)
@@ -178,6 +191,8 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case type, messageId = "messageId", delta, toolName = "toolName"
         case toolCallId = "toolCallId", toolInput = "toolInput"
         case message, text, snapshot, title
+        case streaming, partialText, tools
+        case args
     }
 
     static func msg(_ c: KeyedDecodingContainer<WireKeys>) throws -> String {
