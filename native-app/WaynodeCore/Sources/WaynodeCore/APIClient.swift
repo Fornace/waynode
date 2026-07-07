@@ -90,8 +90,13 @@ public actor APIClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        if !(body is EmptyBody) {
-            req.httpBody = try JSONEncoder.api.encode(AnyEncodable(body))
+        // Never attach an HTTP body to GET/HEAD requests. Since iOS 13
+        // (still true on iOS 27), URLSession rejects a GET with a body
+        // with the misleading NSURLErrorResourceExceedsMaximumSize (-1103)
+        // "resource exceeds maximum size" error. The `let encodable` guard
+        // also correctly skips the nil-default case.
+        if method != "GET" && method != "HEAD", let encodable = body {
+            req.httpBody = try JSONEncoder.api.encode(AnyEncodable(encodable))
         }
 
         let (data, response) = try await session.data(for: req)

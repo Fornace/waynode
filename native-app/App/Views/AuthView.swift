@@ -26,6 +26,8 @@ struct AuthView: View {
     @State private var error: String?
     @State private var customServerURL: String = ""
     @State private var showingServerSheet = false
+    @State private var isFetchingProviders = false
+    @State private var providersFetchFailed = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -76,16 +78,38 @@ struct AuthView: View {
                     .controlSize(.large)
                 }
 
-                // If we don't know providers yet, show a generic login.
+                // If we don't know providers yet, show loading or retry.
                 if appModel.auth.providers == nil {
-                    Button {
-                        Task { await startAuth(provider: "github") }
-                    } label: {
-                        Label("Log In", systemImage: "arrow.right.square")
-                            .frame(maxWidth: .infinity)
+                    if isFetchingProviders {
+                        ProgressView()
+                            .controlSize(.large)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                    } else if providersFetchFailed {
+                        VStack(spacing: 12) {
+                            Text("Couldn't reach server")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Button {
+                                Task { await fetchProviders() }
+                            } label: {
+                                Label("Retry", systemImage: "arrow.clockwise")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.glass)
+                            .controlSize(.large)
+                        }
+                    } else {
+                        // Fallback: generic login (should rarely show since
+                        // fetchProviders runs immediately on appear).
+                        Button {
+                            Task { await startAuth(provider: "github") }
+                        } label: {
+                            Label("Log In", systemImage: "arrow.right.square")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.large)
                     }
-                    .buttonStyle(.glassProminent)
-                    .controlSize(.large)
                 }
             }
             .padding(.horizontal, 24)
@@ -140,14 +164,32 @@ struct AuthView: View {
 
     private func fetchProviders() async {
         // Hit /api/auth/me without a token to discover available providers.
-        // The server returns providers: {github: bool, gitlab: bool} even
-        // when unauthenticated.
+        // Retries up to 3 times with backoff to survive transient network
+        // errors (VPN, DNS hiccup, etc.).
+        isFetchingProviders = true
+        providersFetchFailed = false
         let api = APIClient(baseURL: appModel.auth.serverConfig.baseURL)
-        if let resp = try? await api.authMe() {
-            appModel.auth.setProviders(resp.providers)
+        let maxAttempts = 3
+        for attempt in 1...maxAttempts {
+            do {
+                let resp = try await api.authMe()
+                appModel.auth.setProviders(resp.providers)
+                isFetchingProviders = false
+                providersFetchFailed = false
+                return
+            } catch {
+                if attempt < maxAttempts {
+                    // Exponential backoff: 1s, 2s, 4s
+                    let delay = UInt64(attempt) * 1_000_000_000
+                    try? await Task.sleep(nanoseconds: delay)
+                } else {
+                    // All retries exhausted — show error state with retry button.
+                    isFetchingProviders = false
+                    providersFetchFailed = true
+                }
+            }
         }
     }
-
     private func startAuth(provider: String) async {
         error = nil
         appModel.auth.error = nil // Clear stale "session expired" msg
