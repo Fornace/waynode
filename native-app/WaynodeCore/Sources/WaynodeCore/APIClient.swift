@@ -127,12 +127,6 @@ public actor APIClient {
         try await request("/api/orgs")
     }
 
-    public func listOrgModels(orgId: String) async throws -> [String] {
-        struct Resp: Codable { let models: [String] }
-        let r: Resp = try await request("/api/orgs/\(orgId)/settings")
-        return r.models
-    }
-
     // MARK: - Spaces
 
     public func listSpaces() async throws -> [Space] {
