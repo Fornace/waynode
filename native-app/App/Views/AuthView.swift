@@ -3,6 +3,8 @@ import WaynodeCore
 import AuthenticationServices
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
 #endif
 
 // MARK: - AuthView
@@ -251,8 +253,13 @@ final class AuthPresentationProvider: NSObject, ASWebAuthenticationPresentationC
             return ASPresentationAnchor()
         }
         return window
+        #elseif canImport(AppKit)
+        // macOS: return the key window (or main window as fallback).
+        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow {
+            return window
+        }
+        return ASPresentationAnchor()
         #else
-        // macOS: NSApplication.mainWindow or a new window.
         return ASPresentationAnchor()
         #endif
     }
