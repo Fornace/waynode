@@ -20,6 +20,7 @@
 		C443CB0479232AB4B92DFA16 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B76EABB353F48ADBB9E9A5A /* ChatView.swift */; };
 		CC08168B051773A3058011EA /* ChatItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */; };
 		D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156A741D0EA8E9804E056580 /* SessionDetail.swift */; };
+		D445BFA0F669F13B6334FC75 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7365BF994B13B6120DA3165B /* Assets.xcassets */; };
 		D9DC71A2E65BCC8A13B48A9C /* SpacesSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B382C33134DF897FD4C618 /* SpacesSidebar.swift */; };
 		E6F247329523B034DB67E46A /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD24C4235EFD2CABF8A6565 /* MainView.swift */; };
 /* End PBXBuildFile section */
@@ -36,6 +37,7 @@
 		4B76EABB353F48ADBB9E9A5A /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatItemView.swift; sourceTree = "<group>"; };
 		54B382C33134DF897FD4C618 /* SpacesSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesSidebar.swift; sourceTree = "<group>"; };
+		7365BF994B13B6120DA3165B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7A89D5250119F107505CA318 /* GitInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitInspector.swift; sourceTree = "<group>"; };
 		7CD24C4235EFD2CABF8A6565 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
@@ -96,6 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				49B904D137DD5BC1DE218583 /* Views */,
+				7365BF994B13B6120DA3165B /* Assets.xcassets */,
 				05DEA2882D8C1DF151489327 /* Info.plist */,
 				3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */,
 				3C9668F08A2E898BABC66081 /* WaynodeApp.swift */,
@@ -119,6 +122,7 @@
 			buildConfigurationList = B1F63346B85193FDE52C019A /* Build configuration list for PBXNativeTarget "Waynode" */;
 			buildPhases = (
 				9D64CE4374913D0D82FE758E /* Sources */,
+				27AC99A31E07709E5EBA549D /* Resources */,
 				3DBCD6E84AE10C8F8DB4EAAB /* Frameworks */,
 			);
 			buildRules = (
@@ -169,6 +173,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		27AC99A31E07709E5EBA549D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D445BFA0F669F13B6334FC75 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9D64CE4374913D0D82FE758E /* Sources */ = {
