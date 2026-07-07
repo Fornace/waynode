@@ -150,6 +150,100 @@ public actor APIClient {
         try await request("/api/spaces", method: "POST", body: body)
     }
 
+    // MARK: - Clone progress streaming
+
+    /// A single clone progress event from the server's clone-events SSE.
+    public enum CloneEvent: Sendable, Equatable {
+        /// A git clone --progress line (e.g. "remote: Counting objects: 100% ...").
+        case progress(String)
+        /// Clone finished successfully.
+        case done
+        /// Clone failed.
+        case error(String)
+    }
+
+    /// Stream live clone progress for a space. The server's clone-events SSE
+    /// replays buffered lines + terminal state (done/error), then streams live
+    /// until the clone settles. If the clone already finished and the in-memory
+    /// registry entry was cleaned up, the stream simply finishes with no events.
+    public func streamCloneProgress(spaceId: String) -> AsyncThrowingStream<CloneEvent, Error> {
+        let tok = self.token
+        let url = baseURL.appendingPathComponent("/api/spaces/\(spaceId)/clone-events")
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+                if let tok {
+                    components.queryItems = [URLQueryItem(name: "t", value: tok)]
+                }
+                var req = URLRequest(url: components.url ?? url)
+                req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+
+                do {
+                    let cfg = URLSessionConfiguration.ephemeral
+                    cfg.timeoutIntervalForRequest = 120
+                    cfg.waitsForConnectivity = true
+                    let session = URLSession(configuration: cfg)
+
+                    let (bytes, response) = try await session.bytes(for: req)
+                    guard let http = response as? HTTPURLResponse else {
+                        throw URLError(.badServerResponse)
+                    }
+                    guard (200...299).contains(http.statusCode) else {
+                        throw URLError(.badServerResponse)
+                    }
+
+                    var buffer = ""
+                    for try await line in bytes.lines {
+                        if Task.isCancelled { break }
+                        if line.isEmpty {
+                            if !buffer.isEmpty {
+                                if let event = Self.parseCloneEvent(buffer) {
+                                    continuation.yield(event)
+                                }
+                                buffer = ""
+                            }
+                            continue
+                        }
+                        buffer += line + "\n"
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Parse one SSE event buffer into a CloneEvent (or nil for pings/unknown).
+    private static func parseCloneEvent(_ buffer: String) -> CloneEvent? {
+        var dataLines: [String] = []
+        for line in buffer.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("data:") {
+                let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                dataLines.append(String(payload))
+            }
+        }
+        guard !dataLines.isEmpty else { return nil }
+        let json = dataLines.joined(separator: "\n")
+        guard let data = json.data(using: .utf8) else { return nil }
+
+        struct Payload: Decodable {
+            let type: String
+            let line: String?
+            let error: String?
+        }
+        guard let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return nil }
+        switch payload.type {
+        case "progress": return .progress(payload.line ?? "")
+        case "done": return .done
+        case "error": return .error(payload.error ?? "Clone failed")
+        default: return nil  // ping, unknown
+        }
+    }
+
     public func deleteSpace(_ id: String) async throws {
         try await requestVoid("/api/spaces/\(id)", method: "DELETE")
     }

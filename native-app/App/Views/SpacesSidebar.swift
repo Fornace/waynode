@@ -13,7 +13,6 @@ struct SpacesSidebar: View {
     @Environment(AppModel.self) private var appModel
     @State private var showingCloneSheet = false
     @State private var spaceToDelete: Space?
-    @State private var cloneError: String?
     @State private var searchText = ""
 
     private var filteredSpaces: [Space] {
@@ -77,7 +76,6 @@ struct SpacesSidebar: View {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     Haptics.light()
-                    cloneError = nil
                     showingCloneSheet = true
                 } label: {
                     Label("Clone Repo", systemImage: "plus")
@@ -86,23 +84,7 @@ struct SpacesSidebar: View {
             }
         }
         .sheet(isPresented: $showingCloneSheet) {
-            CloneSheet(
-                error: $cloneError,
-                onClone: { url, branch in
-                    Task {
-                        do {
-                            let space = try await appModel.createSpace(repoUrl: url, branch: branch)
-                            appModel.selectedSpaceId = space.id
-                            showingCloneSheet = false
-                            Haptics.success()
-                        } catch {
-                            cloneError = error.localizedDescription
-                            Haptics.error()
-                        }
-                    }
-                },
-                onCancel: { showingCloneSheet = false }
-            )
+            CloneSheet()
         }
         .confirmationDialog(
             "Delete Space?",
@@ -172,78 +154,241 @@ struct SpaceRow: View {
 }
 
 // MARK: - CloneSheet
+//
+// Self-contained clone flow: input form → live progress streaming →
+// dismiss on completion or show error. The server creates the space row
+// immediately and clones in the background; we subscribe to the
+// clone-events SSE to show real-time `git clone --progress` output.
 
 struct CloneSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var appModel
 
+    enum Phase: Equatable {
+        case input
+        case creating
+        case cloning
+        case error(String)
+    }
+
     @State private var repoURL = ""
     @State private var branch = ""
-    @State private var isCloning = false
-    @Binding var error: String?
+    @State private var orgId: String?
+    @State private var phase: Phase = .input
+    @State private var progressLines: [String] = []
 
-    var onClone: (String, String?) -> Void
-    var onCancel: () -> Void
+    private var isBusy: Bool {
+        if case .creating = phase { return true }
+        if case .cloning = phase { return true }
+        return false
+    }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Repository") {
-                    TextField("https://github.com/user/repo.git", text: $repoURL)
-                        .keyboardType(.URL)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .submitLabel(.done)
-
-                    TextField("Branch (optional, defaults to default branch)", text: $branch)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-
-                if appModel.orgs.count > 1 {
-                    Section("Organization") {
-                        Picker("Org", selection: .constant(appModel.orgs.first?.id ?? "")) {
-                            ForEach(appModel.orgs) { org in
-                                Text(org.name).tag(org.id)
-                            }
-                        }
-                    }
-                }
-
-                if let error {
-                    Section {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
-                    }
+            Group {
+                switch phase {
+                case .input, .creating:
+                    inputForm
+                case .cloning:
+                    progressView
+                case .error(let message):
+                    errorView(message)
                 }
             }
-            .navigationTitle("Clone Repository")
+            .navigationTitle(navTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: error) { _, newError in
-                // A failed clone arrives async via the binding; reset the
-                // spinner so the user can retry or edit the URL.
-                if newError != nil { isCloning = false }
-            }
+            .interactiveDismissDisabled(isBusy)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        onCancel()
+                    Button(isBusy ? "Hide" : "Cancel") {
+                        dismiss()
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Clone") {
-                        isCloning = true
-                        onClone(repoURL, branch.isEmpty ? nil : branch)
-                    }
-                    .disabled(repoURL.trimmingCharacters(in: .whitespaces).isEmpty || isCloning)
-                    .buttonStyle(.glassProminent)
-                    .overlay {
-                        if isCloning {
-                            ProgressView()
+            }
+        }
+    }
+
+    private var navTitle: String {
+        switch phase {
+        case .input, .creating: "Clone Repository"
+        case .cloning: "Cloning…"
+        case .error: "Clone Failed"
+        }
+    }
+
+    // MARK: - Input form
+
+    @ViewBuilder
+    private var inputForm: some View {
+        Form {
+            Section("Repository") {
+                TextField("https://github.com/user/repo.git", text: $repoURL)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.done)
+
+                TextField("Branch (optional, defaults to default branch)", text: $branch)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+
+            if appModel.orgs.count > 1 {
+                Section("Organization") {
+                    Picker("Org", selection: Binding(
+                        get: { orgId ?? appModel.orgs.first?.id ?? "" },
+                        set: { orgId = $0.isEmpty ? nil : $0 }
+                    )) {
+                        ForEach(appModel.orgs) { org in
+                            Text(org.name).tag(org.id)
                         }
                     }
                 }
             }
+        }
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Clone") {
+                    Haptics.light()
+                    startClone()
+                }
+                .disabled(repoURL.trimmingCharacters(in: .whitespaces).isEmpty || phase == .creating)
+                .buttonStyle(.glassProminent)
+                .overlay {
+                    if phase == .creating {
+                        ProgressView()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Progress view
+
+    @ViewBuilder
+    private var progressView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    if progressLines.isEmpty {
+                        Text("Connecting…")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(progressLines.enumerated()), id: \.offset) { _, line in
+                            Text(line)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    Color.clear.frame(height: 1).id("bottom")
+                }
+                .padding()
+            }
+            .background(.regularMaterial)
+            .onChange(of: progressLines.count) { _, _ in
+                withAnimation(.easeOut(duration: 0.15)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Cloning repository…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding()
+            }
+        }
+    }
+
+    // MARK: - Error view
+
+    @ViewBuilder
+    private func errorView(_ message: String) -> some View {
+        ContentUnavailableView {
+            Label("Clone Failed", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(message)
+        } actions: {
+            Button("Try Again") {
+                phase = .input
+                progressLines = []
+            }
+            .buttonStyle(.glassProminent)
+        }
+    }
+
+    // MARK: - Actions
+
+    private func startClone() {
+        let url = repoURL.trimmingCharacters(in: .whitespaces)
+        let br = branch.trimmingCharacters(in: .whitespaces)
+        guard !url.isEmpty else { return }
+
+        phase = .creating
+        progressLines = []
+
+        Task {
+            await performClone(url: url, branch: br.isEmpty ? nil : br)
+        }
+    }
+
+    private func performClone(url: String, branch: String?) async {
+        do {
+            // Step 1: Create the space (server returns immediately, clones in background)
+            let space = try await appModel.createSpace(
+                repoUrl: url,
+                branch: branch,
+                orgId: orgId ?? appModel.orgs.first?.id
+            )
+            appModel.selectedSpaceId = space.id
+            phase = .cloning
+
+            // Step 2: Stream clone progress via SSE
+            guard let api = await appModel.currentAPI() else {
+                // No API client — space was created, just dismiss
+                Haptics.success()
+                dismiss()
+                return
+            }
+
+            let stream = await api.streamCloneProgress(spaceId: space.id)
+            var gotTerminalEvent = false
+            for try await event in stream {
+                switch event {
+                case .progress(let line):
+                    if !line.isEmpty {
+                        progressLines.append(line)
+                    }
+                case .done:
+                    gotTerminalEvent = true
+                    Haptics.success()
+                    dismiss()
+                case .error(let msg):
+                    gotTerminalEvent = true
+                    phase = .error(msg)
+                    Haptics.error()
+                }
+            }
+
+            // If the stream ended without a terminal event, the clone likely
+            // finished before we subscribed (in-memory registry already cleaned
+            // up after 5 min). The space exists and is usable — dismiss.
+            if !gotTerminalEvent {
+                Haptics.success()
+                dismiss()
+            }
+        } catch {
+            phase = .error(error.localizedDescription)
+            Haptics.error()
         }
     }
 }
