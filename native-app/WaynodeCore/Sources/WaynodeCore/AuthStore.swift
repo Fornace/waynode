@@ -33,6 +33,12 @@ public final class AuthStore {
     public private(set) var isLoading: Bool = false
     public var error: String?
 
+    /// True once the initial launch-time token verification has settled
+    /// (success or failure). RootView uses this to show a launch splash
+    /// instead of flashing AuthView while a returning user's token is
+    /// being validated.
+    public private(set) var hasCompletedLaunchCheck: Bool = false
+
     /// Transient token returned from ASWebAuthenticationSession. Set during
     /// the auth callback, then persisted to Keychain after verification.
     public var pendingToken: String?
@@ -64,7 +70,10 @@ public final class AuthStore {
     // MARK: - Verify token (called on launch)
 
     public func verifyToken() async {
-        guard let token else { return }
+        guard let token else {
+            hasCompletedLaunchCheck = true
+            return
+        }
         isLoading = true
         error = nil
         let api = APIClient(baseURL: serverConfig.baseURL, token: token)
@@ -82,6 +91,7 @@ public final class AuthStore {
             self.error = "Session expired. Please log in again."
             isLoading = false
         }
+        hasCompletedLaunchCheck = true
     }
 
     // MARK: - Complete auth flow (from ASWebAuthenticationSession callback)
