@@ -9,15 +9,18 @@ import Foundation
 // Features:
 //   • Automatic reconnection with exponential backoff (capped at 30s)
 //   • Cooperative cancellation (task cancellation tears down the stream)
-//   • Heartbeat watchdog (server sends `ping` events; if none arrive for
-//     60s, the connection is considered stale and reconnected)
+//   • Heartbeat watchdog (if no events arrive for 90s, the connection is
+//     considered stale and force-reconnected via session invalidation)
 //   • Bearer token passed as `?t=` query param (EventSource cannot set
 //     custom headers, and our native client mirrors the web transport)
 
 public actor SSEClient {
     public nonisolated let url: URL
     private let token: String?
-    private let session: URLSession
+    /// Session for the active connection. Created fresh in connectOnce()
+    /// and stored so forceReconnect() can invalidate it without cancelling
+    /// the task (which would kill the continuation permanently).
+    private var currentSession: URLSession?
     private var task: Task<Void, Never>?
     private var continuation: AsyncStream<SSEEvent.Kind>.Continuation
 
@@ -39,13 +42,9 @@ public actor SSEClient {
     public nonisolated func stateChanges() -> AsyncStream<ConnectionState> { stateStream }
     private let stateStream: AsyncStream<ConnectionState>
 
-    public init(url: URL, token: String?, session: URLSession? = nil) {
+    public init(url: URL, token: String?) {
         self.url = url
         self.token = token
-        let cfg = URLSessionConfiguration.ephemeral
-        cfg.waitsForConnectivity = true
-        cfg.timeoutIntervalForRequest = 60
-        self.session = session ?? URLSession(configuration: cfg)
         let (es, ec) = AsyncStream.makeStream(of: SSEEvent.Kind.self)
         self.eventStream = es
         self.continuation = ec
@@ -66,7 +65,10 @@ public actor SSEClient {
     public func stop() {
         task?.cancel()
         task = nil
+        currentSession?.invalidateAndCancel()
+        currentSession = nil
         onStateChange.yield(.disconnected)
+        continuation.finish()
     }
 
     // MARK: - Reconnection loop
@@ -98,7 +100,10 @@ public actor SSEClient {
             }
         }
         onStateChange.yield(.disconnected)
-        continuation.finish()
+        // NOTE: do NOT call continuation.finish() here — only stop() finishes
+        // the continuation. This allows forceReconnect() to invalidate the
+        // session (causing connectOnce to throw) without permanently killing
+        // the event stream. The run loop simply reconnects.
     }
 
     private func connectOnce() async throws {
@@ -112,15 +117,27 @@ public actor SSEClient {
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
+        // Create a fresh session per connection so forceReconnect() can
+        // invalidate it without affecting the task.
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.waitsForConnectivity = true
+        cfg.timeoutIntervalForRequest = 60
+        let session = URLSession(configuration: cfg)
+        currentSession = session
+
+        defer { currentSession = nil }
+
         let (bytes, response) = try await session.bytes(for: req)
         guard let http = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
         if http.statusCode == 401 {
+            // Token is invalid — throw so run() backs off with exponential
+            // backoff instead of tight-looping. The AppModel's 401 handler
+            // (wired via the REST client's unauthorizedStream) will log the
+            // user out.
             onStateChange.yield(.failed(reason: "Unauthorized"))
-            // Don't retry — token is invalid.
-            continuation.finish()
-            return
+            throw URLError(.userAuthenticationRequired)
         }
         guard (200...299).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
@@ -130,7 +147,7 @@ public actor SSEClient {
 
         var buffer = ""
         var heartbeatTask = Task { [weak self] in
-            // If no events for 90s, cancel the stream so it reconnects.
+            // If no events for 90s, force-reconnect by invalidating the session.
             try? await sleep(seconds: 90)
             if !Task.isCancelled {
                 await self?.forceReconnect()
@@ -180,17 +197,12 @@ public actor SSEClient {
         return (try? JSONDecoder.api.decode(SSEEvent.self, from: data))?.kind
     }
 
-    /// Force a reconnect by cancelling the current URLSession stream.
-    /// The bytes.lines iterator will throw, triggering the reconnect loop.
+    /// Force a reconnect by invalidating the current URLSession.
+    /// The bytes.lines iterator will throw immediately, and the run loop
+    /// will reconnect on its own with exponential backoff. We do NOT cancel
+    /// the task — that would exit run() and we'd lose the continuation.
     private func forceReconnect() {
-        // The only way to interrupt bytes.lines is to cancel the task.
-        // We create a cancellation that propagates: cancel the current task
-        // and immediately restart.
-        task?.cancel()
-        // Restart after a brief yield.
-        Task { [weak self] in
-            await self?.start()
-        }
+        currentSession?.invalidateAndCancel()
     }
 }
 
