@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { passport, resolveApiToken } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
@@ -27,9 +28,60 @@ function resolveDevToken(req) {
 }
 
 const NATIVE_SCHEME = "waynode";
+// 10-minute validity window for the signed native state token.
+const NATIVE_STATE_TTL_MS = 10 * 60 * 1000;
 
-// Flag the session when the native app initiates OAuth.
-// The callback handler checks this to decide where to redirect.
+// Sign a self-contained "native app" marker that survives the cross-domain
+// OAuth round-trip. GitHub/GitLab echo the `state` query param back on the
+// callback VERBATIM, so this does NOT depend on cookies or the session store
+// surviving a redirect through github.com/gitlab.com — which is exactly the
+// failure mode that broke native login inside ASWebAuthenticationSession on
+// iOS (SameSite=Lax + shared cookie store round-trips are unreliable).
+//
+// Format:  base64url(payload).base64url(hmac)
+function signNativeState() {
+  const payload = JSON.stringify({ native: true, exp: Date.now() + NATIVE_STATE_TTL_MS });
+  const b64 = Buffer.from(payload).toString("base64url");
+  const sig = createHmac("sha256", config.sessionSecret).update(b64).digest("base64url");
+  return `${b64}.${sig}`;
+}
+
+// Verify a state value returned by the OAuth provider. True iff the HMAC
+// signature matches (timing-safe), the token is unexpired, and it carries
+// native:true. Returns false for missing/tampered/expired state.
+function verifyNativeState(state) {
+  if (!state || typeof state !== "string") return false;
+  const dot = state.indexOf(".");
+  if (dot <= 0 || dot === state.length - 1) return false;
+  const b64 = state.slice(0, dot);
+  const sig = state.slice(dot + 1);
+  const expected = createHmac("sha256", config.sessionSecret).update(b64).digest("base64url");
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || a.length === 0) return false;
+  if (!timingSafeEqual(a, b)) return false;
+  try {
+    const payload = JSON.parse(Buffer.from(b64, "base64url").toString("utf8"));
+    if (payload.native !== true) return false;
+    if (typeof payload.exp === "number" && Date.now() > payload.exp) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Build per-request passport options. When the native app initiated the
+// request (?native=1), embed the signed state so it round-trips through the
+// OAuth provider back to the callback. passport-oauth2 adds a string `state`
+// option to the authorize URL verbatim and (with NullStore) ignores it on the
+// way back — so we read it ourselves in authRedirect.
+function nativeAuthOptions(req) {
+  return req.query.native !== undefined ? { state: signNativeState() } : {};
+}
+
+// Legacy fallback: also flag the session. Unreliable across the cross-domain
+// OAuth redirect (the original bug), but kept as a belt-and-suspenders signal
+// in case the state channel is ever stripped.
 function markNative(req, res, next) {
   if (req.query.native !== undefined) {
     req.session.nativeAuth = true;
@@ -41,7 +93,10 @@ function markNative(req, res, next) {
 // originated from the native app, create an API token and redirect to the
 // custom URL scheme `waynode://auth?token=wn_...`.
 function authRedirect(req, res) {
-  const isNative = req.session.nativeAuth;
+  // Primary signal: the signed `state` param echoed back by the OAuth
+  // provider (cookie-independent — this is what makes native login robust).
+  // Fallback: the session flag set by markNative.
+  const isNative = verifyNativeState(req.query?.state) || !!req.session.nativeAuth;
   delete req.session.nativeAuth;
 
   if (isNative && req.user) {
@@ -58,14 +113,18 @@ function authRedirect(req, res) {
   res.redirect("/");
 }
 
-router.get("/auth/github", markNative, passport.authenticate("github"));
+router.get("/auth/github", markNative, (req, res, next) => {
+  passport.authenticate("github", nativeAuthOptions(req))(req, res, next);
+});
 
 router.get("/auth/github/callback",
   passport.authenticate("github", { failureRedirect: "/" }),
   authRedirect
 );
 
-router.get("/auth/gitlab", markNative, passport.authenticate("gitlab"));
+router.get("/auth/gitlab", markNative, (req, res, next) => {
+  passport.authenticate("gitlab", nativeAuthOptions(req))(req, res, next);
+});
 
 router.get("/auth/gitlab/callback", (req, res, next) => {
   passport.authenticate("gitlab", async (err, user, info, status) => {
