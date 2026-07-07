@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { passport, resolveApiToken } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
-import { createToken } from "../lib/api-tokens.mjs";
+import { createToken, countTokens, listTokens, revokeToken } from "../lib/api-tokens.mjs";
+
+const NATIVE_MAX_TOKENS = 10;
 import db from "../lib/db.mjs";
 
 const router = Router();
@@ -43,6 +45,12 @@ function authRedirect(req, res) {
   delete req.session.nativeAuth;
 
   if (isNative && req.user) {
+    // Enforce the same MAX_TOKENS limit as /api/tokens, but evict the oldest
+    // token first so native re-login never hits a wall (rolling replacement).
+    if (countTokens(req.user.id) >= NATIVE_MAX_TOKENS) {
+      const oldest = listTokens(req.user.id).pop(); // listTokens orders DESC by created_at
+      if (oldest) revokeToken(req.user.id, oldest.id);
+    }
     const { token } = createToken(req.user.id, "iOS / Mac App");
     const params = new URLSearchParams({ token });
     return res.redirect(`${NATIVE_SCHEME}://auth?${params}`);
