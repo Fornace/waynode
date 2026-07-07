@@ -26,6 +26,8 @@ struct RootView: View {
                     .transition(.opacity.combined(with: .move(edge: .leading)))
             }
         }
+        // Force dark mode — Waynode is a developer tool, dark is the right default.
+        .preferredColorScheme(.dark)
         .animation(.smooth(duration: 0.4), value: appModel.auth.isAuthenticated)
         .animation(.smooth(duration: 0.3), value: appModel.auth.hasCompletedLaunchCheck)
     }
