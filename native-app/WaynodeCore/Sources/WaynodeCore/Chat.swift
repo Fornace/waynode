@@ -113,7 +113,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case messageEnd(messageId: String)
         case toolStart(toolName: String, toolCallId: String, toolInput: String?)
         case toolDelta(toolCallId: String, delta: String)
-        case toolEnd(toolCallId: String)
+        case toolEnd(toolCallId: String, finalOutput: String?, isError: Bool)
         case turnEnd
         case end
         case error(message: String)
@@ -156,7 +156,9 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
             kind = .toolDelta(toolCallId: id, delta: delta)
         case "tool_end":
             let id = try c.decodeIfPresent(String.self, forKey: .toolCallId) ?? ""
-            kind = .toolEnd(toolCallId: id)
+            let output = try c.decodeIfPresent(String.self, forKey: .text)
+            let isErr = try c.decodeIfPresent(Bool.self, forKey: .isError) ?? false
+            kind = .toolEnd(toolCallId: id, finalOutput: output, isError: isErr)
         case "turn_end": kind = .turnEnd
         case "end": kind = .end
         case "error":
@@ -193,6 +195,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case message, text, snapshot, title
         case streaming, partialText, tools
         case args
+        case isError = "isError"
     }
 
     static func msg(_ c: KeyedDecodingContainer<WireKeys>) throws -> String {

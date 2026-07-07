@@ -152,9 +152,9 @@ public struct ChatReducer: Sendable, Equatable {
             appendToolOutput(delta, itemIdx: loc.itemIdx, blockIdx: loc.blockIdx)
             return true
 
-        case .toolEnd(let callId):
+        case .toolEnd(let callId, let finalOutput, let isError):
             guard let loc = toolIndex[callId] else { return false }
-            markToolDone(itemIdx: loc.itemIdx, blockIdx: loc.blockIdx)
+            markToolDone(itemIdx: loc.itemIdx, blockIdx: loc.blockIdx, finalOutput: finalOutput, isError: isError)
             return true
 
         case .turnEnd:
@@ -247,10 +247,15 @@ public struct ChatReducer: Sendable, Equatable {
         items[itemIdx] = .assistant(a)
     }
 
-    private mutating func markToolDone(itemIdx: Int, blockIdx: Int) {
+    private mutating func markToolDone(itemIdx: Int, blockIdx: Int, finalOutput: String?, isError: Bool) {
         guard case .assistant(var a) = items[itemIdx], blockIdx < a.blocks.count else { return }
         guard case .tool(var tb) = a.blocks[blockIdx] else { return }
-        tb.status = .done
+        // If finalOutput is provided and the tool emitted no delta events,
+        // use it as the output (handles fast tools that complete instantly).
+        if let final = finalOutput, !final.isEmpty, tb.output.isEmpty {
+            tb.output = final
+        }
+        tb.status = isError ? .error : .done
         a.blocks[blockIdx] = .tool(tb)
         items[itemIdx] = .assistant(a)
     }

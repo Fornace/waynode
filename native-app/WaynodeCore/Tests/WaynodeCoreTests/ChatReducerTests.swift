@@ -101,7 +101,7 @@ struct ChatReducerTests {
         _ = r.reduce(.toolStart(toolName: "bash", toolCallId: "t1", toolInput: "ls"))
         _ = r.reduce(.toolDelta(toolCallId: "t1", delta: "file1\n"))
         _ = r.reduce(.toolDelta(toolCallId: "t1", delta: "file2\n"))
-        _ = r.reduce(.toolEnd(toolCallId: "t1"))
+        _ = r.reduce(.toolEnd(toolCallId: "t1", finalOutput: nil, isError: false))
         if case .assistant(let a) = r.items[0] {
             #expect(a.blocks.count == 1)
             if case .tool(let tb) = a.blocks[0] {
@@ -122,10 +122,43 @@ struct ChatReducerTests {
         _ = r.reduce(.toolStart(toolName: "bash", toolCallId: "t2", toolInput: "echo b"))
         _ = r.reduce(.toolDelta(toolCallId: "t1", delta: "a"))
         _ = r.reduce(.toolDelta(toolCallId: "t2", delta: "b"))
-        _ = r.reduce(.toolEnd(toolCallId: "t1"))
-        _ = r.reduce(.toolEnd(toolCallId: "t2"))
+        _ = r.reduce(.toolEnd(toolCallId: "t1", finalOutput: nil, isError: false))
+        _ = r.reduce(.toolEnd(toolCallId: "t2", finalOutput: nil, isError: false))
         if case .assistant(let a) = r.items[0] {
             #expect(a.blocks.count == 2)
+        }
+    }
+
+    // MARK: Bug #26 — tool_end with finalOutput (fast tools, no delta)
+
+    @Test("tool_end finalOutput populates output when no delta was emitted")
+    func toolEndFinalOutput() {
+        var r = ChatReducer()
+        _ = r.reduce(.start)
+        _ = r.reduce(.messageStart(messageId: "m1"))
+        _ = r.reduce(.toolStart(toolName: "read", toolCallId: "t1", toolInput: "file.txt"))
+        // NO tool_delta — fast tool completes instantly
+        _ = r.reduce(.toolEnd(toolCallId: "t1", finalOutput: "hello world", isError: false))
+        if case .assistant(let a) = r.items[0] {
+            if case .tool(let tb) = a.blocks[0] {
+                #expect(tb.output == "hello world")
+                #expect(tb.status == .done)
+            }
+        }
+    }
+
+    @Test("tool_end with isError sets error status")
+    func toolEndError() {
+        var r = ChatReducer()
+        _ = r.reduce(.start)
+        _ = r.reduce(.messageStart(messageId: "m1"))
+        _ = r.reduce(.toolStart(toolName: "bash", toolCallId: "t1", toolInput: "false"))
+        _ = r.reduce(.toolEnd(toolCallId: "t1", finalOutput: "exit code 1", isError: true))
+        if case .assistant(let a) = r.items[0] {
+            if case .tool(let tb) = a.blocks[0] {
+                #expect(tb.output == "exit code 1")
+                #expect(tb.status == .error)
+            }
         }
     }
 
