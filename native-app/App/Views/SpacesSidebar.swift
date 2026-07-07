@@ -353,7 +353,7 @@ struct CloneSheet: View {
             phase = .cloning
 
             // Step 2: Stream clone progress via SSE
-            guard let api = await appModel.currentAPI() else {
+            guard let api = appModel.currentAPI() else {
                 // No API client — space was created, just dismiss
                 Haptics.success()
                 dismiss()

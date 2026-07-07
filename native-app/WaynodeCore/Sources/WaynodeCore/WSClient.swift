@@ -28,6 +28,7 @@ public actor WSClient {
     public enum TerminalMessage: Sendable, Equatable {
         case output(String)
         case exited(Int)
+        case error(String)
     }
 
     public init(url: URL, token: String?) {
@@ -99,8 +100,14 @@ public actor WSClient {
             switch decoded.type {
             case "output":
                 await self?.outputContinuation.yield(.output(decoded.data ?? ""))
-            case "exited":
+            case "exit", "exited":
+                // Server pty emits { type: "exit", exitCode } — accept both
+                // "exit" and "exited" for robustness.
                 await self?.outputContinuation.yield(.exited(decoded.exitCode ?? 0))
+            case "error":
+                // Server sends { type: "error", message } for agent-busy,
+                // terminal-disabled, etc. Surface to UI.
+                await self?.outputContinuation.yield(.error(decoded.message ?? "Unknown error"))
             default:
                 break
             }
@@ -110,12 +117,12 @@ public actor WSClient {
     // MARK: - Sending
 
     public func sendInput(_ data: String) async {
-        let msg = WireMessage(type: "input", data: data, cols: nil, rows: nil, exitCode: nil)
+        let msg = WireMessage(type: "input", data: data, cols: nil, rows: nil, exitCode: nil, message: nil)
         await send(msg)
     }
 
     public func sendResize(cols: Int, rows: Int) async {
-        let msg = WireMessage(type: "resize", data: nil, cols: cols, rows: rows, exitCode: nil)
+        let msg = WireMessage(type: "resize", data: nil, cols: cols, rows: rows, exitCode: nil, message: nil)
         await send(msg)
     }
 
@@ -131,5 +138,6 @@ public actor WSClient {
         let cols: Int?
         let rows: Int?
         let exitCode: Int?
+        let message: String?
     }
 }

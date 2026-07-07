@@ -362,7 +362,7 @@ public actor APIClient {
 
     public func getGitDiff(_ spaceId: String, file: String? = nil) async throws -> GitDiffResponse {
         var query: [URLQueryItem] = []
-        if let file { query.append(.init(name: "file", value: file)) }
+        if let file { query.append(.init(name: "path", value: file)) }
         return try await request("/api/spaces/\(spaceId)/git/diff", query: query)
     }
 
@@ -434,8 +434,13 @@ public actor APIClient {
         public var label: String
     }
 
+    private struct TokenListResponse: Decodable, Sendable {
+        let tokens: [TokenInfo]
+    }
+
     public func listTokens() async throws -> [TokenInfo] {
-        try await request("/api/tokens")
+        let resp: TokenListResponse = try await request("/api/tokens")
+        return resp.tokens
     }
 
     public func createToken(label: String) async throws -> CreateTokenResponse {

@@ -31,6 +31,11 @@ struct TerminalView: View {
 
     enum TerminalConnection: Equatable {
         case disconnected, connecting, connected, failed(String), exited(Int)
+
+        var isFailed: Bool {
+            if case .failed = self { return true }
+            return false
+        }
     }
 
     private let bottomID = "term-bottom"
@@ -135,6 +140,22 @@ struct TerminalView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+            } else if case .failed(let msg) = connectionState {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                    Text(msg)
+                        .font(.caption)
+                        .lineLimit(2)
+                    Spacer()
+                    Button("Retry") {
+                        Task { await reconnect() }
+                    }
+                    .buttonStyle(.glass)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.thinMaterial)
             } else {
                 HStack {
                     Image(systemName: "checkmark.circle")
@@ -260,6 +281,10 @@ struct TerminalView: View {
             }
         case .exited(let code):
             connectionState = .exited(code)
+            hasExited = true
+        case .error(let message):
+            // Server-side error (agent busy, terminal disabled, etc.)
+            connectionState = .failed(message)
             hasExited = true
         }
     }
