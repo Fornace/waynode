@@ -137,6 +137,17 @@ public final class SessionStore {
         connectionState = .disconnected
     }
 
+    /// Force-close the SSE stream immediately (no 30s timer).
+    /// Called by AppModel on logout, space deletion, or session deletion
+    /// to avoid leaking URLSession connections and listener tasks.
+    public func close() {
+        closeTimer?.cancel()
+        closeTimer = nil
+        viewerCount = 0
+        stopGoalPolling()
+        closeStream()
+    }
+
     // MARK: - Event handling
 
     private func handle(_ event: SSEEvent.Kind) {

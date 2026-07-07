@@ -36,6 +36,7 @@ public final class AppModel {
     public var selectedSessionId: String?
 
     private var api: APIClient?
+    private var unauthorizedTask: Task<Void, Never>?
 
     public init(auth: AuthStore) {
         self.auth = auth
@@ -45,10 +46,13 @@ public final class AppModel {
     /// Reconfigure the API client after auth/server changes.
     /// Wires the 401 handler so token expiry automatically returns to login.
     public func reconfigureAPI() {
+        // Cancel the previous 401 listener task so we don't accumulate
+        // zombie tasks + APIClient instances across reconfigure calls.
+        unauthorizedTask?.cancel()
         let client = APIClient(baseURL: auth.serverConfig.baseURL, token: auth.token)
         api = client
         // Listen for 401s on a background task; bounce to MainActor.
-        Task { [weak self] in
+        unauthorizedTask = Task { [weak self] in
             for await _ in client.unauthorizedStream {
                 guard let self else { return }
                 await self.handleUnauthorized()
@@ -113,11 +117,15 @@ public final class AppModel {
         guard let api else { return }
         do {
             try await api.deleteSpace(id)
-            // Tear down any live session stores belonging to this space's sessions.
+            // Close and tear down any live session stores belonging to this
+            // space's sessions. We close (not just release) because the space
+            // is gone — there's no point keeping a 30s close timer alive.
             let orphanedSessionIds = Set((sessionsBySpace[id] ?? []).map(\.id))
             for sid in orphanedSessionIds {
-                sessionStores[sid]?.release()
-                sessionStores.removeValue(forKey: sid)
+                if let store = sessionStores[sid] {
+                    store.close()
+                    sessionStores.removeValue(forKey: sid)
+                }
             }
             if let sel = selectedSessionId, orphanedSessionIds.contains(sel) {
                 selectedSessionId = nil
@@ -161,8 +169,11 @@ public final class AppModel {
         guard let api else { return }
         do {
             try await api.deleteSession(id)
-            // Remove from cache + store.
-            sessionStores.removeValue(forKey: id)
+            // Close and remove the session store to avoid SSE stream leaks.
+            if let store = sessionStores[id] {
+                store.close()
+                sessionStores.removeValue(forKey: id)
+            }
             for (spaceId, var list) in sessionsBySpace {
                 list.removeAll { $0.id == id }
                 sessionsBySpace[spaceId] = list
@@ -192,6 +203,11 @@ public final class AppModel {
     /// Called when the API returns 401 — clears auth state.
     public func handleUnauthorized() {
         auth.logout()
+        // Close every active SessionStore to release SSE connections and
+        // listener tasks. Just removing from the dict would leak URLSessions.
+        for store in sessionStores.values {
+            store.close()
+        }
         sessionStores.removeAll()
         orgs = []
         spaces = []
