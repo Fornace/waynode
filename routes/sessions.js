@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../lib/auth.mjs";
+import { requireAuth, queryTokenAuth } from "../lib/auth.mjs";
 import {
   createSession,
   getSession,
@@ -16,22 +16,15 @@ import { getAgent, getAgentIfActive } from "../lib/agent-manager.mjs";
 import { config } from "../lib/config.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { getOrgSetting } from "../lib/orgs.mjs";
-import db from "../lib/db.mjs";
 
 const router = Router();
 
-// dev-token may arrive as ?t= for EventSource (can't set headers) — mirrors
 // sseAuth in routes/spaces.js and routes/git.js. Without this, the /stream
 // SSE route 401s for every dev-token client, since EventSource can't send
 // the x-dev-token header requireAuth checks.
 function sseAuth(req, res, next) {
-  const tok = req.query.t;
-  if (config.devToken && tok && tok === config.devToken) {
-    let user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
-    if (!user) {
-      db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
-      user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
-    }
+  const user = queryTokenAuth(req);
+  if (user) {
     req.user = user;
     req.isAuthenticated = () => true;
     return next();

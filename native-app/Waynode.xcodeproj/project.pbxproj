@@ -1,0 +1,405 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		000186C4EC52022640BC6843 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B954C00B60D3DB33B2A804F /* AuthView.swift */; };
+		07686D0CE347E928BD9CD197 /* WaynodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9668F08A2E898BABC66081 /* WaynodeApp.swift */; };
+		370881664556AF549C6AB785 /* SessionsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B759E8CE22B0B375BB475282 /* SessionsList.swift */; };
+		6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A89D5250119F107505CA318 /* GitInspector.swift */; };
+		7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */; };
+		89ED4A1123BF82E715F6576F /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */; };
+		8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF14352DE276CEE0FD2DEEC /* RootView.swift */; };
+		AD06B8C7096720EA43E77579 /* WaynodeCore in Frameworks */ = {isa = PBXBuildFile; productRef = 94F593349EDED17C7E44778A /* WaynodeCore */; };
+		C0C99F3EE7F086A282859DA3 /* AccountScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4429524F93F2D7BAD0B11C7F /* AccountScene.swift */; };
+		C30EDF89EAFFF22AE8FBA5EA /* PlatformUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */; };
+		C443CB0479232AB4B92DFA16 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B76EABB353F48ADBB9E9A5A /* ChatView.swift */; };
+		CC08168B051773A3058011EA /* ChatItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */; };
+		D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156A741D0EA8E9804E056580 /* SessionDetail.swift */; };
+		D9DC71A2E65BCC8A13B48A9C /* SpacesSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B382C33134DF897FD4C618 /* SpacesSidebar.swift */; };
+		E6F247329523B034DB67E46A /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD24C4235EFD2CABF8A6565 /* MainView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		05DEA2882D8C1DF151489327 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0B954C00B60D3DB33B2A804F /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WaynodeCore; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
+		156A741D0EA8E9804E056580 /* SessionDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetail.swift; sourceTree = "<group>"; };
+		3C9668F08A2E898BABC66081 /* WaynodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaynodeApp.swift; sourceTree = "<group>"; };
+		3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformUtilities.swift; sourceTree = "<group>"; };
+		4429524F93F2D7BAD0B11C7F /* AccountScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountScene.swift; sourceTree = "<group>"; };
+		46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Waynode.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B76EABB353F48ADBB9E9A5A /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatItemView.swift; sourceTree = "<group>"; };
+		54B382C33134DF897FD4C618 /* SpacesSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesSidebar.swift; sourceTree = "<group>"; };
+		7A89D5250119F107505CA318 /* GitInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitInspector.swift; sourceTree = "<group>"; };
+		7CD24C4235EFD2CABF8A6565 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
+		B759E8CE22B0B375BB475282 /* SessionsList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsList.swift; sourceTree = "<group>"; };
+		BAF14352DE276CEE0FD2DEEC /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerBar.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3DBCD6E84AE10C8F8DB4EAAB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AD06B8C7096720EA43E77579 /* WaynodeCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		17828DD8790D53F6BF9E92A5 = {
+			isa = PBXGroup;
+			children = (
+				97D6AC4023C59C96D02BBC31 /* App */,
+				CB52F70C25F62C2823662A08 /* Packages */,
+				3C32FF7665F0F8CF77D345F4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3C32FF7665F0F8CF77D345F4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		49B904D137DD5BC1DE218583 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				4429524F93F2D7BAD0B11C7F /* AccountScene.swift */,
+				0B954C00B60D3DB33B2A804F /* AuthView.swift */,
+				4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */,
+				4B76EABB353F48ADBB9E9A5A /* ChatView.swift */,
+				FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */,
+				7A89D5250119F107505CA318 /* GitInspector.swift */,
+				7CD24C4235EFD2CABF8A6565 /* MainView.swift */,
+				BAF14352DE276CEE0FD2DEEC /* RootView.swift */,
+				156A741D0EA8E9804E056580 /* SessionDetail.swift */,
+				B759E8CE22B0B375BB475282 /* SessionsList.swift */,
+				54B382C33134DF897FD4C618 /* SpacesSidebar.swift */,
+				8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		97D6AC4023C59C96D02BBC31 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				49B904D137DD5BC1DE218583 /* Views */,
+				05DEA2882D8C1DF151489327 /* Info.plist */,
+				3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */,
+				3C9668F08A2E898BABC66081 /* WaynodeApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		CB52F70C25F62C2823662A08 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				0BF9F27A3F277D070EC66A8B /* WaynodeCore */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		52C15B13C72933960BEF0FA9 /* Waynode */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1F63346B85193FDE52C019A /* Build configuration list for PBXNativeTarget "Waynode" */;
+			buildPhases = (
+				9D64CE4374913D0D82FE758E /* Sources */,
+				3DBCD6E84AE10C8F8DB4EAAB /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Waynode;
+			packageProductDependencies = (
+				94F593349EDED17C7E44778A /* WaynodeCore */,
+			);
+			productName = Waynode;
+			productReference = 46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F58CAD3B1EB1646E95A4C3E0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					52C15B13C72933960BEF0FA9 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = FBE6B83C30DE4DCE974D1D16 /* Build configuration list for PBXProject "Waynode" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 17828DD8790D53F6BF9E92A5;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				99CB13A050CE261162F679BE /* XCLocalSwiftPackageReference "WaynodeCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3C32FF7665F0F8CF77D345F4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				52C15B13C72933960BEF0FA9 /* Waynode */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9D64CE4374913D0D82FE758E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C0C99F3EE7F086A282859DA3 /* AccountScene.swift in Sources */,
+				000186C4EC52022640BC6843 /* AuthView.swift in Sources */,
+				CC08168B051773A3058011EA /* ChatItemView.swift in Sources */,
+				C443CB0479232AB4B92DFA16 /* ChatView.swift in Sources */,
+				7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */,
+				6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */,
+				E6F247329523B034DB67E46A /* MainView.swift in Sources */,
+				C30EDF89EAFFF22AE8FBA5EA /* PlatformUtilities.swift in Sources */,
+				8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */,
+				D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */,
+				370881664556AF549C6AB785 /* SessionsList.swift in Sources */,
+				D9DC71A2E65BCC8A13B48A9C /* SpacesSidebar.swift in Sources */,
+				89ED4A1123BF82E715F6576F /* TerminalView.swift in Sources */,
+				07686D0CE347E928BD9CD197 /* WaynodeApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		082AFE25C0AE3F7B1B175E01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		62FC0726316165E3FB17E6F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		66232B4BCC88EBF1E0E410A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.waynode.app;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F20FB371AC863188DA33B38F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.waynode.app;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B1F63346B85193FDE52C019A /* Build configuration list for PBXNativeTarget "Waynode" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				66232B4BCC88EBF1E0E410A5 /* Debug */,
+				F20FB371AC863188DA33B38F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FBE6B83C30DE4DCE974D1D16 /* Build configuration list for PBXProject "Waynode" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				082AFE25C0AE3F7B1B175E01 /* Debug */,
+				62FC0726316165E3FB17E6F1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		99CB13A050CE261162F679BE /* XCLocalSwiftPackageReference "WaynodeCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = WaynodeCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		94F593349EDED17C7E44778A /* WaynodeCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WaynodeCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = F58CAD3B1EB1646E95A4C3E0 /* Project object */;
+}

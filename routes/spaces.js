@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { requireAuth, requireSpaceAccess } from "../lib/auth.mjs";
+import { requireAuth, requireSpaceAccess, queryTokenAuth } from "../lib/auth.mjs";
 import { cloneRepo, getSpace, listSpaces, listSpacesByOrg, deleteSpace, pullSpace, getSpacePath, createSpaceRecord, cloneRepoStreaming, assertSafeRepoUrl } from "../lib/spaces.mjs";
 import { isOrgMember } from "../lib/orgs.mjs";
 import { startClone, publish, finishClone, subscribe } from "../lib/clone-progress.mjs";
@@ -70,13 +70,8 @@ router.post("/api/spaces", requireAuth, async (req, res) => {
 
 // dev-token may arrive as ?t= for EventSource (can't set headers)
 function sseAuth(req, res, next) {
-  const tok = req.query.t;
-  if (config.devToken && tok && tok === config.devToken) {
-    let user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
-    if (!user) {
-      db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
-      user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
-    }
+  const user = queryTokenAuth(req);
+  if (user) {
     req.user = user;
     req.isAuthenticated = () => true;
     return next();

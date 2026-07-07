@@ -22,6 +22,7 @@ import adminRoutes from "./routes/admin.js";
 import orgRoutes from "./routes/orgs.js";
 import resolveRoutes from "./routes/resolve.js";
 import gitRoutes from "./routes/git.js";
+import apiTokenRoutes from "./routes/api-tokens.js";
 import billingRoutes, { webhookRouter as billingWebhookRoutes } from "./routes/billing.js";
 
 const app = express();
@@ -114,6 +115,7 @@ app.use(adminRoutes);
 app.use(orgRoutes);
 app.use(resolveRoutes);
 app.use(gitRoutes);
+app.use(apiTokenRoutes);
 app.use(billingRoutes);
 
 // Model listing endpoint

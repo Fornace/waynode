@@ -66,6 +66,29 @@ BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs
 
 Screenshots land in `shots/`; `last-result.json` records the pass/fail summary.
 
+## Native app auth E2E (`test-native-auth.mjs`)
+
+A standalone server-side test that boots a throwaway Waynode instance on
+port 3999 with a temp database and verifies the native-app auth layer:
+
+```bash
+node e2e/test-native-auth.mjs
+```
+
+| # | What it asserts |
+|---|-----------------|
+| 1 | Unauthenticated `/api/auth/me` returns configured providers (github/gitlab) |
+| 2 | `createToken()` mints a `wn_`-prefixed token |
+| 3 | Bearer token authenticates `/api/auth/me` and returns the user |
+| 4 | Bearer tokens **cannot** create other tokens (403 escalation guard) |
+| 5 | Bearer tokens **can** list their own tokens (token management) |
+| 6 | SSE events endpoint accepts `?t=` bearer query param |
+| 7 | Bad/unknown bearer token → 401 (not silent 200) |
+| 8 | Revoked token is immediately invalid (401) |
+
+No external services required — sets `DATA_DIR` to a temp dir, configures
+`GITHUB_CLIENT_ID`, and spawns `node server.js`.
+
 ## Reliability
 
 The harness is **rate-limit-aware**: `browser.fornace.net` throttles sustained

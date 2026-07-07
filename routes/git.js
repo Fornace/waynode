@@ -13,7 +13,7 @@
  * (informational) and never hard-blocks writes here — the UI soft-warns.
  */
 import { Router } from "express";
-import { requireAuth, requireSpaceAccess } from "../lib/auth.mjs";
+import { requireAuth, requireSpaceAccess, queryTokenAuth } from "../lib/auth.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { isSpaceBusy } from "../lib/agent-manager.mjs";
 import * as git from "../lib/git-ops.mjs";
@@ -67,13 +67,8 @@ router.get("/api/spaces/:spaceId/git/diff", requireAuth, requireSpaceAccess, (re
 // ── SSE live stream ──
 // EventSource can't set headers, so the dev token comes through ?t=.
 function sseAuth(req, res, next) {
-  const tok = req.query.t;
-  if (config.devToken && tok && tok === config.devToken) {
-    let user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
-    if (!user) {
-      db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
-      user = db.prepare("SELECT * FROM users WHERE id = ?").get("dev-user");
-    }
+  const user = queryTokenAuth(req);
+  if (user) {
     req.user = user;
     req.isAuthenticated = () => true;
     return next();

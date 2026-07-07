@@ -1,0 +1,23 @@
+# Swift / Xcode build artifacts
+WaynodeCore/.build/
+WaynodeCore/Package.resolved
+build/
+DerivedData/
+*.o
+*.obj
+*.swiftdoc
+*.swiftdoc.sig
+*.xclaunchd
+*. Playground
+
+# Xcode user state
+Waynode.xcodeproj/xcuserdata/
+Waynode.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# SwiftPM
+.swiftpm/
+
+# OS
+.DS_Store

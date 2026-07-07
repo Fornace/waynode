@@ -5,6 +5,7 @@ import { getTerminal } from "../lib/agent-manager.mjs";
 import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
 import { randomUUID } from "crypto";
+import { resolveApiToken } from "../lib/auth.mjs";
 
 const router = Router();
 
@@ -47,9 +48,16 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
     sessionMiddleware(req, {}, async () => {
       let authedUserId = null;
 
+      // Bearer API-token path (?t=wn_...): native apps pass their personal
+      // token as a query param since WebSocket/EventSource can't set headers.
+      if (tok && tok.startsWith("wn_")) {
+        const user = resolveApiToken(tok);
+        if (user) authedUserId = user.id;
+      }
+
       // Dev-token path (?t= == config.devToken): log in as dev-user. Used by
       // automated E2E (and dev). Same privilege model as the REST dev-token.
-      if (config.devToken && tok && tok === config.devToken) {
+      if (!authedUserId && config.devToken && tok && tok === config.devToken) {
         let devUser = db.prepare("SELECT id FROM users WHERE id = ?").get("dev-user");
         if (!devUser) {
           db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("dev-user", config.devUserName || "Dev");
