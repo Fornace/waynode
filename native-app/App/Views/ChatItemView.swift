@@ -310,6 +310,7 @@ struct CodeBlockView: View {
                         .foregroundStyle(showCopied ? .green : .secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(showCopied ? "Copied" : "Copy code")
                 Button {
                     withAnimation(.smooth) { isExpanded.toggle() }
                 } label: {
@@ -318,6 +319,7 @@ struct CodeBlockView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(isExpanded ? "Collapse code" : "Expand code")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
