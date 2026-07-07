@@ -43,8 +43,17 @@ public final class AppModel {
     }
 
     /// Reconfigure the API client after auth/server changes.
+    /// Wires the 401 handler so token expiry automatically returns to login.
     public func reconfigureAPI() {
-        api = APIClient(baseURL: auth.serverConfig.baseURL, token: auth.token)
+        let client = APIClient(baseURL: auth.serverConfig.baseURL, token: auth.token)
+        api = client
+        // Listen for 401s on a background task; bounce to MainActor.
+        Task { [weak self] in
+            for await _ in client.unauthorizedStream {
+                guard let self else { return }
+                await self.handleUnauthorized()
+            }
+        }
     }
 
     public func currentAPI() -> APIClient? { api }

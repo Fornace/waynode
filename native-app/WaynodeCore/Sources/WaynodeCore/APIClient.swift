@@ -15,13 +15,13 @@ public actor APIClient {
     /// Called when a request receives 401 Unauthorized. The UI observes this
     /// to present the auth flow and clear the stored token.
     public let onUnauthorized: AsyncStream<Void>.Continuation
-    private let onUnauthorizedStream: AsyncStream<Void>
+    public let unauthorizedStream: AsyncStream<Void>
 
     public init(baseURL: URL, token: String? = nil) {
         self.baseURL = baseURL
         self.token = token
         var (stream, cont) = AsyncStream.makeStream(of: Void.self)
-        self.onUnauthorizedStream = stream
+        self.unauthorizedStream = stream
         self.onUnauthorized = cont
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 30
