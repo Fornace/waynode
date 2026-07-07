@@ -65,10 +65,20 @@ public struct ChatReducer: Sendable, Equatable {
             case "user":
                 items.append(.user(.init(id: h.id, content: h.content ?? "", isGoal: h.isGoal ?? false)))
             case "assistant":
+                // Server sends assistant text as `content` (NOT `text`), and
+                // optional reasoning as `thinking`. This mirrors the web
+                // client (sessionStore.ts loadHistory) exactly:
+                //   if (m.thinking) blocks.push({ type: "thinking", text: m.thinking });
+                //   blocks.push({ type: "text", text: m.content || "" });
                 var blocks: [Block] = []
-                if let txt = h.text, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
                 if let th = h.thinking, !th.isEmpty { blocks.append(.thinking(.init(text: th))) }
-                items.append(.assistant(.init(id: h.id, blocks: blocks, done: true)))
+                if let txt = h.content, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
+                // Only add an assistant item if there's actual content.
+                // Skip pure tool-call turns (no text/thinking) — they were
+                // already filtered server-side, but guard defensively.
+                if !blocks.isEmpty {
+                    items.append(.assistant(.init(id: h.id, blocks: blocks, done: true)))
+                }
             case "system":
                 items.append(.system(.init(id: h.id, content: h.content ?? "", key: h.key)))
             default:

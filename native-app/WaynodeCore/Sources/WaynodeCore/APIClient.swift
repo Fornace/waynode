@@ -431,6 +431,16 @@ public actor APIClient {
         public var label: String
         public var lastUsedAt: String?
         public var createdAt: String
+
+        // Server returns DB rows with snake_case columns (last_used_at,
+        // created_at). Explicit CodingKeys handle the mapping since we
+        // can't use .convertFromSnakeCase (it conflicts with other models
+        // that declare snake_case CodingKey rawValues).
+        enum CodingKeys: String, CodingKey {
+            case id, label
+            case lastUsedAt = "last_used_at"
+            case createdAt = "created_at"
+        }
     }
 
     public struct CreateTokenResponse: Decodable, Sendable {
@@ -585,11 +595,13 @@ extension JSONEncoder {
 }
 
 extension JSONDecoder {
-    static let api: JSONDecoder = {
-        let d = JSONDecoder()
-        d.keyDecodingStrategy = .convertFromSnakeCase
-        return d
-    }()
+    // NOTE: Do NOT use .convertFromSnakeCase here. All Codable models in
+    // this project declare explicit CodingKeys with snake_case raw values
+    // (e.g. repoName = "repo_name"). Adding .convertFromSnakeCase on top
+    // converts JSON keys to camelCase BEFORE matching, so "repo_name" →
+    // "repoName" which no longer matches the CodingKey rawValue "repo_name",
+    // and every snake_case field silently decodes as nil/empty.
+    static let api: JSONDecoder = JSONDecoder()
 }
 
 /// Type-erased Encodable wrapper for sending generic bodies.

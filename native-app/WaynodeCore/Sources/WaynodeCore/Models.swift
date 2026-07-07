@@ -87,6 +87,8 @@ public struct Space: Codable, Hashable, Identifiable, Sendable {
     public var orgId: String?
     public var sessionCount: Int?
     public var myRole: String?
+    public var latestSessionTitle: String?
+    public var latestSessionAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id, branch
@@ -99,6 +101,8 @@ public struct Space: Codable, Hashable, Identifiable, Sendable {
         case orgId = "org_id"
         case sessionCount = "session_count"
         case myRole = "my_role"
+        case latestSessionTitle = "latest_session_title"
+        case latestSessionAt = "latest_session_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -114,12 +118,15 @@ public struct Space: Codable, Hashable, Identifiable, Sendable {
         orgId = try c.decodeIfPresent(String.self, forKey: .orgId)
         sessionCount = try c.decodeIfPresent(Int.self, forKey: .sessionCount)
         myRole = try c.decodeIfPresent(String.self, forKey: .myRole)
+        latestSessionTitle = try c.decodeIfPresent(String.self, forKey: .latestSessionTitle)
+        latestSessionAt = try c.decodeIfPresent(String.self, forKey: .latestSessionAt)
     }
 
-    public init(id: String, ownerId: String, repoUrl: String, repoName: String, repoFullName: String? = nil, branch: String, localPath: String, createdAt: String, orgId: String? = nil, sessionCount: Int? = nil, myRole: String? = nil) {
+    public init(id: String, ownerId: String, repoUrl: String, repoName: String, repoFullName: String? = nil, branch: String, localPath: String, createdAt: String, orgId: String? = nil, sessionCount: Int? = nil, myRole: String? = nil, latestSessionTitle: String? = nil, latestSessionAt: String? = nil) {
         self.id = id; self.ownerId = ownerId; self.repoUrl = repoUrl; self.repoName = repoName
         self.repoFullName = repoFullName; self.branch = branch; self.localPath = localPath
         self.createdAt = createdAt; self.orgId = orgId; self.sessionCount = sessionCount; self.myRole = myRole
+        self.latestSessionTitle = latestSessionTitle; self.latestSessionAt = latestSessionAt
     }
 }
 

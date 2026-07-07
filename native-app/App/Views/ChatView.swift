@@ -15,6 +15,8 @@ import WaynodeCore
 //   • Primary action (Send) — .glassProminent.
 //   • Auto-scroll to bottom on new content, but respects manual scroll-up.
 //   • Streaming text appears character-by-character (from SSE deltas).
+//   • Keyboard: auto-focuses on appear, tap message area to focus,
+//     interactively dismisses on scroll.
 
 struct ChatView: View {
     @Bindable var store: SessionStore
@@ -47,7 +49,7 @@ struct ChatView: View {
             // Message list
             messageList
 
-            // Composer
+            // Composer — passed the focus binding so it can request focus
             ComposerBar(
                 text: $composerText,
                 isSending: store.isSending,
@@ -66,6 +68,14 @@ struct ChatView: View {
                 }
             )
         }
+        // Auto-focus the composer shortly after the view appears so the
+        // keyboard animates in smoothly. A tiny delay lets SwiftUI finish
+        // layout first; without it the keyboard sometimes doesn't animate.
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                composerFocused = true
+            }
+        }
     }
 
     // MARK: - Message list
@@ -77,6 +87,10 @@ struct ChatView: View {
                     if store.reducer.items.isEmpty && !store.isLoadingHistory {
                         EmptyChatState()
                             .padding(.top, 60)
+                            // Tapping the empty state focuses the composer
+                            .onTapGesture {
+                                composerFocused = true
+                            }
                     }
 
                     if store.isLoadingHistory {
@@ -93,21 +107,27 @@ struct ChatView: View {
                             .id(item.id)
                     }
 
-                    // Bottom anchor for auto-scroll
+                    // Bottom anchor for auto-scroll — generous bottom padding
+                    // so the last message doesn't hide behind the composer
+                    // when the keyboard is visible.
                     Color.clear
                         .frame(height: 1)
                         .id(bottomID)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
+            // Interactively dismiss the keyboard as the user scrolls down.
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
+            // Tap anywhere on the message list (that isn't a link/button)
+            // to bring the keyboard back.
+            .onTapGesture {
+                composerFocused = true
+            }
             // Track whether user is near the bottom — drives autoScroll.
-            // When the user scrolls up, autoScroll becomes false; when they
-            // scroll back to the bottom, it becomes true again.
             .onScrollGeometryChange(for: Bool.self) { geo in
-                // "Near bottom" = the visible area reaches within 80pt of the end.
                 let maxOffset = geo.contentSize.height - geo.bounds.height
                 let currentOffset = geo.contentOffset.y + geo.bounds.height
                 return maxOffset <= 0 || currentOffset >= geo.contentSize.height - 80

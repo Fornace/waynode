@@ -290,7 +290,9 @@ struct ChatReducerTests {
         var r = ChatReducer()
         r.loadHistory([
             .init(role: "user", id: "u1", content: "Hello"),
-            .init(role: "assistant", id: "a1", text: "Hi there"),
+            // Server sends assistant text as `content` (not `text`),
+            // and optional reasoning as `thinking`.
+            .init(role: "assistant", id: "a1", content: "Hi there"),
             .init(role: "user", id: "u2", content: "Bye"),
         ])
         #expect(r.items.count == 3)
@@ -300,6 +302,51 @@ struct ChatReducerTests {
             if case .text(let tb) = a.blocks[0] { #expect(tb.text == "Hi there") }
         }
         if case .user(let u) = r.items[2] { #expect(u.content == "Bye") }
+    }
+
+    // MARK: History loading with thinking blocks
+
+    @Test("History assistant with thinking loads thinking before text")
+    func historyLoadWithThinking() {
+        var r = ChatReducer()
+        r.loadHistory([
+            .init(role: "user", id: "u1", content: "What is 2+2?"),
+            .init(role: "assistant", id: "a1", content: "4", thinking: "2+2=4"),
+        ])
+        #expect(r.items.count == 2)
+        if case .assistant(let a) = r.items[1] {
+            #expect(a.blocks.count == 2)
+            // Thinking comes first (matches web frontend)
+            if case .thinking(let tb) = a.blocks[0] { #expect(tb.text == "2+2=4") }
+            if case .text(let tb) = a.blocks[1] { #expect(tb.text == "4") }
+        }
+    }
+
+    @Test("History assistant with only thinking and no text still loads")
+    func historyLoadThinkingOnly() {
+        var r = ChatReducer()
+        r.loadHistory([
+            .init(role: "assistant", id: "a1", thinking: "Just thinking"),
+        ])
+        #expect(r.items.count == 1)
+        if case .assistant(let a) = r.items[0] {
+            #expect(a.blocks.count == 1)
+            if case .thinking(let tb) = a.blocks[0] { #expect(tb.text == "Just thinking") }
+        }
+    }
+
+    @Test("History assistant with empty content and no thinking is skipped")
+    func historyLoadEmptyAssistant() {
+        var r = ChatReducer()
+        r.loadHistory([
+            .init(role: "user", id: "u1", content: "Hello"),
+            .init(role: "assistant", id: "a1", content: ""),  // empty
+            .init(role: "user", id: "u2", content: "World"),
+        ])
+        // Empty assistant message is skipped — only 2 items
+        #expect(r.items.count == 2)
+        if case .user(let u) = r.items[0] { #expect(u.content == "Hello") }
+        if case .user(let u) = r.items[1] { #expect(u.content == "World") }
     }
 
     // MARK: Optimistic user append

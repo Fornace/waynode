@@ -71,16 +71,18 @@ struct SpacesScene: View {
             }
         }
         .navigationTitle("Spaces")
-        .searchable(text: $searchText, prompt: "Search spaces")
+        // Force search into a drawer below the title so it doesn't collide
+        // with the Clone button in the navigation bar on iOS 26+.
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search spaces")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     Haptics.light()
                     showingCloneSheet = true
                 } label: {
-                    Label("Clone Repo", systemImage: "plus")
+                    Image(systemName: "plus.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
                 }
-                .buttonStyle(.glass)
             }
         }
         .sheet(isPresented: $showingCloneSheet) {
@@ -125,28 +127,113 @@ struct SpacesScene: View {
 struct SpaceRow: View {
     let space: Space
 
+    /// Derive a human-readable repo path from repoFullName or repoUrl.
+    /// Server stores repo_full_name as the full URL in some cases; we
+    /// extract the `owner/repo` portion for display.
+    private var displayPath: String? {
+        // Prefer repoFullName if it looks like an org/repo path (not a URL)
+        if let fn = space.repoFullName, !fn.isEmpty, !fn.contains("://") {
+            return fn
+        }
+        // Extract from URL: https://github.com/Fornace/waynode.git → Fornace/waynode
+        let url = space.repoUrl.isEmpty ? (space.repoFullName ?? "") : space.repoUrl
+        guard !url.isEmpty else { return nil }
+        // Strip .git suffix and protocol, take last two path components
+        var cleaned = url
+        if cleaned.hasSuffix(".git") { cleaned.removeLast(4) }
+        if let schemeRange = cleaned.range(of: "://") {
+            cleaned = String(cleaned[schemeRange.upperBound...])
+        }
+        let parts = cleaned.split(separator: "/").filter { !$0.isEmpty }
+        if parts.count >= 2 {
+            return "\(parts[parts.count - 2])/\(parts[parts.count - 1])"
+        }
+        return nil
+    }
+
+    /// Short date+time label so clones of the same repo are distinguishable.
+    /// Uses absolute time ("Jun 24, 5:43 PM") rather than relative because
+    /// 15 clones created the same day all collapse to "1 wk ago".
+    private var dateLabel: String? {
+        guard !space.createdAt.isEmpty else { return nil }
+        let date = parseDate(space.createdAt)
+        guard let date else { return nil }
+        let df = DateFormatter()
+        // If older than a week, show month + day + time; otherwise full date.
+        df.locale = Locale.autoupdatingCurrent
+        df.setLocalizedDateFormatFromTemplate("MMMd HHmm")
+        return df.string(from: date)
+    }
+
+    private func parseDate(_ s: String) -> Date? {
+        // Server format: "2026-06-24 17:43:07" (SQLite datetime)
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        if let d = df.date(from: s) { return d }
+        // Fallback: ISO 8601
+        let iso = ISO8601DateFormatter()
+        return iso.date(from: s)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: "folder.fill")
+            // Title row: repo name + session count badge
+            HStack(spacing: 6) {
+                Image(systemName: "book.closed.fill")
+                    .font(.subheadline)
                     .foregroundStyle(.tint)
-                Text(space.repoName)
+                Text(space.repoName.isEmpty ? "Untitled" : space.repoName)
                     .font(.headline)
                     .lineLimit(1)
-                Spacer()
+                Spacer(minLength: 0)
                 if let count = space.sessionCount, count > 0 {
                     Text("\(count)")
-                        .font(.caption2)
+                        .font(.caption2.bold())
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 7)
                         .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
+                        .background(Color.secondary.opacity(0.15), in: Capsule())
                 }
             }
-            if !space.branch.isEmpty {
-                Label(space.branch, systemImage: "arrow.triangle.branch")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            // Latest session preview — the most useful distinguishing info.
+            // Shows what was last worked on in this workspace.
+            if let title = space.latestSessionTitle, !title.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tint)
+                    Text(title)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary.opacity(0.85))
+                        .lineLimit(1)
+                }
+            }
+            // Metadata row: owner/repo (if different) + timestamp + branch
+            HStack(spacing: 6) {
+                if let path = displayPath, path != space.repoName {
+                    Text(path)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                if let date = dateLabel {
+                    Text(date)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                if !space.branch.isEmpty && space.branch != "main" {
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Label(space.branch, systemImage: "arrow.triangle.branch")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 2)
