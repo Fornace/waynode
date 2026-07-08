@@ -1,6 +1,25 @@
 import SwiftUI
 import WaynodeCore
 
+// MARK: - Edit-message environment (#9)
+//
+// Lets a user message pre-fill the composer with its text so the user can
+// tweak and resend. True conversation forking (server-side pi checkpoint /
+// resume with a parent pointer) is not yet supported by the server, so this
+// is the achievable client-side slice: edit-and-resend as a new message.
+
+private struct EditMessageKey: EnvironmentKey {
+    nonisolated(unsafe) static let defaultValue: ((String) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    /// Set by ChatView; consumed by UserMessageView's context menu.
+    var onEditMessage: ((String) -> Void)? {
+        get { self[EditMessageKey.self] }
+        set { self[EditMessageKey.self] = newValue }
+    }
+}
+
 // MARK: - ChatView
 //
 // The main conversation surface. Shows:
@@ -48,6 +67,12 @@ struct ChatView: View {
                 }
                 .animation(.smooth, value: store.connectionState)
                 .animation(.smooth, value: store.goalStatus.status)
+            }
+            // Provide an edit handler so user messages can pre-fill the
+            // composer via their context menu (#9).
+            .environment(\.onEditMessage) { text in
+                composerText = text
+                composerFocused = true
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ComposerBar(
@@ -115,10 +140,17 @@ struct ChatView: View {
                         .frame(height: 1)
                         .id(bottomID)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
+                // Tighter horizontal padding so content uses more of the
+                // screen width on iPhone (was 16 → 10). Bubbles and markdown
+                // blocks already carry their own internal padding.
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
             }
+            // Per-session identity: forces a fresh ScrollView instance when
+            // switching sessions so the scroll offset from a previous session
+            // is NOT carried over (#8 — scroll position remembered bug).
+            .id(ObjectIdentifier(store))
             // Interactively dismiss the keyboard as the user scrolls down.
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
@@ -138,6 +170,23 @@ struct ChatView: View {
             .onChange(of: store.reducer.items.last?.id) {
                 if autoScroll {
                     withAnimation(.smooth) {
+                        proxy.scrollTo(bottomID, anchor: .bottom)
+                    }
+                }
+            }
+            // When history finishes loading, jump to the bottom so the user
+            // lands on the latest message rather than a stale offset (#8).
+            .onChange(of: store.isLoadingHistory) { _, loading in
+                if !loading, !store.reducer.items.isEmpty {
+                    autoScroll = true
+                    proxy.scrollTo(bottomID, anchor: .bottom)
+                }
+            }
+            .onAppear {
+                // Ensure we start at the bottom for this session.
+                if !store.reducer.items.isEmpty {
+                    autoScroll = true
+                    DispatchQueue.main.async {
                         proxy.scrollTo(bottomID, anchor: .bottom)
                     }
                 }

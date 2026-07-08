@@ -59,17 +59,20 @@ struct ComposerBar: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            // The input capsule
-            HStack(alignment: .bottom, spacing: 6) {
+            // The input capsule — a distinct floating pill inside the bar.
+            // Centered alignment keeps the goal toggle, placeholder text, and
+            // send button on a shared baseline when single-line (the common
+            // case); the field still grows vertically for multiline input.
+            HStack(alignment: .center, spacing: 4) {
                 // Goal toggle
                 Button {
                     Haptics.light()
                     withAnimation(.smooth) { isGoalMode.toggle() }
                 } label: {
                     Image(systemName: isGoalMode ? "target" : "scope")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(isGoalMode ? Color.accentColor : Color.secondary)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
                 .disabled(isGoalActive)
@@ -82,14 +85,32 @@ struct ComposerBar: View {
                     .font(.body)
                     .lineLimit(1...6)
                     .focused(isFocused)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 7)
+                    .frame(minHeight: 32)
 
                 // Send / Abort
                 sendOrAbortButton
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.thinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(
+                        isFocused.wrappedValue
+                            ? Color.accentColor.opacity(0.85)
+                            : Color.secondary.opacity(0.25),
+                        lineWidth: isFocused.wrappedValue ? 1.5 : 1
+                    )
+            )
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 6)
+            .animation(.smooth, value: isFocused.wrappedValue)
         }
         .background(.bar)
         .animation(.smooth, value: error != nil)
@@ -107,7 +128,7 @@ struct ComposerBar: View {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 32, height: 32)
                     .background(Color.red, in: Circle())
             }
             .buttonStyle(.plain)
@@ -120,7 +141,7 @@ struct ComposerBar: View {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 32, height: 32)
                     .background(
                         canSend ? Color.accentColor : Color.secondary.opacity(0.3),
                         in: Circle()

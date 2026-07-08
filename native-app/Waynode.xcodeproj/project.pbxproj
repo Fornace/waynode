@@ -18,6 +18,7 @@
 		C0C99F3EE7F086A282859DA3 /* AccountScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4429524F93F2D7BAD0B11C7F /* AccountScene.swift */; };
 		C30EDF89EAFFF22AE8FBA5EA /* PlatformUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */; };
 		C443CB0479232AB4B92DFA16 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B76EABB353F48ADBB9E9A5A /* ChatView.swift */; };
+		C54BD14AA6CFE0287ED26646 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */; };
 		CC08168B051773A3058011EA /* ChatItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */; };
 		D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156A741D0EA8E9804E056580 /* SessionDetail.swift */; };
 		D445BFA0F669F13B6334FC75 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7365BF994B13B6120DA3165B /* Assets.xcassets */; };
@@ -43,6 +44,7 @@
 		8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
 		B759E8CE22B0B375BB475282 /* SessionsList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsList.swift; sourceTree = "<group>"; };
 		BAF14352DE276CEE0FD2DEEC /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
 		FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -85,6 +87,7 @@
 				FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */,
 				7A89D5250119F107505CA318 /* GitInspector.swift */,
 				7CD24C4235EFD2CABF8A6565 /* MainView.swift */,
+				E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */,
 				BAF14352DE276CEE0FD2DEEC /* RootView.swift */,
 				156A741D0EA8E9804E056580 /* SessionDetail.swift */,
 				B759E8CE22B0B375BB475282 /* SessionsList.swift */,
@@ -197,6 +200,7 @@
 				7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */,
 				6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */,
 				E6F247329523B034DB67E46A /* MainView.swift in Sources */,
+				C54BD14AA6CFE0287ED26646 /* MarkdownView.swift in Sources */,
 				C30EDF89EAFFF22AE8FBA5EA /* PlatformUtilities.swift in Sources */,
 				8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */,
 				D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */,

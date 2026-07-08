@@ -22,33 +22,41 @@ struct ChatItemView: View {
 }
 
 // MARK: - User Message
+//
+// iMessage-style: blue bubble, right-aligned, text left-aligned inside.
+// The bubble takes its natural width up to a cap so short messages form a
+// compact pill and long ones wrap, always hugging the trailing edge.
 
 struct UserMessageView: View {
     let message: ChatItem.UserItem
+    @Environment(\.onEditMessage) private var onEdit
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            if message.isGoal {
-                Image(systemName: "target")
-                    .font(.caption)
-                    .foregroundStyle(.tint)
-                    .padding(.top, 6)
-            }
+            Spacer(minLength: 48)
             VStack(alignment: .leading, spacing: 6) {
                 if message.isGoal {
-                    Text("Goal")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.tint)
-                        .textCase(.uppercase)
+                    HStack(spacing: 4) {
+                        Image(systemName: "target")
+                            .font(.caption2)
+                        Text("Goal")
+                            .font(.caption2.bold())
+                            .textCase(.uppercase)
+                    }
+                    .foregroundStyle(.white.opacity(0.9))
                 }
                 Text(message.content)
+                    .foregroundStyle(.white)
+                    .font(.body)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(12)
-            .background(Color.accentColor.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.blue)
+            .clipShape(UserBubbleShape())
+            .frame(maxWidth: 300, alignment: .trailing)
+            .fixedSize(horizontal: false, vertical: true)
             .contextMenu {
                 Button {
                     copyToClipboard(message.content)
@@ -56,9 +64,43 @@ struct UserMessageView: View {
                 } label: {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
+                // Edit-and-resend: pre-fills the composer with this message's
+                // text so the user can tweak and send as a new message. True
+                // conversation forking needs server-side support (#9).
+                Button {
+                    onEdit?(message.content)
+                    Haptics.light()
+                } label: {
+                    Label("Edit & Resend", systemImage: "pencil")
+                }
             }
-            Spacer(minLength: 40)
         }
+    }
+}
+
+/// Rounded-rect bubble with a slightly flattened bottom-right corner — the
+/// classic iMessage "tail" cue without drawing a full tail.
+struct UserBubbleShape: Shape {
+    var radius: CGFloat = 18
+
+    func path(in rect: CGRect) -> Path {
+        let r = rect
+        let tl = CGPoint(x: r.minX + radius, y: r.minY)
+        let tr = CGPoint(x: r.maxX - radius, y: r.minY)
+        let br = CGPoint(x: r.maxX, y: r.maxY)
+        let bl = CGPoint(x: r.minX + radius, y: r.maxY)
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY + radius))
+        p.addQuadCurve(to: tl, control: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: tr)
+        p.addQuadCurve(to: CGPoint(x: r.maxX, y: r.minY + radius),
+                       control: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: br)
+        p.addLine(to: bl)
+        p.addQuadCurve(to: CGPoint(x: r.minX, y: r.maxY - radius),
+                       control: CGPoint(x: r.minX, y: r.maxY))
+        p.closeSubpath()
+        return p
     }
 }
 
@@ -153,197 +195,25 @@ struct BlockView: View {
 }
 
 // MARK: - Text Block
+//
+// All assistant text renders through MarkdownView — a dependency-free,
+// block-level Markdown engine with lightweight syntax-highlighted code
+// blocks. This gives full coverage of headers, lists, tables, blockquotes,
+// fenced code, and inline formatting (#6, #2).
 
 struct TextBlock: View {
     let text: String
 
     var body: some View {
-        // If the text contains fenced code blocks, render them with syntax
-        // (the RichTextWithCode splitter handles fenced ``` blocks).
-        if text.contains("```") {
-            RichTextWithCode(text: text)
-        } else {
-            // Use AttributedString for inline markdown (bold, italic, inline
-            // code, links). Falls back to plain text on parse failure.
-            if let attributed = try? AttributedString(markdown: text) {
-                Text(attributed)
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Text(text)
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-}
-
-// MARK: - Rich Text with Code
-
-struct RichTextWithCode: View {
-    let text: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
-                switch segment {
-                case .text(let str):
-                    if !str.isEmpty {
-                        // Render inline markdown (bold, italic, links, inline code)
-                        if let attributed = try? AttributedString(markdown: str) {
-                            Text(attributed)
-                                .font(.body)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            Text(str)
-                                .font(.body)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                case .codeBlock(let lang, let code):
-                    CodeBlockView(language: lang, code: code)
-                }
-            }
-        }
-    }
-
-    private enum Segment {
-        case text(String)
-        case codeBlock(String, String)
-    }
-
-    private var segments: [Segment] {
-        // Split on ``` fences
-        var parts: [Segment] = []
-        let pattern = "```"
-        var remaining = text[...]
-        while let range = remaining.range(of: pattern) {
-            // Text before fence (may contain inline markdown)
-            let before = remaining[..<range.lowerBound]
-            if !before.isEmpty {
-                parts.append(.text(String(before)))
-            }
-            remaining = remaining[range.upperBound...]
-            // Find closing fence
-            if let endRange = remaining.range(of: pattern) {
-                let block = remaining[..<endRange.lowerBound]
-                parts.append(contentsOf: parseCodeBlock(String(block)))
-                remaining = remaining[endRange.upperBound...]
-            } else {
-                // No closing fence — treat rest as code
-                parts.append(contentsOf: parseCodeBlock(String(remaining)))
-                break
-            }
-        }
-        if !remaining.isEmpty {
-            parts.append(.text(String(remaining)))
-        }
-        return parts
-    }
-
-    /// Parse a raw code-block body (the text between ``` fences) into a
-    /// `.codeBlock` segment. Per GitHub-Flavored Markdown, the first line
-    /// is treated as a language *info string* ONLY when it is a single
-    /// token (letters, digits, +, -, #); otherwise the entire body is code
-    /// with no language. This prevents the first line of a language-less
-    /// code block from being eaten as a fake "language".
-    private func parseCodeBlock(_ raw: String) -> [Segment] {
-        // Strip a single leading newline (fences are usually ```\n...)
-        var body = raw
-        if body.hasPrefix("\n") { body.removeFirst() }
-        // Single line with no newline: could be a language hint OR code.
-        guard let firstNewline = body.firstIndex(of: "\n") else {
-            let line = body.trimmingCharacters(in: .whitespaces)
-            if isLanguageHint(line) {
-                return [.codeBlock(line, "")]
-            }
-            return [.codeBlock("", body)]
-        }
-        let firstLine = String(body[..<firstNewline]).trimmingCharacters(in: .whitespaces)
-        if isLanguageHint(firstLine) {
-            let code = String(body[body.index(after: firstNewline)...])
-            return [.codeBlock(firstLine, code)]
-        } else {
-            // No language hint — entire body is code.
-            return [.codeBlock("", body)]
-        }
-    }
-
-    /// A language info string is a single token: letters, digits, and the
-    /// characters +, -, #. Anything with a space is NOT a language.
-    private func isLanguageHint(_ s: String) -> Bool {
-        guard !s.isEmpty else { return false }
-        return s.allSatisfy { c in c.isLetter || c.isNumber || c == "+" || c == "-" || c == "#" }
-    }
-}
-
-// MARK: - Code Block
-
-struct CodeBlockView: View {
-    let language: String
-    let code: String
-    @State private var isExpanded: Bool = true
-    @State private var showCopied: Bool = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(language.isEmpty ? "code" : language)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    copyToClipboard(code)
-                    Haptics.success()
-                    withAnimation { showCopied = true }
-                    Task {
-                        try? await Task.sleep(nanoseconds: 2_000_000_000)
-                        await MainActor.run { showCopied = false }
-                    }
-                } label: {
-                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                        .font(.caption2)
-                        .foregroundStyle(showCopied ? .green : .secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(showCopied ? "Copied" : "Copy code")
-                Button {
-                    withAnimation(.smooth) { isExpanded.toggle() }
-                } label: {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isExpanded ? "Collapse code" : "Expand code")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.thinMaterial)
-
-            if isExpanded {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Text(code)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(12)
-                }
-                .frame(maxHeight: 400)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.gray.opacity(0.3))
-        )
+        MarkdownView(text: text)
     }
 }
 
 // MARK: - Thinking Block
+//
+// Collapsible reasoning. Now renders its content through MarkdownView so
+// code snippets and structured markdown inside the model's reasoning are
+// formatted readably instead of dumped as plain text (#5).
 
 struct ThinkingBlock: View {
     let text: String
@@ -352,6 +222,7 @@ struct ThinkingBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
+                Haptics.light()
                 withAnimation(.smooth) { isExpanded.toggle() }
             } label: {
                 HStack {
@@ -366,14 +237,12 @@ struct ThinkingBlock: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
             if isExpanded {
-                Text(text)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                MarkdownView(text: text)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 10)
@@ -394,6 +263,7 @@ struct ToolBlockView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
+                Haptics.light()
                 withAnimation(.smooth) { isExpanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
