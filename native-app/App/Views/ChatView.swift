@@ -29,51 +29,53 @@ struct ChatView: View {
     private let bottomID = "chat-bottom"
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Top banners (conditional)
-            VStack(spacing: 0) {
-                if showConnectionBanner {
-                    ConnectionBanner(state: store.connectionState)
+        // Top banners (conditional) sit in a safeAreaInset so the message
+        // list fills the full screen and banners slide in from the top when
+        // needed.
+        messageList
+            .safeAreaInset(edge: .top, spacing: 0) {
+                VStack(spacing: 0) {
+                    if showConnectionBanner {
+                        ConnectionBanner(state: store.connectionState)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    if store.goalStatus.status == .active || store.goalStatus.status == .paused {
+                        GoalBanner(status: store.goalStatus) {
+                            Task { await store.abortTurn() }
+                        }
                         .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
-                if store.goalStatus.status == .active || store.goalStatus.status == .paused {
-                    GoalBanner(status: store.goalStatus) {
+                .animation(.smooth, value: store.connectionState)
+                .animation(.smooth, value: store.goalStatus.status)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                ComposerBar(
+                    text: $composerText,
+                    isSending: store.isSending,
+                    error: store.sendError,
+                    isGoalActive: store.goalStatus.status == .active,
+                    isFocused: $composerFocused,
+                    onSend: { prompt, isGoal in
+                        Task {
+                            await store.sendMessage(prompt, isGoal: isGoal)
+                            composerText = ""
+                            autoScroll = true
+                        }
+                    },
+                    onAbort: {
                         Task { await store.abortTurn() }
                     }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
+                )
             }
-            .animation(.smooth, value: store.connectionState)
-            .animation(.smooth, value: store.goalStatus.status)
-
-            // Message list
-            messageList
-
-            // Composer — passed the focus binding so it can request focus
-            ComposerBar(
-                text: $composerText,
-                isSending: store.isSending,
-                error: store.sendError,
-                isGoalActive: store.goalStatus.status == .active,
-                isFocused: $composerFocused,
-                onSend: { prompt, isGoal in
-                    Task {
-                        await store.sendMessage(prompt, isGoal: isGoal)
-                        composerText = ""
-                        autoScroll = true
-                    }
-                },
-                onAbort: {
-                    Task { await store.abortTurn() }
-                }
-            )
-        }
-        // Auto-focus the composer shortly after the view appears so the
-        // keyboard animates in smoothly. A tiny delay lets SwiftUI finish
-        // layout first; without it the keyboard sometimes doesn't animate.
+        // Only auto-focus when the chat is empty (new conversation).
+        // When opening a session with history, don't steal focus — let the
+        // user read first, tap to type when ready.
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                composerFocused = true
+            if store.reducer.items.isEmpty && !store.isLoadingHistory {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    composerFocused = true
+                }
             }
         }
     }
@@ -85,12 +87,11 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     if store.reducer.items.isEmpty && !store.isLoadingHistory {
-                        EmptyChatState()
-                            .padding(.top, 60)
-                            // Tapping the empty state focuses the composer
-                            .onTapGesture {
-                                composerFocused = true
-                            }
+                        EmptyChatState {
+                            composerFocused = true
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
                     }
 
                     if store.isLoadingHistory {
@@ -171,19 +172,55 @@ struct ChatView: View {
 // MARK: - Empty Chat State
 
 struct EmptyChatState: View {
+    var onTap: () -> Void
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 48))
-                .foregroundStyle(.tint)
-            Text("Start a conversation")
-                .font(.title2.bold())
-            Text("Describe a task, paste code, or ask a question.\nThe agent works in your repository on the server.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        VStack(spacing: 20) {
+            VStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(.tint)
+                Text("How can I help?")
+                    .font(.title3.bold())
+                Text("Describe a task, paste code, or ask a question.\nThe agent works directly in your repository.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Suggestion chips — tap to pre-fill the composer
+            VStack(spacing: 8) {
+                SuggestionChip(icon: "doc.text.magnifyingglass", text: "Explain this codebase", onTap: onTap)
+                SuggestionChip(icon: "bug", text: "Find and fix bugs", onTap: onTap)
+                SuggestionChip(icon: "wand.and.stars", text: "Add a feature", onTap: onTap)
+            }
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
+        .onTapGesture { onTap() }
+    }
+}
+
+private struct SuggestionChip: View {
+    let icon: String
+    let text: String
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(.tint)
+                Text(text)
+                    .font(.subheadline)
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

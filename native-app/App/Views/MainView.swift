@@ -13,10 +13,15 @@ import WaynodeCore
 // Uses NavigationStack (NOT NavigationSplitView) for the Spaces tab so that
 // taps always work and the drill-down is natural on mobile: tap a repo → see
 // its sessions → tap a session → chat. This is the Mail/Messages pattern.
+//
+// Deep linking: waynode://space/<id> pushes the sessions list for a space;
+// waynode://space/<id>/session/<sid> pushes all the way to a chat. The path
+// is driven by a NavigationPath binding so we can push multiple levels.
 
 struct MainView: View {
     @Environment(AppModel.self) private var appModel
     @State private var selection: TopLevelTab? = .spaces
+    @State private var spacesPath = NavigationPath()
 
     enum TopLevelTab: String, Hashable, CaseIterable {
         case spaces, account
@@ -39,8 +44,16 @@ struct MainView: View {
     var body: some View {
         TabView(selection: $selection) {
             // Spaces tab: drill-down navigation (Spaces → Sessions → Chat)
-            NavigationStack {
+            NavigationStack(path: $spacesPath) {
                 SpacesScene()
+                    .navigationDestination(for: DeepLink.self) { destination in
+                        switch destination {
+                        case .sessionsList(let spaceId):
+                            SessionsList(spaceId: spaceId)
+                        case .sessionDetail(let spaceId, let sessionId):
+                            SessionDetail(sessionId: sessionId, spaceId: spaceId)
+                        }
+                    }
             }
             .tabItem {
                 Label(TopLevelTab.spaces.label, systemImage: TopLevelTab.spaces.systemImage)
@@ -56,6 +69,31 @@ struct MainView: View {
             }
             .tag(TopLevelTab.account)
         }
+        // Deep-link handling: when pendingDeepLink changes, push it.
+        .onChange(of: appModel.pendingDeepLink) {
+            handleDeepLink()
+        }
+        .onAppear {
+            handleDeepLink()
+        }
+    }
+
+    // MARK: - Deep Link
+
+    private func handleDeepLink() {
+        guard let link = appModel.pendingDeepLink else { return }
+        selection = .spaces
+        switch link {
+        case .sessionsList(let spaceId):
+            spacesPath = NavigationPath([DeepLink.sessionsList(spaceId: spaceId)])
+        case .sessionDetail(let spaceId, let sessionId):
+            spacesPath = NavigationPath([
+                DeepLink.sessionsList(spaceId: spaceId),
+                DeepLink.sessionDetail(spaceId: spaceId, sessionId: sessionId)
+            ])
+        }
+        // Clear the pending link so it doesn't re-trigger
+        appModel.pendingDeepLink = nil
     }
 }
 

@@ -1,5 +1,16 @@
 import Foundation
 
+// MARK: - DeepLink
+//
+// Represents a navigation destination that can be triggered via URL
+// (waynode://space/<id> or waynode://space/<id>/session/<id>) or
+// programmatically. Used for deep linking and E2E test navigation.
+
+public enum DeepLink: Hashable {
+    case sessionsList(spaceId: String)
+    case sessionDetail(spaceId: String, sessionId: String)
+}
+
 // MARK: - Core Domain Models
 // Exact mirror of frontend/src/types.ts — every field, every optionality,
 // every union case. Decoding is lenient: unknown keys are ignored and

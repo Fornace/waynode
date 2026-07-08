@@ -55,9 +55,7 @@ struct SpacesScene: View {
                 }
             } else {
                 ForEach(filteredSpaces) { space in
-                    NavigationLink {
-                        SessionsList(spaceId: space.id)
-                    } label: {
+                    NavigationLink(value: DeepLink.sessionsList(spaceId: space.id)) {
                         SpaceRow(space: space)
                     }
                     .swipeActions(edge: .trailing) {

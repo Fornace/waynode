@@ -16,7 +16,6 @@ struct SessionsList: View {
     @State private var sessionError: String?
     @State private var sessionToDelete: Session?
     @State private var searchText = ""
-    @State private var pushedSession: Session?
 
     private var sessions: [Session] {
         let all = appModel.sessions(forSpace: spaceId)
@@ -64,9 +63,7 @@ struct SessionsList: View {
                 }
             } else {
                 ForEach(sessions) { session in
-                    NavigationLink {
-                        SessionDetail(sessionId: session.id, spaceId: spaceId)
-                    } label: {
+                    NavigationLink(value: DeepLink.sessionDetail(spaceId: spaceId, sessionId: session.id)) {
                         SessionRow(session: session)
                     }
                     .swipeActions(edge: .trailing) {
@@ -81,9 +78,6 @@ struct SessionsList: View {
         }
         .navigationTitle(spaceName)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(item: $pushedSession) { session in
-            SessionDetail(sessionId: session.id, spaceId: spaceId)
-        }
         .searchable(text: $searchText, prompt: "Search sessions")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -110,8 +104,8 @@ struct SessionsList: View {
                             newSessionTitle = ""
                             showingNewSession = false
                             Haptics.success()
-                            // Auto-navigate into the new session
-                            pushedSession = session
+                            // Auto-navigate into the new session via deep link
+                            appModel.pendingDeepLink = .sessionDetail(spaceId: spaceId, sessionId: session.id)
                         } catch {
                             sessionError = error.localizedDescription
                             Haptics.error()

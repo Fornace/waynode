@@ -17,6 +17,7 @@ struct WaynodeApp: App {
 
         // DEBUG: allow injecting a token via launch arguments for testing.
         // Usage: simctl launch ... com.waynode.app -dev-token wn_xxx
+        //        -space <id> [-session <id>]  (deep-link navigation)
         #if DEBUG
         if let idx = CommandLine.arguments.firstIndex(of: "-dev-token"),
            idx + 1 < CommandLine.arguments.count {
@@ -36,6 +37,21 @@ struct WaynodeApp: App {
                     if appModel.auth.isAuthenticated {
                         await appModel.bootstrap()
                     }
+                    #if DEBUG
+                    // Deep-link navigation via launch args (for testing)
+                    let args = CommandLine.arguments
+                    if let spaceIdx = args.firstIndex(of: "-space"),
+                       spaceIdx + 1 < args.count {
+                        let spaceId = args[spaceIdx + 1]
+                        if let sessionIdx = args.firstIndex(of: "-session"),
+                           sessionIdx + 1 < args.count {
+                            let sessionId = args[sessionIdx + 1]
+                            appModel.pendingDeepLink = .sessionDetail(spaceId: spaceId, sessionId: sessionId)
+                        } else {
+                            appModel.pendingDeepLink = .sessionsList(spaceId: spaceId)
+                        }
+                    }
+                    #endif
                 }
         }
     }

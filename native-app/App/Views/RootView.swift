@@ -30,6 +30,35 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .animation(.smooth(duration: 0.4), value: appModel.auth.isAuthenticated)
         .animation(.smooth(duration: 0.3), value: appModel.auth.hasCompletedLaunchCheck)
+        .onOpenURL { url in
+            handleDeepLink(url)
+        }
+    }
+
+    // MARK: - Deep Link Handling
+    //
+    // URL schemes:
+    //   waynode://auth?token=wn_...     — OAuth callback (handled by AuthView)
+    //   waynode://space/<id>             — open a space's sessions list
+    //   waynode://space/<id>/session/<id> — open a specific chat session
+
+    private func handleDeepLink(_ url: URL) {
+        // OAuth callbacks are handled by AuthView's ASWebAuthenticationSession
+        if url.host == "auth" { return }
+
+        guard url.host == "space" else { return }
+        let segments = url.pathComponents.filter { !$0.isEmpty }
+
+        if segments.count >= 3 && segments[1] == "session" {
+            // /space/<spaceId>/session/<sessionId>
+            appModel.pendingDeepLink = .sessionDetail(
+                spaceId: segments[0],
+                sessionId: segments[2]
+            )
+        } else if segments.count >= 1 {
+            // /space/<spaceId>
+            appModel.pendingDeepLink = .sessionsList(spaceId: segments[0])
+        }
     }
 }
 

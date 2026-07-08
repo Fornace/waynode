@@ -35,6 +35,10 @@ public final class AppModel {
     public var selectedSpaceId: String?
     public var selectedSessionId: String?
 
+    // Deep-link navigation. Set by .onOpenURL handler; consumed by
+    // MainView's NavigationStack to push the right destination.
+    public var pendingDeepLink: DeepLink?
+
     private var api: APIClient?
     private var unauthorizedTask: Task<Void, Never>?
 
