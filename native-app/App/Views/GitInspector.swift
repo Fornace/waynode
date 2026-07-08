@@ -26,6 +26,9 @@ struct GitInspector: View {
     @State private var pendingBranch: String?
     @State private var showingBranchConfirm = false
     @State private var isBranchesExpanded = false
+    @State private var isPulling = false
+    @State private var isPushing = false
+    @State private var actionError: String?
 
     var body: some View {
         NavigationStack {
@@ -88,6 +91,14 @@ struct GitInspector: View {
             } message: {
                 Text("Uncommitted changes will be carried to the new branch. This is safe but may cause merge conflicts if the target branch has diverged.")
             }
+            .alert("Git action failed", isPresented: Binding(
+                get: { actionError != nil },
+                set: { if !$0 { actionError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(actionError ?? "")
+            }
             .task {
                 await loadSnapshot()
             }
@@ -125,6 +136,41 @@ struct GitInspector: View {
                         }
                     }
                 }
+            }
+
+            // Sync actions — pull remote changes / push local commits.
+            HStack(spacing: 12) {
+                Button {
+                    Task { await pullChanges() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isPulling {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                        }
+                        Text(snap.behind > 0 ? "Pull (\(snap.behind))" : "Pull")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isPulling || isPushing)
+
+                Button {
+                    Task { await pushChanges() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isPushing {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill")
+                        }
+                        Text(snap.ahead > 0 ? "Push (\(snap.ahead))" : "Push")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isPulling || isPushing)
             }
 
             DisclosureGroup("Branches", isExpanded: $isBranchesExpanded) {
@@ -301,6 +347,34 @@ struct GitInspector: View {
             Haptics.error()
         }
         switchingBranch = false
+    }
+
+    private func pullChanges() async {
+        guard let api = appModel.currentAPI() else { return }
+        isPulling = true
+        do {
+            try await api.pullBranch(spaceId)
+            Haptics.success()
+            await loadSnapshot()
+        } catch {
+            actionError = error.localizedDescription
+            Haptics.error()
+        }
+        isPulling = false
+    }
+
+    private func pushChanges() async {
+        guard let api = appModel.currentAPI() else { return }
+        isPushing = true
+        do {
+            try await api.pushBranch(spaceId)
+            Haptics.success()
+            await loadSnapshot()
+        } catch {
+            actionError = error.localizedDescription
+            Haptics.error()
+        }
+        isPushing = false
     }
 }
 

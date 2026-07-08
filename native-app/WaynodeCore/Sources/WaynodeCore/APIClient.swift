@@ -418,9 +418,11 @@ public actor APIClient {
         if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Pull failed") }
     }
 
-    public func pushBranch(_ spaceId: String) async throws {
+    public func pushBranch(_ spaceId: String, setUpstream: Bool = true) async throws {
+        struct Body: Encodable { let setUpstream: Bool }
         struct Resp: Decodable { let ok: Bool; let error: String? }
-        let r: Resp = try await request("/api/spaces/\(spaceId)/git/push", method: "POST")
+        let r: Resp = try await request("/api/spaces/\(spaceId)/git/push", method: "POST",
+                                        body: Body(setUpstream: setUpstream))
         if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Push failed") }
     }
 
