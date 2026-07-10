@@ -4,6 +4,7 @@ frontend/node_modules/
 
 # Build output
 frontend/dist/
+.build/
 
 # Data (runtime)
 data/
