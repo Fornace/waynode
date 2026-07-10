@@ -8,6 +8,27 @@ Docker image requires Stripe or these tiers.
 All numbers below are a starting proposal for human review. They are not
 final — this file exists so the reasoning is legible, not just a table.
 
+## Hosted activation boundary
+
+Billing is disabled by default, including if a self-hosted operator happens
+to provide a Stripe key. It is enabled only when all of the following are set
+in the hosted deployment environment:
+
+```
+WAYNODE_DEPLOYMENT=hosted
+STRIPE_SECRET_KEY=sk_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_STARTER=price_...
+STRIPE_PRICE_PRO=price_...
+STRIPE_PRICE_TEAM=price_...
+```
+
+Do not add these values to a self-hosted `.env` or image. Web checkout gathers
+a payment method and anchors a trial to the organization creation timestamp;
+the Stripe subscription uses the remaining portion of that 15-day trial and
+the signed webhook is authoritative for its resulting status. A previously
+subscribed Stripe customer cannot receive another trial.
+
 ## 1. Cost basis
 
 The product owner said fornace model costs are "roughly Qwen3.7 Max." Verified
@@ -75,15 +96,17 @@ mostly cached/short prompts would cost less. Pricing to worst case is the
 right call per the brief: heavy/abusive usage inside a quota is the actual
 margin risk, not the average customer.
 
-## 2. Free tier (given, not designed)
+## 2. Free trial (given, not designed)
 
+- **15 days from organization creation**, with no renewal and no second trial
+  after a Stripe subscription is canceled.
 - 2 GB storage
-- 5,000,000 tokens/month, combined across fornace reasoning/max/fast,
+- 5,000,000-token trial allowance, combined across fornace reasoning/max/fast,
   including thinking tokens
 - 1 seat (implicit — no paid multi-seat features)
 
-Worst-case COGS for Free: `5M / 1M × $4.00 = $20.00/month` per fully-utilized
-free org. This is a real, accepted customer-acquisition cost, not something
+Worst-case COGS for the trial: `5M / 1M × $4.00 = $20.00` per fully-utilized
+trial org. This is a real, accepted customer-acquisition cost, not something
 this doc tries to eliminate — it's bounded hard by the quota (see §5 on
 enforcement gaps) and is standard for a "try it free" LLM-wrapper product.
 
@@ -147,9 +170,9 @@ sells token overage separately instead of a large flat allowance.
 at first glance but is a deliberate, common SaaS pattern once you separate
 what each tier is actually selling:
 
-- **Free** is a single-seat trial with a generous token allowance to let one
-  person fully evaluate the product — acceptable to subsidize once, per
-  signup, because it's capped and non-recurring-revenue-bearing.
+- **Free trial** is a single-seat evaluation with a generous token allowance
+  to let one person fully evaluate the product — acceptable to subsidize once,
+  per organization, because it is time- and quota-capped.
 - **Starter/Pro/Team** are *team* products. The value is seats (3/10/25),
   storage (10/50/200 GB), and roadmap differentiators (priority queueing,
   concurrency), not "more tokens than a single free trial." A 3-person team
@@ -212,15 +235,16 @@ RPC path.
 
 ## 5. Storage metering — what's real vs. approximate
 
-`routes/billing.js`'s `measureOrgStorageBytes()` shells out to `du -sk` on
-each space's `local_path` and sums the result. This is a real, working
-measurement (not stubbed), refreshed on every `GET
-/api/orgs/:orgId/billing` call and persisted to `org_usage.storage_bytes`.
+`lib/storage-quota.mjs` shells out to `du -sk` on each space's `local_path`
+and sums the result. Hosted clone, upload, and text-editor writes refresh that
+measurement before work is accepted; uploads are checked again after writing
+and their new files are removed if a chunked request crosses the quota. The
+Billing tab also records the current snapshot in `org_usage.storage_bytes`.
 Caveats: `du` on a large repo tree is not free (I/O cost scales with repo
 size/count), it doesn't account for shared/hardlinked blobs across spaces,
-and there is no continuous/scheduled recalculation — it is a point-in-time
-snapshot taken when someone loads the Billing tab, not enforced against the
-quota at write time (a space clone is never blocked for being over quota).
+and there is no continuous/scheduled recalculation. Agent and terminal shell
+writes cannot be bounded reliably at the route layer; hosted terminal access
+therefore remains disabled until it has a reservation/metering implementation.
 
 ## 6. What still needs a human / isn't built
 
@@ -230,9 +254,9 @@ quota at write time (a space clone is never blocked for being over quota).
 - Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
   `STRIPE_PRICE_STARTER/PRO/TEAM` in the hosted deployment's env — never in
   the self-host `.env.example` as anything but blank.
-- Decide on a real token-usage data source (§4) — this is required before
-  quota enforcement (blocking usage over quota) can exist; today
-  `checkQuota()` reports `exceeded: true/false` but nothing acts on it.
+- Add DB-backed token reservations and durable per-session meter cursors. Chat
+  now preflights active/trialing state and included usage, but a concurrent or
+  in-flight turn can still overshoot before its end-of-turn meter is recorded.
 - Decide whether/when to add Stripe metered billing for token overage (§3).
 - Priority queueing and concurrency-cap differentiators (§3 footnotes) are
   sold in the tier table but not implemented in `lib/agent-manager.mjs` —

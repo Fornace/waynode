@@ -27,6 +27,8 @@ export const api = {
   auth: {
     me: () => fetchJSON<{ user: User | null }>("/api/auth/me"),
     logout: () => fetchJSON("/auth/logout", { method: "POST" }),
+    deletionCheck: () => fetchJSON<{ can_delete: boolean; blockers: Array<{ id: string; name: string; slug: string }> }>("/api/auth/account/deletion-check"),
+    deleteAccount: () => fetchJSON("/api/auth/account", { method: "DELETE", body: JSON.stringify({ confirmation: "DELETE" }) }),
   },
 
   orgs: {
@@ -154,5 +156,16 @@ export const api = {
         `/api/spaces/${spaceId}/git/merge`,
         { method: "POST", body: JSON.stringify({ branchName }) }
       ),
+  },
+  files: {
+    read: (spaceId: string, path: string) =>
+      fetchJSON<{ type: "file"; path: string; content: string; revision: string }>(
+        `/api/spaces/${spaceId}/files?path=${encodeURIComponent(path)}`
+      ),
+    write: (spaceId: string, path: string, content: string, revision: string) =>
+      fetchJSON<{ ok: true; revision: string }>(`/api/spaces/${spaceId}/files`, {
+        method: "PUT",
+        body: JSON.stringify({ path, content, revision }),
+      }),
   },
 };

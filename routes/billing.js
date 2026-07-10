@@ -42,6 +42,14 @@ router.get("/api/billing/enabled", (req, res) => {
   res.json({ enabled: billingEnabled });
 });
 
+// Keep every hosted-billing read and write inert on self-host installs. The
+// public capability endpoint above is intentionally the only exception, so
+// the client can hide its billing affordances without probing protected URLs.
+router.use((req, res, next) => {
+  if (!billingEnabled) return res.status(404).json({ error: "Billing is not configured on this deployment" });
+  next();
+});
+
 router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, (req, res) => {
   const orgId = req.params.orgId;
   const storageBytes = measureOrgStorageBytes(orgId);
@@ -66,7 +74,6 @@ router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, (req, res) 
 });
 
 router.post("/api/orgs/:orgId/billing/checkout", requireAuth, requireOrgAdmin, async (req, res) => {
-  if (!billingEnabled) return res.status(404).json({ error: "Billing is not configured on this deployment" });
   const { plan } = req.body || {};
   if (!["starter", "pro", "team"].includes(plan)) return res.status(400).json({ error: "Invalid plan" });
 
@@ -86,7 +93,6 @@ router.post("/api/orgs/:orgId/billing/checkout", requireAuth, requireOrgAdmin, a
 });
 
 router.post("/api/orgs/:orgId/billing/portal", requireAuth, requireOrgAdmin, async (req, res) => {
-  if (!billingEnabled) return res.status(404).json({ error: "Billing is not configured on this deployment" });
   try {
     const url = await createPortalSession(req.params.orgId, {
       returnUrl: `${config.appUrl}/`,

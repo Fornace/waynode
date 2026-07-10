@@ -50,6 +50,7 @@ router.get("/api/spaces/:spaceId/secrets", requireAuth, requireSpaceAccess, (req
 });
 
 router.post("/api/spaces/:spaceId/secrets", requireAuth, requireSpaceAccess, (req, res) => {
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Editor required" });
   const { keyName, value } = req.body;
   if (!keyName || !value) return res.status(400).json({ error: "keyName and value required" });
   res.json(setSecret({ scope: "space", spaceId: req.params.spaceId, keyName, value }));

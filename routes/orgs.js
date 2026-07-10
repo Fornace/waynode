@@ -78,7 +78,7 @@ router.delete("/api/orgs/:orgId", requireAuth, async (req, res) => {
 
   if (billingEnabled) {
     const sub = getSubscription(orgId);
-    if (sub.status === "active" && sub.stripe_subscription_id) {
+    if (["active", "trialing", "past_due", "unpaid"].includes(sub.status) && sub.stripe_subscription_id) {
       try {
         await cancelSubscription(orgId);
       } catch (e) {
@@ -156,6 +156,7 @@ router.post("/api/invites/:token/accept", requireAuth, (req, res) => {
   if (new Date(invite.expires_at).getTime() < Date.now()) return res.status(410).json({ error: "This invite has expired" });
 
   const result = acceptInvite(req.params.token, req.user.id);
+  if (result.error === "seat_limit") return res.status(402).json({ error: "This organization has reached its plan's seat limit. Ask an admin to update billing or free a seat." });
   if (result.error) return res.status(410).json({ error: "This invite is no longer valid" });
   res.json(result.org);
 });

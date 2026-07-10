@@ -29,6 +29,7 @@ struct AccountScene: View {
             profileSection
             providersSection
             tokensSection
+            billingSection
             serverSection
             aboutSection
             logoutSection
@@ -219,6 +220,33 @@ struct AccountScene: View {
             Text("API Tokens")
         } footer: {
             Text("Tokens let the native app authenticate with the server. Max 10 per account.")
+        }
+    }
+
+    // MARK: - Billing
+
+    /// Billing is deliberately informational until the hosted service exposes
+    /// its server-verified App Store entitlement contract. In particular, do
+    /// not infer access from a device-local StoreKit transaction: plans grant
+    /// organization-scoped server capacity, not a local app feature.
+    private var billingSection: some View {
+        Section("Hosted Billing") {
+            Label("Hosted plans are managed on the web", systemImage: "safari")
+                .foregroundStyle(.secondary)
+
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "app.badge.checkmark")
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("App Store subscriptions are coming soon")
+                        .font(.subheadline.weight(.medium))
+                    Text("They will be tied to a workspace and verified by Waynode before access changes.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } footer: {
+            Text("Self-hosted Waynode has no subscription requirement. This app never treats a local purchase as proof of hosted access.")
         }
     }
 

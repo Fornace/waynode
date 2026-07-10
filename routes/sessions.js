@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, queryTokenAuth } from "../lib/auth.mjs";
+import { requireAuth, requireSpaceAccess, queryTokenAuth } from "../lib/auth.mjs";
 import {
   createSession,
   getSession,
@@ -16,6 +16,8 @@ import { getAgent, getAgentIfActive } from "../lib/agent-manager.mjs";
 import { config } from "../lib/config.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { getOrgSetting } from "../lib/orgs.mjs";
+import { billingEnabled } from "../lib/config.mjs";
+import { checkQuota } from "../lib/billing.mjs";
 
 const router = Router();
 
@@ -34,12 +36,13 @@ function sseAuth(req, res, next) {
 
 // ── Session CRUD ──
 
-router.get("/api/spaces/:spaceId/sessions", requireAuth, (req, res) => {
+router.get("/api/spaces/:spaceId/sessions", requireAuth, requireSpaceAccess, (req, res) => {
   const includeArchived = req.query.includeArchived === "true" || req.query.includeArchived === "1";
   res.json(listSessions(req.params.spaceId, { includeArchived }));
 });
 
-router.post("/api/spaces/:spaceId/sessions", requireAuth, (req, res) => {
+router.post("/api/spaces/:spaceId/sessions", requireAuth, requireSpaceAccess, (req, res) => {
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
   const { title, model, provider } = req.body;
 
   // Precedence: explicit request body > org's default_model setting > global env default.
@@ -67,6 +70,36 @@ function ownSession(req, res) {
     return null;
   }
   return session;
+}
+
+// Self-hosted deployments never enforce Waynode Cloud plans. In hosted mode,
+// gate a new model turn before the agent starts so expired trials and dunning
+// accounts cannot keep consuming provider spend. Usage is metered at turn end;
+// this preflight deliberately protects the next turn rather than pretending to
+// predict its token cost.
+function canUseHostedWorkspace(session, res) {
+  if (!billingEnabled) return true;
+  const space = getSpace(session.space_id);
+  if (!space?.org_id) return true;
+  const quota = checkQuota(space.org_id);
+  if (!['active', 'trialing'].includes(quota.status)) {
+    res.status(402).json({ error: 'Your Waynode Cloud trial or subscription is not active. Update billing to continue.' });
+    return false;
+  }
+  return true;
+}
+
+function canStartHostedTurn(session, res) {
+  if (!canUseHostedWorkspace(session, res)) return false;
+  if (!billingEnabled) return true;
+  const space = getSpace(session.space_id);
+  if (!space?.org_id) return true;
+  const quota = checkQuota(space.org_id);
+  if (quota.tokens.exceeded) {
+    res.status(402).json({ error: 'Your organization has reached its monthly included usage. Update billing to continue.' });
+    return false;
+  }
+  return true;
 }
 
 router.get("/api/sessions/:sessionId", requireAuth, (req, res) => {
@@ -152,6 +185,7 @@ function writeSSE(res, ev) {
 router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
+  if (!canUseHostedWorkspace(session, res)) return;
 
   if (!isPiAvailable()) {
     sseSetup(res);
@@ -186,6 +220,7 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
   if (!session) return;
   const { prompt, isGoal = false } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt required" });
+  if (!canStartHostedTurn(session, res)) return;
 
   if (!isPiAvailable()) return res.status(503).json({ error: "pi is not installed" });
 
@@ -215,6 +250,7 @@ router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   if (!session) return;
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt required" });
+  if (!canStartHostedTurn(session, res)) return;
 
   const handle = getAgentIfActive(session.id);
   if (handle?.streaming) {

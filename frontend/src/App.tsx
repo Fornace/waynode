@@ -9,6 +9,8 @@ import { SpaceSettings } from "./components/SpaceSettings";
 import { AdminPanel } from "./components/AdminPanel";
 import { OrgSettings } from "./components/OrgSettings";
 import { GitSidebar } from "./components/GitSidebar";
+import { OnboardingWizard } from "./components/OnboardingWizard";
+import { AccountSettings } from "./components/AccountSettings";
 import { api } from "./api/client";
 import * as store from "./lib/sessionStore";
 import { slugWithId, parseSlugSegment } from "./lib/slugs";
@@ -36,10 +38,13 @@ function AppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [orgSettingsOpen, setOrgSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [gitSidebarOpen, setGitSidebarOpen] = useState(false);
   const [githubConnected, setGithubConnected] = useState(false);
   const [gitlabConnected, setGitlabConnected] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [onboardingError, setOnboardingError] = useState("");
+  const [onboardingCloning, setOnboardingCloning] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -106,6 +111,27 @@ function AppContent() {
 
   const handleSessionDeleted = (sessionId: string) => {
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+  };
+
+  const handleOnboardingClone = async (repoUrl: string, branch: string) => {
+    if (!activeOrgId) {
+      setOnboardingError("Your workspace is still loading. Please try again in a moment.");
+      return;
+    }
+    setOnboardingCloning(true);
+    setOnboardingError("");
+    try {
+      const space = await api.spaces.create(repoUrl, branch, undefined, undefined, activeOrgId);
+      setSpaces((previous) => previous.some((item) => item.id === space.id) ? previous : [...previous, space]);
+      const session = await api.sessions.create(space.id, { title: "First task" });
+      handleSessionCreated(session);
+      handleSelectSession(session, space);
+    } catch (error) {
+      setOnboardingError(error instanceof Error ? error.message : "Could not create that workspace.");
+      throw error;
+    } finally {
+      setOnboardingCloning(false);
+    }
   };
 
   // ── Auto-generated session titles arrive over the live stream. ──
@@ -235,6 +261,17 @@ function AppContent() {
     );
   }
 
+  if (accountSettingsOpen) {
+    return (
+      <div className="app-layout">
+        <AccountSettings
+          onClose={() => setAccountSettingsOpen(false)}
+          onDeleted={() => { setAccountSettingsOpen(false); logout(); navigate("/"); }}
+        />
+      </div>
+    );
+  }
+
 
   return (
     <div className={`app-layout ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -257,6 +294,7 @@ function AppContent() {
         isAdmin={isAdmin}
         onOpenAdmin={() => setAdminOpen(true)}
         onOpenOrgSettings={() => setOrgSettingsOpen(true)}
+        onOpenAccountSettings={() => setAccountSettingsOpen(true)}
         user={user}
         onLogout={logout}
         orgs={orgs}
@@ -289,11 +327,19 @@ function AppContent() {
               {isAdmin && <button className="tab-btn" onClick={() => setAdminOpen(true)}>Admin</button>}
             </div>
           )}
-          <div className="empty-state">
+          {spaces.length === 0 && activeOrgId ? (
+            <OnboardingWizard
+              githubConnected={githubConnected}
+              gitlabConnected={gitlabConnected}
+              cloning={onboardingCloning}
+              error={onboardingError}
+              onClone={handleOnboardingClone}
+            />
+          ) : <div className="empty-state">
             <div className="empty-state-icon">🚀</div>
             <div className="empty-state-title">{activeOrg ? activeOrg.name : "Waynode AI"}</div>
             <div className="empty-state-desc">Clone a repository and create a session to get started</div>
-          </div>
+          </div>}
         </div>
       )}
     </div>

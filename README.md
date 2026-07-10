@@ -4,6 +4,27 @@ Open-source, self-hosted coding-agent workspace. Each workspace is a real cloned
 
 **Mobile-first. Small-team ready. macOS + iOS clients planned.**
 
+## Choose your Waynode
+
+### Self-host — free and yours
+
+Run Waynode on infrastructure you control. Your repositories, database,
+credentials, provider accounts, and billing stay with you. Self-hosted installs
+do **not** enable Waynode hosted billing, usage limits, or payment collection.
+
+### Waynode Cloud — managed hosting
+
+Waynode Cloud runs the same open-source workspace for your team, with managed
+updates, isolated workspaces, backups, and support. New cloud organizations get
+a 15-day trial; choose Starter, Pro, or Team only when you are ready to keep
+using the service. Web subscriptions use Stripe. Native App Store billing is
+intentionally not enabled until its server-verified entitlement flow is shipped;
+never enter Stripe credentials into a native client.
+
+> Operators: hosted billing is deliberately disabled unless
+> `WAYNODE_DEPLOYMENT=hosted` is set alongside the Stripe configuration. Do not
+> set that flag on a self-host deployment.
+
 ## Quick Start
 
 ### Self-host (Docker)
@@ -16,6 +37,11 @@ cp .env.example .env
 docker compose up -d
 # → http://localhost:3000
 ```
+
+For a production self-host, set a public `APP_URL`, use HTTPS at your reverse
+proxy, keep `SESSION_SECRET` and `ENCRYPTION_KEY` in a secret manager, and
+configure GitHub and/or GitLab OAuth callbacks for that exact URL. Never commit
+your `.env`, OAuth client secrets, or provider access tokens.
 
 ### Local Development
 
@@ -74,14 +100,14 @@ variables → Actions):
 
 | Secret | Value |
 |--------|-------|
-| `DEPLOY_HOST` | Deploy server IP (e.g. `49.12.9.255`) |
+| `DEPLOY_HOST` | The host currently serving `waynode.fornace.net` |
 | `DEPLOY_USER` | SSH user (e.g. `root`) |
 | `DEPLOY_SSH_KEY` | Private SSH key authorized on the server |
 
 Set them once with the CLI:
 
 ```bash
-gh secret set DEPLOY_HOST   --body '49.12.9.255'
+gh secret set DEPLOY_HOST   --body '<serving-host>'
 gh secret set DEPLOY_USER   --body 'root'
 gh secret set DEPLOY_SSH_KEY < ~/.ssh/waynode_deploy_key
 ```
@@ -90,6 +116,16 @@ The Dockerfile is a multi-stage build: it compiles the frontend
 (`npm run build`) then installs pi + the `pi-codex-goal` / `pi-lean-ctx`
 plugins and configures the fornace LLM provider, so `frontend/dist` does not
 need to be committed.
+
+Before treating a deployment as successful, confirm the container on
+`DEPLOY_HOST` was actually replaced (not merely that the public domain answers
+HTTP). The compose file used by CI and the compose file running on the host
+must be the same topology. For Waynode Cloud, configure the hosted-only Stripe
+variables in the host's root-owned `.env` (mode `0600`), then verify
+`/api/billing/enabled` returns `{"enabled":true}` and complete a signed-webhook
+and isolated authenticated E2E run. See [pricing operations](docs/PRICING.md).
+Use [the hosted launch gate](docs/HOSTED-LAUNCH.md) for the complete
+reconciliation and payment-verification checklist.
 
 ## Architecture
 

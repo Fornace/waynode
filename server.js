@@ -24,6 +24,7 @@ import resolveRoutes from "./routes/resolve.js";
 import gitRoutes from "./routes/git.js";
 import apiTokenRoutes from "./routes/api-tokens.js";
 import billingRoutes, { webhookRouter as billingWebhookRoutes } from "./routes/billing.js";
+import appStoreRoutes from "./routes/app-store.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -104,6 +105,22 @@ app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Cookie-authenticated write requests must originate from this deployment.
+// SameSite cookies reduce risk but do not replace an Origin check, especially
+// for WebSocket-adjacent or multipart flows. Requests without Origin are kept
+// available for native/CLI bearer-token clients; browsers attach Origin on
+// cross-site unsafe requests. Stripe's signed webhook is mounted above this.
+let appOrigin = null;
+try { appOrigin = new URL(config.appUrl).origin; } catch {}
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const origin = req.headers.origin;
+  if (origin && appOrigin && origin !== appOrigin) {
+    return res.status(403).json({ error: 'Cross-site request blocked' });
+  }
+  next();
+});
+
 app.use(authRoutes);
 app.use(spacesRoutes);
 app.use(sessionsRoutes);
@@ -117,6 +134,7 @@ app.use(resolveRoutes);
 app.use(gitRoutes);
 app.use(apiTokenRoutes);
 app.use(billingRoutes);
+app.use(appStoreRoutes);
 
 // Model listing endpoint
 app.get("/api/models", (req, res) => {

@@ -22,6 +22,7 @@ interface SidebarProps {
   isAdmin: boolean;
   onOpenAdmin: () => void;
   onOpenOrgSettings: () => void;
+  onOpenAccountSettings: () => void;
   orgs: Org[];
   activeOrgId: string | null;
   onSelectOrg: (orgId: string) => void;
@@ -35,7 +36,7 @@ import { WaynodeMark } from "./Brand";
 export function Sidebar({
   spaces, sessions, activeSessionId, activeSpaceId,
   onToggleSidebar, onSelectSession, onSpaceCreated, onSessionCreated, onSessionArchived, onSessionDeleted, onSpaceExpand,
-  githubConnected, gitlabConnected, isAdmin, onOpenAdmin, onOpenOrgSettings,
+  githubConnected, gitlabConnected, isAdmin, onOpenAdmin, onOpenOrgSettings, onOpenAccountSettings,
   orgs, activeOrgId, onSelectOrg, onOrgCreated, user, onLogout,
 }: SidebarProps) {
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set());
@@ -426,6 +427,9 @@ export function Sidebar({
                     Admin
                   </button>
                 )}
+                <button className="send-dropdown-item" onClick={() => { setShowUserMenu(false); onOpenAccountSettings(); }}>
+                  Account settings
+                </button>
                 <button className="send-dropdown-item" onClick={() => { setShowUserMenu(false); onLogout(); }}>
                   Log out
                 </button>

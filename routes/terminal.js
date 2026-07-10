@@ -6,6 +6,8 @@ import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
 import { randomUUID } from "crypto";
 import { resolveApiToken } from "../lib/auth.mjs";
+import { getSpace } from "../lib/spaces.mjs";
+import { billingEnabled } from "../lib/billing.mjs";
 
 const router = Router();
 
@@ -85,10 +87,10 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
       }
 
       const user = db.prepare("SELECT * FROM users WHERE id = ?").get(authedUserId);
-      if (!user || session.owner_id !== user.id) {
-        socket.destroy();
-        return;
-      }
+        if (!user || session.owner_id !== user.id) {
+          socket.destroy();
+          return;
+        }
 
       wss.handleUpgrade(req, socket, head, async (ws) => {
         // The 101 handshake response can still be in flight on the underlying
@@ -107,6 +109,18 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
         // pty — spawning one only if none exists yet.
         let handle;
         try {
+          // The interactive PTY can execute arbitrary commands and pi turns,
+          // but it currently has no provider-side token reservation or durable
+          // usage meter. Do not let a hosted org bypass its trial/subscription
+          // limits through this side channel. Self-hosted terminals are
+          // unaffected; re-enable hosted terminals only with a reservation and
+          // execution accounting model that is at least as strict as chat.
+          const space = getSpace(session.space_id);
+          if (billingEnabled && space?.org_id) {
+            const err = new Error("Terminal is temporarily unavailable on Waynode Cloud while usage safeguards are being completed. Use Chat for metered agent work.");
+            err.terminalDisabled = true;
+            throw err;
+          }
           handle = await getTerminal(session);
         } catch (err) {
           // Mirror the existing terminalDisabled (sandboxed-mode) pattern:

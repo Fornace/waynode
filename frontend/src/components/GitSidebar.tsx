@@ -158,6 +158,7 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [diff, setDiff] = useState<string>("");
   const [loadingDiff, setLoadingDiff] = useState(false);
+  const [editorPath, setEditorPath] = useState<string | null>(null);
   const [committing, setCommitting] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [pushing, setPushing] = useState(false);
@@ -210,6 +211,14 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
     } finally {
       setLoadingDiff(false);
     }
+  };
+
+  const openEditor = (path: string, status: string) => {
+    if (status === "deleted") {
+      showMsg("This file was deleted. Use the diff to review it, then restore it with git if needed.", "error");
+      return;
+    }
+    setEditorPath(path);
   };
 
   const handleCommit = async () => {
@@ -378,7 +387,7 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
                     onChange={() => toggle(f.path)}
                   />
                   <span className="git-status-dot" style={{ background: STATUS_COLOR[f.status] }} title={f.status} />
-                  <button className="git-file-info" onClick={() => loadDiff(f.path)}>
+                  <button className="git-file-info" onClick={() => openEditor(f.path, f.status)} aria-label={`Open ${f.path} in editor`}>
                     <span className="git-file-name">{basename(f.path)}</span>
                     <span className="git-file-dir">{dirname(f.path)}</span>
                   </button>
@@ -405,6 +414,14 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
               </li>
             ))}
           </ul>
+          {editorPath && (
+            <FileEditor
+              space={space}
+              path={editorPath}
+              onClose={() => setEditorPath(null)}
+              onSaved={() => { api.git.status(space.id).then(onChange).catch(() => {}); showMsg("Saved — ready to review and commit", "success"); }}
+            />
+          )}
         </>
       )}
 
@@ -854,6 +871,80 @@ function MergeModal({
 }
 
 // ───────────────────────────── Diff view ─────────────────────────────
+
+function FileEditor({ space, path, onClose, onSaved }: { space: Space; path: string; onClose: () => void; onSaved: () => void }) {
+  const [content, setContent] = useState("");
+  const [original, setOriginal] = useState("");
+  const [revision, setRevision] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const dirty = !loading && content !== original;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    api.files.read(space.id, path)
+      .then((file) => {
+        if (!active) return;
+        setContent(file.content);
+        setOriginal(file.content);
+        setRevision(file.revision);
+      })
+      .catch((e: Error) => active && setError(e.message))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [space.id, path]);
+
+  useEffect(() => {
+    const saveShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (dirty && !saving && !loading) void save();
+      }
+    };
+    document.addEventListener("keydown", saveShortcut);
+    return () => document.removeEventListener("keydown", saveShortcut);
+  });
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const result = await api.files.write(space.id, path, content, revision);
+      setOriginal(content);
+      setRevision(result.revision);
+      onSaved();
+    } catch (e: any) {
+      setError(e.message || "Could not save this file");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const close = () => {
+    if (!dirty || window.confirm("Discard unsaved changes?")) onClose();
+  };
+
+  return (
+    <div className="file-editor-overlay" role="dialog" aria-modal="true" aria-label={`Edit ${path}`}>
+      <section className="file-editor">
+        <header className="file-editor-head">
+          <div className="file-editor-title"><strong>{basename(path)}</strong><span>{dirname(path)}</span>{dirty && <i title="Unsaved changes" />}</div>
+          <button className="git-icon-btn" onClick={close} title="Close editor"><CloseIcon /></button>
+        </header>
+        {loading ? <div className="git-empty">Opening file…</div> : error && !content ? <div className="file-editor-error">{error}</div> : <textarea className="file-editor-text" value={content} onChange={(e) => setContent(e.target.value)} spellCheck={false} autoFocus />}
+        {error && content && <div className="file-editor-error">{error}</div>}
+        <footer className="file-editor-foot">
+          <span>{dirty ? "Unsaved changes" : "Saved"}</span>
+          <button className="git-btn-ghost" disabled={!dirty || saving} onClick={() => setContent(original)}>Revert</button>
+          <button className="git-btn-primary" disabled={!dirty || saving || loading} onClick={save}>{saving ? "Saving…" : "Save"}</button>
+        </footer>
+      </section>
+    </div>
+  );
+}
 
 function DiffView({ text }: { text: string }) {
   // Split into lines but keep the trailing newline state stable; React keys

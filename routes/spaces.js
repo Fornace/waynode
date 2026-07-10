@@ -6,8 +6,29 @@ import { isOrgMember } from "../lib/orgs.mjs";
 import { startClone, publish, finishClone, subscribe } from "../lib/clone-progress.mjs";
 import { config } from "../lib/config.mjs";
 import path from "path";
+import { rmSync } from "fs";
 import db from "../lib/db.mjs";
+import { assertOrgStorageCapacity, refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
 const router = Router();
+
+function requireSpaceEditor(req, res, next) {
+  if (req.spaceRole === "viewer") return res.status(403).json({ err: "Editor required" });
+  next();
+}
+
+function requireSpaceStorageCapacity(req, res, next) {
+  const space = getSpace(req.params.spaceId);
+  if (!space?.org_id) return next();
+  // Content-Length includes multipart framing, so it is conservative for the
+  // incoming file payload. A post-write check below catches chunked uploads.
+  const incoming = Number.parseInt(String(req.headers["content-length"] || "0"), 10);
+  try {
+    assertOrgStorageCapacity(space.org_id, Number.isFinite(incoming) ? incoming : 0);
+    next();
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
+  }
+}
 
 const upload = multer({
   limits: { fileSize: 500 * 1024 * 1024, files: 20 },
@@ -23,11 +44,24 @@ const upload = multer({
   })
 });
 
-router.post("/api/spaces/:spaceId/upload", requireAuth, requireSpaceAccess, upload.array("files", 20), (req, res) => {
+router.post("/api/spaces/:spaceId/upload", requireAuth, requireSpaceAccess, requireSpaceEditor, requireSpaceStorageCapacity, upload.array("files", 20), (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ err: "No files uploaded" });
   }
+  const space = getSpace(req.params.spaceId);
+  try {
+    // Enforce after disk write too, then remove only this request's files if a
+    // chunked/lying Content-Length crossed the hard plan boundary.
+    assertOrgStorageCapacity(space?.org_id);
+  } catch (error) {
+    for (const file of req.files) {
+      try { rmSync(file.path, { force: true }); } catch {}
+    }
+    refreshOrgStorageUsage(space?.org_id);
+    return res.status(error.status || 500).json({ error: error.message });
+  }
   const filenames = req.files.map(f => f.originalname);
+  refreshOrgStorageUsage(space?.org_id);
   res.json({ success: true, files: filenames });
 });
 
@@ -53,6 +87,11 @@ router.post("/api/spaces", requireAuth, async (req, res) => {
   }
   const member = isOrgMember(orgId, req.user.id);
   if (!member || member.role === "viewer") return res.status(403).json({ err: "Editor required" });
+  try {
+    assertOrgStorageCapacity(orgId);
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message });
+  }
   // Create the space row immediately so a session can reference it; clone
   // streams in the background and clients subscribe via /clone-events.
   const space = createSpaceRecord(safeUrl, branch || "main", req.user.id, orgId);
@@ -60,8 +99,13 @@ router.post("/api/spaces", requireAuth, async (req, res) => {
   (async () => {
     try {
       await cloneRepoStreaming(space, { authUser, authToken, onProgress: (l) => publish(space.id, l) });
+      assertOrgStorageCapacity(orgId);
+      refreshOrgStorageUsage(orgId);
       finishClone(space.id);
     } catch (e) {
+      if (e.status === 402) {
+        try { deleteSpace(space.id); } catch {}
+      }
       finishClone(space.id, e.message);
     }
   })();
@@ -108,7 +152,7 @@ router.get("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res) =
 // switch/create branch, merge, push, pull) — all with --no-optional-locks and
 // the per-space write mutex. This file keeps only space CRUD.
 
-router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, async (req, res) => {
+router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, requireSpaceEditor, async (req, res) => {
   try {
     const output = await pullSpace(req.params.spaceId);
     return res.json({ output });

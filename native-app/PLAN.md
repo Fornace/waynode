@@ -364,6 +364,7 @@ of truth. We revisit once the client is shipped and stable.
 | **SwiftData migration maturity (2026)** | Local store is a *cache*, droppable anytime — worst case we wipe and rehydrate from server. GRDB as fallback. |
 | **Terminal UX on phone** | Collapsible keyboard bar, gesture shortcuts; default to Chat, terminal opt-in. |
 | **Multi-account / org scoping** | Reuse server's org/space membership; token is user-scoped; org picker on launch. |
+| **App Store subscriptions** | Hosted entitlement must be server-verified and bound to an org through a short-lived `appAccountToken`; do not add a client-only StoreKit purchase flow. See [`docs/storekit-entitlement-contract.md`](docs/storekit-entitlement-contract.md). |
 | **Bundle ID / team / signing** | Need an Apple Developer setup + `waynode` App ID + APNs `.p8` key. **Action for Francesco.** |
 | **Do we ship the Mac app to the App Store or notarized direct?** | Default: **notarized, outside the store** (faster iteration, no review for v1). Revisit. |
 | **App name / icon / brand** | Need assets. Can run `/ads dna` on waynode.fornace.net for a brand profile, then design. |

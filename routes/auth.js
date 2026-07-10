@@ -1,11 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
-import { passport, resolveApiToken } from "../lib/auth.mjs";
+import { passport, resolveApiToken, requireAuth, prepareAccountDeletion, deletePreparedAccount } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
 import { createToken, countTokens, listTokens, revokeToken } from "../lib/api-tokens.mjs";
 
 const NATIVE_MAX_TOKENS = 10;
 import db from "../lib/db.mjs";
+import { deleteSpace } from "../lib/spaces.mjs";
 
 const router = Router();
 
@@ -76,7 +77,10 @@ function verifyNativeState(state) {
 // option to the authorize URL verbatim and (with NullStore) ignores it on the
 // way back — so we read it ourselves in authRedirect.
 function nativeAuthOptions(req) {
-  return req.query.native !== undefined ? { state: signNativeState() } : {};
+  // Browser OAuth uses Passport's session-bound state store, which rejects
+  // login-CSRF callbacks. Native OAuth uses the separately signed, expiring
+  // marker because its system browser may not share the app's cookie jar.
+  return req.query.native !== undefined ? { state: signNativeState() } : { state: true };
 }
 
 // Legacy fallback: also flag the session. Unreliable across the cross-domain
@@ -113,14 +117,28 @@ function authRedirect(req, res) {
   res.redirect("/");
 }
 
+function rotateAndLogin(req, res, user) {
+  // Regenerate the pre-auth session before attaching an identity so a session
+  // ID set before OAuth cannot survive into an authenticated browser session.
+  req.session.regenerate((regenerateError) => {
+    if (regenerateError) return res.redirect("/?auth_error=session_failed");
+    req.login(user, (loginError) => {
+      if (loginError) return res.redirect("/?auth_error=login_failed");
+      authRedirect(req, res);
+    });
+  });
+}
+
 router.get("/auth/github", markNative, (req, res, next) => {
   passport.authenticate("github", nativeAuthOptions(req))(req, res, next);
 });
 
-router.get("/auth/github/callback",
-  passport.authenticate("github", { failureRedirect: "/" }),
-  authRedirect
-);
+router.get("/auth/github/callback", (req, res, next) => {
+  passport.authenticate("github", { failureRedirect: "/" }, (err, user) => {
+    if (err || !user) return res.redirect("/?auth_error=github_failed");
+    rotateAndLogin(req, res, user);
+  })(req, res, next);
+});
 
 router.get("/auth/gitlab", markNative, (req, res, next) => {
   passport.authenticate("gitlab", nativeAuthOptions(req))(req, res, next);
@@ -131,20 +149,11 @@ router.get("/auth/gitlab/callback", (req, res, next) => {
     if (err) return res.redirect("/?auth_error=" + encodeURIComponent(err.message));
     if (!user) return res.redirect("/?auth_error=gitlab_failed");
 
-    // If already logged in via GitHub, link GitLab to the existing account
-    if (req.user && req.user.id !== user.id) {
-      db.prepare(`
-        UPDATE users SET gitlab_id = ?, gitlab_token = ?
-        WHERE id = ?
-      `).run(
-        user.gitlab_id || null,
-        user.gitlab_token || null,
-        req.user.id
-      );
-      req.login({ id: req.user.id }, () => authRedirect(req, res));
-    } else {
-      req.login(user, () => authRedirect(req, res));
-    }
+    // Provider linking must be an explicit, state-bound flow. Do not silently
+    // merge an OAuth identity into whichever browser account happens to have a
+    // session: that is an account-confusion vulnerability and the verifier only
+    // returns a user ID, not safely linkable provider credentials.
+    rotateAndLogin(req, res, user);
   })(req, res, next);
 });
 
@@ -184,7 +193,55 @@ router.get("/api/auth/me", (req, res) => {
 
 router.post("/auth/logout", (req, res) => {
   req.logout(() => {
-    res.json({ ok: true });
+    // Destroy the server-side session too.  Merely calling passport logout
+    // clears req.user but leaves a usable session identifier in the browser.
+    req.session?.destroy(() => res.json({ ok: true }));
+  });
+});
+
+// A preflight keeps the destructive UI honest and gives users a concrete way
+// to resolve the only safe blocker: appoint another administrator for every
+// org they are the final admin of (especially important for paid orgs).
+router.get("/api/auth/account/deletion-check", requireAuth, (req, res) => {
+  if (req.authMethod === "bearer") {
+    return res.status(403).json({ error: "For account safety, delete your account from a web sign-in session." });
+  }
+  const prepared = prepareAccountDeletion(req.user.id);
+  res.json({ can_delete: prepared.blockers.length === 0, blockers: prepared.blockers });
+});
+
+router.delete("/api/auth/account", requireAuth, (req, res) => {
+  // A long-lived bearer token must not be enough to erase an account. Native
+  // users can complete this from the web session created by OAuth instead.
+  if (req.authMethod === "bearer") {
+    return res.status(403).json({ error: "For account safety, delete your account from a web sign-in session." });
+  }
+  if (req.body?.confirmation !== "DELETE") {
+    return res.status(400).json({ error: 'Type DELETE to permanently delete your account.' });
+  }
+
+  const prepared = prepareAccountDeletion(req.user.id);
+  if (prepared.blockers.length) {
+    return res.status(409).json({
+      error: "Transfer administration before deleting your account. Each organization needs another admin to protect its work and billing.",
+      blockers: prepared.blockers,
+    });
+  }
+
+  // Delete only unscoped legacy/personal spaces. Org-owned work is transferred
+  // inside deletePreparedAccount, never destroyed as a side effect of one
+  // member leaving. Delete filesystem state first so a failure leaves the
+  // account intact rather than a DB row pointing to a missing repository.
+  try {
+    for (const space of prepared.personalSpaces) deleteSpace(space.id);
+    deletePreparedAccount(req.user.id, prepared.transfers);
+  } catch (error) {
+    console.error("[auth] account deletion failed:", error);
+    return res.status(500).json({ error: "Could not delete the account safely. Nothing else was signed out." });
+  }
+
+  req.logout(() => {
+    req.session?.destroy(() => res.json({ ok: true }));
   });
 });
 
