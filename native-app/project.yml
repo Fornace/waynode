@@ -13,7 +13,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: "2V6YSU4HFB"
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: NO
 
@@ -31,7 +31,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app
         INFOPLIST_FILE: App/Info.plist
         TARGETED_DEVICE_FAMILY: "1,2"
-        SUPPORTS_MACCATALYST: NO
+        # One universal target: iPhone, iPad, and Mac share the same bundle
+        # identifier, signing team, StoreKit products, and SwiftUI code.
+        SUPPORTS_MACCATALYST: YES
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         ENABLE_PREVIEWS: YES

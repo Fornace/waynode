@@ -230,7 +230,7 @@ struct AccountScene: View {
     /// not infer access from a device-local StoreKit transaction: plans grant
     /// organization-scoped server capacity, not a local app feature.
     private var billingSection: some View {
-        Section("Hosted Billing") {
+        Section {
             Label("Hosted plans are managed on the web", systemImage: "safari")
                 .foregroundStyle(.secondary)
 
@@ -245,6 +245,8 @@ struct AccountScene: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        } header: {
+            Text("Hosted Billing")
         } footer: {
             Text("Self-hosted Waynode has no subscription requirement. This app never treats a local purchase as proof of hosted access.")
         }
