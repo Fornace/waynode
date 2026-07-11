@@ -96,8 +96,11 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
       <aside className={`git-panel ${open ? "open" : ""}`} aria-hidden={!open}>
         <header className="git-header">
           <div className="git-header-title">
-            <BranchIcon />
-            <span className="git-branch-current">{snap?.currentBranch || "…"}</span>
+            <span className="git-worktree-icon"><BranchIcon /></span>
+            <span className="git-worktree-heading">
+              <b>Git worktree</b>
+              <small>{space.repo_name} · {snap?.currentBranch || "…"}</small>
+            </span>
             {snap && !snap.detached && snap.upstream && (
               <span className="git-ahead-behind" title={`${snap.upstream} · ↑${snap.ahead} ↓${snap.behind}`}>
                 {snap.ahead > 0 && <span className="ab-ahead">↑{snap.ahead}</span>}
@@ -373,47 +376,50 @@ function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssue }: { 
         </div>
       ) : (
         <>
-          <label className="git-select-all">
-            <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-            <span>{allSelected ? "Deselect all" : "Select all"}</span>
-          </label>
-          <ul className="git-file-list">
-            {snap.files.map((f) => (
-              <li key={f.path}>
-                <div className={`git-file-row ${selected.has(f.path) ? "selected" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(f.path)}
-                    onChange={() => toggle(f.path)}
-                  />
-                  <span className="git-status-dot" style={{ background: STATUS_COLOR[f.status] }} title={f.status} />
-                  <button className="git-file-info" onClick={() => openEditor(f.path, f.status)} aria-label={`Open ${f.path} in editor`}>
-                    <span className="git-file-name">{basename(f.path)}</span>
-                    <span className="git-file-dir">{dirname(f.path)}</span>
-                  </button>
-                  <span className="git-file-stats">
-                    {f.additions !== null && <span className="stat-add">+{f.additions}</span>}
-                    {f.deletions !== null && <span className="stat-del">-{f.deletions}</span>}
-                    {f.additions === null && f.deletions === null && (
-                      <span className="stat-new">{f.status === "untracked" ? "new" : f.status}</span>
-                    )}
-                  </span>
-                  <button
-                    className={`git-chev ${expanded === f.path ? "open" : ""}`}
-                    onClick={() => loadDiff(f.path)}
-                    title="View diff"
-                  >›</button>
-                </div>
-                {expanded === f.path && (
-                  loadingDiff ? (
-                    <div className="git-diff-loading">Loading diff…</div>
-                  ) : (
-                    <DiffView text={diff} />
-                  )
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="git-review-layout">
+            <div className="git-file-browser">
+              <label className="git-select-all">
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                <span>{allSelected ? "Deselect all" : "Select all"}</span>
+              </label>
+              <ul className="git-file-list">
+                {snap.files.map((f) => (
+                  <li key={f.path}>
+                    <div className={`git-file-row ${selected.has(f.path) ? "selected" : ""} ${expanded === f.path ? "active" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(f.path)}
+                        onChange={() => toggle(f.path)}
+                      />
+                      <span className="git-status-dot" style={{ background: STATUS_COLOR[f.status] }} title={f.status} />
+                      <button className="git-file-info" onClick={() => openEditor(f.path, f.status)} aria-label={`Open ${f.path} in editor`}>
+                        <span className="git-file-name">{basename(f.path)}</span>
+                        <span className="git-file-dir">{dirname(f.path)}</span>
+                      </button>
+                      <span className="git-file-stats">
+                        {f.additions !== null && <span className="stat-add">+{f.additions}</span>}
+                        {f.deletions !== null && <span className="stat-del">-{f.deletions}</span>}
+                        {f.additions === null && f.deletions === null && (
+                          <span className="stat-new">{f.status === "untracked" ? "new" : f.status}</span>
+                        )}
+                      </span>
+                      <button
+                        className={`git-chev ${expanded === f.path ? "open" : ""}`}
+                        onClick={() => loadDiff(f.path)}
+                        title="View diff"
+                      >›</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <section className="git-diff-pane" aria-live="polite">
+              {expanded ? <>
+                <div className="git-diff-pane-head"><b>{basename(expanded)}</b><span>Unified diff</span></div>
+                {loadingDiff ? <div className="git-diff-loading">Loading diff…</div> : <DiffView text={diff} />}
+              </> : <div className="git-diff-empty"><span>⌘</span><b>Select a file to inspect its diff</b><small>Review changes before you commit and push.</small></div>}
+            </section>
+          </div>
           {editorPath && (
             <FileEditor
               space={space}

@@ -28,7 +28,7 @@
 .git-panel.open { transform: translateX(0); }
 
 @media (min-width: 768px) {
-  .git-panel { width: 360px; }
+  .git-panel { width: min(92vw, 860px); }
   .git-overlay { background: rgba(0, 0, 0, 0.35); }
 }
 
@@ -47,9 +47,29 @@
   gap: 8px;
   min-width: 0;
 }
-.git-branch-current {
-  font-weight: 600;
+.git-worktree-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #9bb9ff;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(110, 153, 255, 0.18);
+}
+.git-worktree-heading {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.git-worktree-heading b {
+  color: var(--text);
   font-size: 15px;
+  line-height: 1.1;
+}
+.git-worktree-heading small {
+  color: var(--text-dim);
+  font: 11px var(--mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -175,6 +195,7 @@
   cursor: default;
 }
 .git-file-row.selected { background: rgba(59, 130, 246, 0.08); }
+.git-file-row.active { background: rgba(89, 135, 239, 0.16); box-shadow: inset 2px 0 0 var(--accent); }
 .git-file-row input[type="checkbox"] { accent-color: var(--accent); flex-shrink: 0; }
 .git-status-dot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
@@ -211,6 +232,22 @@
   word-break: break-word;
 }
 .git-diff.loading { color: var(--text-faint); }
+
+/* The web inspector is deliberately a review surface on desktop: changed
+   files remain visible while the diff stays anchored beside them. The phone
+   layout collapses this into a single vertical flow without losing either. */
+.git-review-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(230px, .52fr) minmax(330px, 1fr); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.git-file-browser { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: rgba(5, 8, 14, .18); }
+.git-review-layout .git-select-all { padding: 9px 14px; border-bottom: 1px solid rgba(255,255,255,.05); }
+.git-review-layout .git-file-list { padding: 7px; }
+.git-diff-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg); }
+.git-diff-pane-head { padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); font-size: 12px; }
+.git-diff-pane-head b { font-family: var(--mono); color: var(--text); }
+.git-diff-pane-head span { color: var(--text-faint); font-size: 11px; }
+.git-diff-pane .git-diff-view { margin: 0; flex: 1; border: 0; border-radius: 0; max-height: none; }
+.git-diff-pane .git-diff-loading { margin: 0; padding: 20px; }
+.git-diff-empty { flex: 1; min-height: 220px; display: grid; align-content: center; justify-items: center; gap: 7px; padding: 32px; text-align: center; color: var(--text-faint); }
+.git-diff-empty > span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: #91b2fb; background: rgba(59,130,246,.12); font-size: 18px; }.git-diff-empty b { color: var(--text-dim); font-size: 12px; }.git-diff-empty small { font-size: 11px; }
 
 /* ── File editor ── */
 .file-editor-overlay {
@@ -518,3 +555,11 @@
 .diff-meta { color: var(--text-faint); font-size: 10.5px; }
 
 .git-mini-row { display: flex; gap: 6px; }
+
+@media (max-width: 767px) {
+  .git-panel { width: min(100vw, 460px); }
+  .git-review-layout { display: flex; flex-direction: column; min-height: auto; }
+  .git-file-browser { border-right: 0; max-height: 46vh; }
+  .git-diff-pane { min-height: 270px; border-top: 1px solid var(--border); }
+  .git-diff-pane .git-diff-view { max-height: 360px; flex: initial; }
+}

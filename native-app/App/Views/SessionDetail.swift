@@ -41,12 +41,14 @@ struct SessionDetail: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if detailTab == .chat {
+                    Button {
+                        showingGitInspector = true
+                    } label: {
+                        Label("Git worktree", systemImage: "arrow.triangle.branch")
+                    }
+                    .accessibilityHint("Review changed files, commits, branches, and sync status")
+
                     Menu {
-                        Button {
-                            showingGitInspector = true
-                        } label: {
-                            Label("Git Inspector", systemImage: "arrow.triangle.branch")
-                        }
                         Button {
                             showingSessionSettings = true
                         } label: {

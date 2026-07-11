@@ -50,7 +50,7 @@ struct GitInspector: View {
                     commitsSection(snapshot)
                 }
             }
-            .navigationTitle("Git Inspector")
+            .navigationTitle("Git worktree")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -111,69 +111,53 @@ struct GitInspector: View {
 
     private func branchSection(_ snap: GitSnapshot) -> some View {
         Section {
-            HStack {
-                Image(systemName: "arrow.triangle.branch")
-                    .foregroundStyle(.tint)
-                VStack(alignment: .leading) {
-                    Text(snap.currentBranch)
-                        .font(.headline)
-                    if let upstream = snap.upstream {
-                        Text("\(upstream)")
-                            .font(.caption)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.tint)
+                        .frame(width: 38, height: 38)
+                        .background(.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 11))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Git worktree")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
+                        Text(snap.currentBranch)
+                            .font(.headline)
+                        if let upstream = snap.upstream {
+                            Text(upstream)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    Spacer()
+                    syncBadge(snap)
                 }
-                Spacer()
-                if snap.ahead > 0 || snap.behind > 0 {
-                    HStack(spacing: 6) {
-                        if snap.ahead > 0 {
-                            Label("\(snap.ahead)", systemImage: "arrow.up")
-                                .font(.caption2)
-                                .foregroundStyle(.green)
-                        }
-                        if snap.behind > 0 {
-                            Label("\(snap.behind)", systemImage: "arrow.down")
-                                .font(.caption2)
-                                .foregroundStyle(.orange)
-                        }
+
+                // Sync actions remain separate, equal-sized targets. This makes the
+                // current repo state readable first and the irreversible action clear.
+                HStack(spacing: 10) {
+                    Button {
+                        Task { await pullChanges() }
+                    } label: {
+                        Label(snap.behind > 0 ? "Pull \(snap.behind)" : "Pull", systemImage: isPulling ? "arrow.triangle.2.circlepath" : "arrow.down")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.bordered)
+                    .disabled(isPulling || isPushing)
+
+                    Button {
+                        Task { await pushChanges() }
+                    } label: {
+                        Label(snap.ahead > 0 ? "Push \(snap.ahead)" : "Push", systemImage: isPushing ? "arrow.triangle.2.circlepath" : "arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(snap.ahead > 0 ? .accentColor : .secondary)
+                    .disabled(isPulling || isPushing)
                 }
             }
-
-            // Sync actions — pull remote changes / push local commits.
-            HStack(spacing: 12) {
-                Button {
-                    Task { await pullChanges() }
-                } label: {
-                    HStack(spacing: 6) {
-                        if isPulling {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.down.circle.fill")
-                        }
-                        Text(snap.behind > 0 ? "Pull (\(snap.behind))" : "Pull")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(isPulling || isPushing)
-
-                Button {
-                    Task { await pushChanges() }
-                } label: {
-                    HStack(spacing: 6) {
-                        if isPushing {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.up.circle.fill")
-                        }
-                        Text(snap.ahead > 0 ? "Push (\(snap.ahead))" : "Push")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(isPulling || isPushing)
-            }
+            .padding(.vertical, 4)
 
             DisclosureGroup("Branches", isExpanded: $isBranchesExpanded) {
                 ForEach(snap.branches) { branch in
@@ -199,7 +183,31 @@ struct GitInspector: View {
                 }
             }
         } header: {
-            Text("Branch")
+            Text("Workspace")
+        }
+    }
+
+    @ViewBuilder
+    private func syncBadge(_ snap: GitSnapshot) -> some View {
+        if snap.ahead == 0 && snap.behind == 0 {
+            Label("Synced", systemImage: "checkmark.circle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(.green.opacity(0.12), in: Capsule())
+        } else {
+            VStack(alignment: .trailing, spacing: 3) {
+                if snap.ahead > 0 {
+                    Label("\(snap.ahead) ahead", systemImage: "arrow.up")
+                        .foregroundStyle(.green)
+                }
+                if snap.behind > 0 {
+                    Label("\(snap.behind) behind", systemImage: "arrow.down")
+                        .foregroundStyle(.orange)
+                }
+            }
+            .font(.caption2.weight(.semibold))
         }
     }
 
