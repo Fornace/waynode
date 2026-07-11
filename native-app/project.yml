@@ -30,6 +30,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app
         INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/Waynode.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
         # One universal target: iPhone, iPad, and Mac share the same bundle
         # identifier, signing team, StoreKit products, and SwiftUI code.
