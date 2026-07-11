@@ -196,8 +196,16 @@ public final class AppModel {
         if let existing = sessionStores[sessionId] {
             return existing
         }
-        guard let api else { fatalError("No API client — not authenticated") }
-        let store = SessionStore(sessionId: sessionId, spaceId: spaceId, api: api)
+        // OAuth changes AuthStore synchronously, while SwiftUI may render a
+        // restored/deep-linked SessionDetail before AuthView's following
+        // bootstrap task reaches reconfigureAPI().  This used to fatalError
+        // in that narrow window, turning a successful native GitHub callback
+        // into an app crash. Reconfigure on demand instead; the client is
+        // cheap and this also makes restoration resilient to view timing.
+        if api == nil { reconfigureAPI() }
+        let client = api ?? APIClient(baseURL: auth.serverConfig.baseURL, token: auth.token)
+        if api == nil { api = client }
+        let store = SessionStore(sessionId: sessionId, spaceId: spaceId, api: client)
         sessionStores[sessionId] = store
         return store
     }
