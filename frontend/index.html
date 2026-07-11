@@ -13,11 +13,11 @@
     <meta name="color-scheme" content="dark" />
 
     <!-- Favicons -->
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/brand/waynode-mark.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
     <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="mask-icon" href="/favicon.svg" color="#3b82f6" />
+    <link rel="mask-icon" href="/brand/waynode-mark.svg" color="#3b82f6" />
     <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Social / share -->
@@ -55,16 +55,16 @@
     <!-- Branded boot screen (removed once React mounts) -->
     <div id="boot">
       <svg id="boot-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-        <g fill="#3b82f6" class="hub">
-          <rect x="29" y="11" width="6" height="15" rx="3"/>
-          <rect x="29" y="38" width="6" height="15" rx="3"/>
-          <rect x="11" y="29" width="15" height="6" rx="3"/>
-          <rect x="38" y="29" width="15" height="6" rx="3"/>
-          <rect x="25" y="25" width="14" height="14" rx="4"/>
+        <g class="hub" fill="none" stroke="#60a5fa" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 23 24 50 32 15 45 50 55 11" stroke-width="4"/>
+          <path d="m11 23 12 7 9-15 13 12 10-16" stroke-width="3.2" opacity=".8"/>
+          <path d="m24 50 8-13 13 13" stroke-width="3.2" opacity=".82"/>
         </g>
-        <g fill="#e0f2fe">
-          <circle cx="32" cy="11" r="5"/><circle cx="32" cy="53" r="5"/>
-          <circle cx="11" cy="32" r="5"/><circle cx="53" cy="32" r="5"/>
+        <g fill="#dbeafe" stroke="#60a5fa" stroke-width="1.5">
+          <circle cx="11" cy="23" r="4"/><circle cx="23" cy="30" r="4"/>
+          <circle cx="32" cy="15" r="4.5"/><circle cx="45" cy="27" r="4"/>
+          <circle cx="55" cy="11" r="4.5"/><circle cx="24" cy="50" r="4.5"/>
+          <circle cx="32" cy="37" r="4.5"/><circle cx="45" cy="50" r="4.5"/>
         </g>
       </svg>
       <div id="boot-label">Waynode</div>

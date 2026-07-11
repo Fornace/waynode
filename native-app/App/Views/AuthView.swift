@@ -238,45 +238,44 @@ struct AuthView: View {
 
 struct BrandLogo: View {
     var body: some View {
-        ZStack {
-            // Outer ring (the "way" paths radiating from center)
-            ForEach(0..<4, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(LinearGradient(
-                        colors: [.accentColor, .accentColor.opacity(0.6)],
-                        startPoint: .center,
-                        endPoint: edgeFor(i)
-                    ))
-                    .frame(width: 8, height: 36)
-                    .offset(offsetFor(i))
-                    .rotationEffect(.degrees(Double(i) * 90))
+        GeometryReader { proxy in
+            let scale = min(proxy.size.width, proxy.size.height) / 64
+            let nodes: [(CGFloat, CGFloat, CGFloat)] = [
+                (11, 23, 4), (23, 30, 4), (32, 15, 4.5), (45, 27, 4),
+                (55, 11, 4.5), (24, 50, 4.5), (32, 37, 4.5), (45, 50, 4.5),
+            ]
+            ZStack {
+                Path { path in
+                    path.move(to: CGPoint(x: 11 * scale, y: 23 * scale))
+                    path.addLine(to: CGPoint(x: 24 * scale, y: 50 * scale))
+                    path.addLine(to: CGPoint(x: 32 * scale, y: 15 * scale))
+                    path.addLine(to: CGPoint(x: 45 * scale, y: 50 * scale))
+                    path.addLine(to: CGPoint(x: 55 * scale, y: 11 * scale))
+                    path.move(to: CGPoint(x: 11 * scale, y: 23 * scale))
+                    path.addLine(to: CGPoint(x: 23 * scale, y: 30 * scale))
+                    path.addLine(to: CGPoint(x: 32 * scale, y: 15 * scale))
+                    path.addLine(to: CGPoint(x: 45 * scale, y: 27 * scale))
+                    path.addLine(to: CGPoint(x: 55 * scale, y: 11 * scale))
+                    path.move(to: CGPoint(x: 24 * scale, y: 50 * scale))
+                    path.addLine(to: CGPoint(x: 32 * scale, y: 37 * scale))
+                    path.addLine(to: CGPoint(x: 45 * scale, y: 50 * scale))
+                }
+                .stroke(
+                    LinearGradient(colors: [.blue.opacity(0.55), .accentColor], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    style: StrokeStyle(lineWidth: 3.8 * scale, lineCap: .round, lineJoin: .round)
+                )
+
+                ForEach(nodes.indices, id: \.self) { index in
+                    let node = nodes[index]
+                    Circle()
+                        .fill(.white.opacity(0.88))
+                        .overlay(Circle().stroke(Color.accentColor, lineWidth: 1.4 * scale))
+                        .frame(width: node.2 * 2 * scale, height: node.2 * 2 * scale)
+                        .position(x: node.0 * scale, y: node.1 * scale)
+                }
             }
-            // Central node hub
-            Circle()
-                .fill(Color.accentColor)
-                .frame(width: 28, height: 28)
-            Circle()
-                .fill(.white)
-                .frame(width: 12, height: 12)
         }
-    }
-
-    private func edgeFor(_ i: Int) -> UnitPoint {
-        switch i {
-        case 0: return .top
-        case 1: return .trailing
-        case 2: return .bottom
-        default: return .leading
-        }
-    }
-
-    private func offsetFor(_ i: Int) -> CGSize {
-        switch i {
-        case 0: return CGSize(width: 0, height: -28)
-        case 1: return CGSize(width: 28, height: 0)
-        case 2: return CGSize(width: 0, height: 28)
-        default: return CGSize(width: -28, height: 0)
-        }
+        .aspectRatio(1, contentMode: .fit)
     }
 }
 
