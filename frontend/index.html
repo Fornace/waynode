@@ -43,10 +43,14 @@
         z-index: 9999;
       }
       #boot-mark { width: 56px; height: 56px; animation: boot-pulse 1.6s ease-in-out infinite; }
-      #boot-mark .hub { transform-origin: center; animation: boot-spin 6s linear infinite; }
+      #boot-mark .hub { transform-origin: center; animation: boot-tension 4.8s ease-in-out infinite; }
+      #boot-mark .nodes circle { transform-box: fill-box; transform-origin: center; animation: boot-node-tension 4.8s ease-in-out infinite; }
+      #boot-mark .nodes circle:nth-child(2n) { animation-delay: -2.4s; }
       #boot-label { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: #555; }
       @keyframes boot-pulse { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
-      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-tension { 0%,100% { opacity: .84; transform: scale(.985); } 50% { opacity: 1; transform: scale(1.015); } }
+      @keyframes boot-node-tension { 0%,100% { transform: translateY(0) scale(.96); } 50% { transform: translateY(-.65px) scale(1.04); } }
+      @media (prefers-reduced-motion: reduce) { #boot-mark .hub, #boot-mark .nodes circle { animation: none; } }
     </style>
   </head>
   <body>
@@ -60,7 +64,7 @@
           <path d="m11 23 12 7 9-15 13 12 10-16" stroke-width="3.2" opacity=".8"/>
           <path d="m24 50 8-13 13 13" stroke-width="3.2" opacity=".82"/>
         </g>
-        <g fill="#dbeafe" stroke="#60a5fa" stroke-width="1.5">
+        <g class="nodes" fill="#dbeafe" stroke="#60a5fa" stroke-width="1.5">
           <circle cx="11" cy="23" r="4"/><circle cx="23" cy="30" r="4"/>
           <circle cx="32" cy="15" r="4.5"/><circle cx="45" cy="27" r="4"/>
           <circle cx="55" cy="11" r="4.5"/><circle cx="24" cy="50" r="4.5"/>

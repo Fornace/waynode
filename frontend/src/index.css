@@ -1849,6 +1849,24 @@ input, textarea {
 /* ── Brand mark ── */
 @keyframes wn-spin { to { transform: rotate(360deg); } }
 
+/* The Waynode mark should feel like a connected system, not a loading
+   spinner. When used on a login/invite surface, let the links carry a tiny
+   amount of tension and the nodes answer it at an almost imperceptible pace. */
+.wn-tension .wn-links { transform-origin: center; animation: wn-link-tension 4.8s ease-in-out infinite; }
+.wn-tension .wn-nodes circle { transform-box: fill-box; transform-origin: center; animation: wn-node-tension 4.8s ease-in-out infinite; }
+.wn-tension .wn-nodes circle:nth-child(2n) { animation-delay: -2.4s; }
+@keyframes wn-link-tension {
+  0%, 100% { opacity: .86; transform: scale(.985); }
+  50% { opacity: 1; transform: scale(1.015); }
+}
+@keyframes wn-node-tension {
+  0%, 100% { opacity: .88; transform: translateY(0) scale(.96); }
+  50% { opacity: 1; transform: translateY(-.65px) scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wn-tension .wn-links, .wn-tension .wn-nodes circle { animation: none; }
+}
+
 /* login card: give the brand mark breathing room */
 .login-card .login-title { margin-top: 6px; }
 /* Git Sidebar */
