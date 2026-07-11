@@ -13,6 +13,7 @@
  * (informational) and never hard-blocks writes here — the UI soft-warns.
  */
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { requireAuth, requireSpaceAccess, queryTokenAuth } from "../lib/auth.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { isSpaceBusy } from "../lib/agent-manager.mjs";
@@ -180,17 +181,22 @@ router.post("/api/spaces/:spaceId/git/pull", requireAuth, requireSpaceAccess, as
 });
 
 router.post("/api/spaces/:spaceId/git/push", requireAuth, requireSpaceAccess, async (req, res) => {
+  const operationId = randomUUID().slice(0, 8);
+  res.setHeader("X-Waynode-Operation-Id", operationId);
   const cwd = spacePath(req);
-  if (!cwd) return res.status(404).json({ error: "Space not found" });
-  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  if (!cwd) return res.status(404).json({ error: "Space not found", operationId });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role", operationId });
+  console.info(`[git:push:${operationId}] start space=${req.params.spaceId} user=${req.user.id} upstream=${!!req.body?.setUpstream}`);
   try {
     const result = await git.push(cwd, { setUpstream: !!req.body?.setUpstream });
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
-    res.json({ ok: true, pushed: result.pushed, data });
+    console.info(`[git:push:${operationId}] success space=${req.params.spaceId}`);
+    res.json({ ok: true, pushed: result.pushed, data, operationId });
   } catch (e) {
+    console.warn(`[git:push:${operationId}] failed space=${req.params.spaceId} reason=${e.message}`);
     if (e.spaceDirMissing) return sendGitError(res, e);
-    res.status(400).json({ error: e.message, pushRejected: !!e.pushRejected, noUpstream: !!e.noUpstream });
+    res.status(400).json({ error: e.message, pushRejected: !!e.pushRejected, noUpstream: !!e.noUpstream, operationId });
   }
 });
 
