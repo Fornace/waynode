@@ -199,7 +199,7 @@ struct AuthView: View {
         let url = authURL.url!
         let scheme = AuthStore.callbackScheme
 
-        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme) { callbackURL, err in
+        let completion: @Sendable (URL?, Error?) -> Void = { callbackURL, err in
             // ASWebAuthenticationSession invokes its completion from Safari's
             // XPC queue on macOS. Creating a @MainActor Task directly there
             // inherits an invalid executor and trips Swift 6's runtime
@@ -221,6 +221,7 @@ struct AuthView: View {
                 }
             }
         }
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme, completionHandler: completion)
         session.prefersEphemeralWebBrowserSession = false
         session.presentationContextProvider = AuthPresentationProvider.shared
         self.session = session
