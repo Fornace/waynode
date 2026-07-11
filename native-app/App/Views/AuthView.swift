@@ -295,13 +295,15 @@ final class AuthPresentationProvider: NSObject, ASWebAuthenticationPresentationC
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         #if canImport(UIKit)
-        // iOS: return the key window from the active scene.
-        guard let scene = UIApplication.shared.connectedScenes
-            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-              let window = scene.windows.first else {
+        // UIKit: return a window associated with the active scene.
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else {
+            // Returning a fallback anchor lets the auth framework report a recoverable
+            // presentation failure if startup has not attached a scene yet.  Never
+            // terminate the app from its presentation-provider callback.
             return ASPresentationAnchor()
         }
-        return window
+        return scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first ?? UIWindow(windowScene: scene)
         #elseif canImport(AppKit)
         // macOS: return the key window (or main window as fallback).
         if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow {

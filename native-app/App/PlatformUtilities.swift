@@ -15,6 +15,7 @@ func copyToClipboard(_ text: String) {
 }
 
 /// Trigger a haptic feedback pattern. No-op on macOS.
+@MainActor
 enum Haptics {
     static func success() {
         UINotificationFeedbackGenerator().notificationOccurred(.success)

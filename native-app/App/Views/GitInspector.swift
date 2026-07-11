@@ -1,5 +1,6 @@
 import SwiftUI
 import WaynodeCore
+import OSLog
 
 // MARK: - GitInspector
 //
@@ -9,6 +10,7 @@ import WaynodeCore
 // All data comes from the server's git API (routes/git.js).
 
 struct GitInspector: View {
+    private let gitLog = Logger(subsystem: "com.waynode.app", category: "git-push")
     let spaceId: String
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss
@@ -322,7 +324,7 @@ struct GitInspector: View {
         isCommitting = true
         commitError = nil
         do {
-            try await api.commitFiles(spaceId, message: commitMessage, files: Array(selectedFiles))
+            _ = try await api.commitFiles(spaceId, message: commitMessage, files: Array(selectedFiles))
             selectedFiles.removeAll()
             commitMessage = ""
             Haptics.success()
@@ -366,11 +368,19 @@ struct GitInspector: View {
     private func pushChanges() async {
         guard let api = appModel.currentAPI() else { return }
         isPushing = true
+        gitLog.notice("Push requested for space \(spaceId, privacy: .public)")
         do {
             try await api.pushBranch(spaceId)
+            gitLog.notice("Push succeeded for space \(spaceId, privacy: .public)")
             Haptics.success()
             await loadSnapshot()
         } catch {
+            if let apiError = error as? APIClient.APIError {
+                let operation = apiError.operationId ?? "none"
+                gitLog.error("Push failed for space \(spaceId, privacy: .public), status=\(apiError.statusCode), operation=\(operation, privacy: .public), message=\(apiError.message, privacy: .public)")
+            } else {
+                gitLog.error("Push transport failure for space \(spaceId, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
             actionError = error.localizedDescription
             Haptics.error()
         }

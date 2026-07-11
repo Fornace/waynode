@@ -59,7 +59,7 @@ public final class AppModel {
         unauthorizedTask = Task { [weak self] in
             for await _ in client.unauthorizedStream {
                 guard let self else { return }
-                await self.handleUnauthorized()
+                self.handleUnauthorized()
             }
         }
     }

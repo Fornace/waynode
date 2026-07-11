@@ -170,7 +170,6 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case "sync":
             // Server wire format: { type: "sync", streaming: Bool, partialText: String, tools: [...] }
             // We build a SyncSnapshot from the flat fields. partialText becomes an assistant item.
-            let streaming = try c.decodeIfPresent(Bool.self, forKey: .streaming) ?? false
             var items: [SyncSnapshot.WireItem] = []
             if let partial = try c.decodeIfPresent(String.self, forKey: .partialText), !partial.isEmpty {
                 items.append(SyncSnapshot.WireItem(role: "assistant", content: nil, id: nil, isGoal: nil, text: partial, thinking: nil, blocks: nil))

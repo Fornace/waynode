@@ -20,7 +20,7 @@ public actor APIClient {
     public init(baseURL: URL, token: String? = nil) {
         self.baseURL = baseURL
         self.token = token
-        var (stream, cont) = AsyncStream.makeStream(of: Void.self)
+        let (stream, cont) = AsyncStream.makeStream(of: Void.self)
         self.unauthorizedStream = stream
         self.onUnauthorized = cont
         let config = URLSessionConfiguration.ephemeral
@@ -45,9 +45,12 @@ public actor APIClient {
     public struct APIError: Error, LocalizedError, Sendable {
         public let statusCode: Int
         public let message: String
+        public let operationId: String?
         public var errorDescription: String? { message }
-        public init(statusCode: Int, message: String) {
-            self.statusCode = statusCode; self.message = message
+        public init(statusCode: Int, message: String, operationId: String? = nil) {
+            self.statusCode = statusCode
+            self.message = message
+            self.operationId = operationId
         }
     }
 
@@ -103,16 +106,17 @@ public actor APIClient {
         guard let http = response as? HTTPURLResponse else {
             throw APIError(statusCode: -1, message: "Invalid response")
         }
+        let operationId = http.value(forHTTPHeaderField: "X-Waynode-Operation-Id")
 
         if http.statusCode == 401 {
             onUnauthorized.yield()
-            throw APIError(statusCode: 401, message: "Unauthorized")
+            throw APIError(statusCode: 401, message: "Unauthorized", operationId: operationId)
         }
         if !(200...299).contains(http.statusCode) {
             let msg = (try? JSONDecoder.api.decode(ErrorBody.self, from: data))?.error
                 ?? String(data: data, encoding: .utf8)
                 ?? "HTTP \(http.statusCode)"
-            throw APIError(statusCode: http.statusCode, message: msg)
+            throw APIError(statusCode: http.statusCode, message: msg, operationId: operationId)
         }
         return data
     }

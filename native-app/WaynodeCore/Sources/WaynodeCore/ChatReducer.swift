@@ -196,7 +196,7 @@ public struct ChatReducer: Sendable, Equatable {
             applySync(snapshot)
             return true
 
-        case .sessionRenamed(let title):
+        case .sessionRenamed:
             // Handled by the store (title mutation on Session), not the reducer
             // body. We no-op here; the store observes this via the event stream.
             return false

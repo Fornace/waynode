@@ -72,7 +72,7 @@ public final class SessionStore {
             closeTimer = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
                 guard !Task.isCancelled else { return }
-                await self?.closeStream()
+                self?.closeStream()
             }
         }
     }
@@ -109,8 +109,8 @@ public final class SessionStore {
 
         // Listen to events on the main actor.
         listenerTask?.cancel()
-        let events = await client.events()
-        let states = await client.stateChanges()
+        let events = client.events()
+        let states = client.stateChanges()
         listenerTask = Task { [weak self] in
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -155,7 +155,7 @@ public final class SessionStore {
         case .sessionRenamed(let title):
             sessionMeta?.title = title
             return
-        case .status(let text):
+        case .status:
             // Status update — also feed the reducer.
             _ = reducer.reduce(event)
             // Start goal polling if not already.
@@ -225,9 +225,9 @@ public final class SessionStore {
                 await self?.refreshGoalStatus()
                 // Stop polling when goal is complete or null.
                 if let self {
-                    let status = await self.goalStatus.status
+                    let status = self.goalStatus.status
                     if status == nil || status == .complete {
-                        await self.stopGoalPolling()
+                        self.stopGoalPolling()
                         return
                     }
                 }

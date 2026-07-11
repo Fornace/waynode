@@ -229,7 +229,7 @@ struct TerminalView: View {
         await client.connect()
 
         listenTask = Task {
-            let stream = await client.output()
+            let stream = client.output()
             for await msg in stream {
                 await handleMessage(msg)
             }
