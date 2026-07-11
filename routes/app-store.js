@@ -16,7 +16,12 @@ const router = Router();
 // storage into an unauthenticated database-amplification endpoint on either
 // self-hosted or ordinary hosted Stripe deployments.
 router.use((req, res, next) => {
-  if (!appStoreEnabled) return res.status(404).json({ error: "App Store billing is not configured on this deployment" });
+  const isAppStoreRoute =
+    req.path.startsWith("/api/app-store/") ||
+    (req.path.startsWith("/api/orgs/") && req.path.includes("/app-store/"));
+  if (!appStoreEnabled && isAppStoreRoute) {
+    return res.status(404).json({ error: "App Store billing is not configured on this deployment" });
+  }
   next();
 });
 

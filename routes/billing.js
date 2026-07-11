@@ -46,7 +46,12 @@ router.get("/api/billing/enabled", (req, res) => {
 // public capability endpoint above is intentionally the only exception, so
 // the client can hide its billing affordances without probing protected URLs.
 router.use((req, res, next) => {
-  if (!billingEnabled) return res.status(404).json({ error: "Billing is not configured on this deployment" });
+  const isBillingRoute =
+    req.path.startsWith("/api/billing/") ||
+    (req.path.startsWith("/api/orgs/") && req.path.includes("/billing"));
+  if (!billingEnabled && isBillingRoute) {
+    return res.status(404).json({ error: "Billing is not configured on this deployment" });
+  }
   next();
 });
 
