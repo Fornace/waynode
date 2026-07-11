@@ -128,13 +128,12 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
           // again shortly" from "sandboxed mode, terminal permanently
           // unavailable" instead of treating both as the same hard error.
           if (err.agentBusy) {
-            ws.send(JSON.stringify({ type: "error", agentBusy: true, message: err.message }));
+            ws.send(JSON.stringify({ type: "error", agentBusy: true, message: err.message }), () => ws.close());
           } else if (err.terminalDisabled) {
-            ws.send(JSON.stringify({ type: "error", terminalDisabled: true, message: err.message }));
+            ws.send(JSON.stringify({ type: "error", terminalDisabled: true, message: err.message }), () => ws.close());
           } else {
-            ws.send(JSON.stringify({ type: "error", message: err.message }));
+            ws.send(JSON.stringify({ type: "error", message: err.message }), () => ws.close());
           }
-          ws.close();
           return;
         }
 

@@ -118,12 +118,20 @@ try {
   });
 
   let sessionUrl = null;
+  let terminalAvailable = true;
   await flow("open-session", async () => {
     await call("browser_click", { selector: ".space-item", timeout: 10000 });
-    await call("browser_wait", { time: 800 });
-    // if a New Session affordance exists, click it; else just use the first
-    const has = await jval(await call("browser_evaluate", { script: "return !!document.querySelector('.new-session-btn')" }));
-    if (has) await call("browser_click", { selector: ".new-session-btn", timeout: 8000 });
+    await call("browser_wait", { selector: ".space-sessions", timeout: 8000 });
+    // Expanding a space reveals its sessions. Prefer one of those so the
+    // smoke test does not create unnecessary production sessions; create a
+    // session only when the space is genuinely empty.
+    const hasSession = await jval(await call("browser_evaluate", { script: "return !!document.querySelector('.space-sessions .session-item')" }));
+    if (hasSession) {
+      await call("browser_click", { selector: ".space-sessions .session-item", timeout: 8000 });
+    } else {
+      await call("browser_click", { selector: ".space-sessions .new-session-btn", timeout: 8000 });
+    }
+    await call("browser_wait", { selector: ".tabs", timeout: 10000 });
     const r = await call("browser_evaluate", { script: "return { url: location.href, tabs: !!document.querySelector('.tabs') }" });
     const v = await jval(r);
     if (!v?.tabs) throw new Error("session tabs did not render");
@@ -179,12 +187,27 @@ try {
       const v = await jval(await call("browser_evaluate", { script: "return (document.querySelector('.xterm-rows')?.textContent||'').trim().length > 2 || !!document.querySelector('.terminal-container canvas')" }));
       if (v) { ok = true; break; }
     }
-    if (!ok) throw new Error("terminal never rendered");
+    if (!ok) {
+      const disabled = await jval(await call("browser_evaluate", {
+        script: "return document.querySelector('.terminal-container')?.textContent?.includes('Terminal is unavailable') || false",
+      }));
+      if (disabled) {
+        terminalAvailable = false;
+        await shot("05-terminal-disabled");
+        console.log("   terminal safety gate shown (sandboxed host)");
+        return;
+      }
+      throw new Error("terminal never rendered");
+    }
     await shot("05-terminal");
     console.log("   pi TUI painted");
   });
 
   await flow("terminal-survival", async () => {
+    if (!terminalAvailable) {
+      console.log("   (skipped: terminal safety gate is active)");
+      return;
+    }
     // marker via /name so the live session has unique state
     const marker = `E2E-${Date.now().toString(36)}`;
     await call("browser_evaluate", { script: "document.querySelector('.terminal-container').click()" });
