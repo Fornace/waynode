@@ -58,6 +58,9 @@ struct SpacesScene: View {
                     NavigationLink(value: DeepLink.sessionsList(spaceId: space.id)) {
                         SpaceRow(space: space)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
                             spaceToDelete = space
@@ -68,7 +71,7 @@ struct SpacesScene: View {
                 }
             }
         }
-        .navigationTitle("Spaces")
+        .navigationTitle("Workspaces")
         // Force search into a drawer below the title so it doesn't collide
         // with the Clone button in the navigation bar on iOS 26+.
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search spaces")
@@ -175,12 +178,16 @@ struct SpaceRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Title row: repo name + session count badge
-            HStack(spacing: 6) {
-                Image(systemName: "book.closed.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.tint)
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 40, height: 40)
+                .background(.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 5) {
+                // Title row: repo name + session count badge
+                HStack(spacing: 6) {
                 Text(space.repoName.isEmpty ? "Untitled" : space.repoName)
                     .font(.headline)
                     .lineLimit(1)
@@ -193,48 +200,46 @@ struct SpaceRow: View {
                         .padding(.vertical, 2)
                         .background(Color.secondary.opacity(0.15), in: Capsule())
                 }
-            }
-            // Latest session preview — the most useful distinguishing info.
-            // Shows what was last worked on in this workspace.
-            if let title = space.latestSessionTitle, !title.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "bubble.left.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tint)
-                    Text(title)
+                }
+                // Latest session preview — the most useful distinguishing info.
+                if let title = space.latestSessionTitle, !title.isEmpty {
+                    Label(title, systemImage: "bubble.left.fill")
                         .font(.subheadline)
-                        .foregroundStyle(.primary.opacity(0.85))
+                        .foregroundStyle(.primary.opacity(0.84))
                         .lineLimit(1)
                 }
-            }
-            // Metadata row: owner/repo (if different) + timestamp + branch
-            HStack(spacing: 6) {
-                if let path = displayPath, path != space.repoName {
-                    Text(path)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    Text("·")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                if let date = dateLabel {
-                    Text(date)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                if !space.branch.isEmpty && space.branch != "main" {
-                    Text("·")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                    Label(space.branch, systemImage: "arrow.triangle.branch")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+
+                // Metadata row: owner/repo (if different) + timestamp + branch
+                HStack(spacing: 6) {
+                    if let path = displayPath, path != space.repoName {
+                        Text(path)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    if let date = dateLabel {
+                        Text("·")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        Text(date)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    if !space.branch.isEmpty {
+                        Text("·")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        Label(space.branch, systemImage: "arrow.triangle.branch")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(.primary.opacity(0.07)))
     }
 }
 

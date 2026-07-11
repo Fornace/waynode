@@ -66,6 +66,9 @@ struct SessionsList: View {
                     NavigationLink(value: DeepLink.sessionDetail(spaceId: spaceId, sessionId: session.id)) {
                         SessionRow(session: session)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
                             sessionToDelete = session
@@ -195,8 +198,15 @@ struct SessionRow: View {
     let session: Session
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 38, height: 38)
+                .background(.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 11))
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
                 Text(session.title.isEmpty ? "Untitled" : session.title)
                     .font(.headline)
                     .lineLimit(1)
@@ -205,14 +215,26 @@ struct SessionRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            }
-            let rel = Format.compactRelative(fromISO: session.createdAt)
-            if !rel.isEmpty {
-                Text(rel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 6) {
+                    if let model = session.model, !model.isEmpty {
+                        Text(model)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.tint)
+                            .lineLimit(1)
+                    }
+                    let rel = Format.compactRelative(fromISO: session.createdAt)
+                    if !rel.isEmpty {
+                        if session.model != nil { Text("·").foregroundStyle(.tertiary) }
+                        Text(rel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
-        .padding(.vertical, 2)
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(.primary.opacity(0.07)))
     }
 }
