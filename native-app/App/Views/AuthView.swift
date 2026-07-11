@@ -200,18 +200,25 @@ struct AuthView: View {
         let scheme = AuthStore.callbackScheme
 
         let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme) { callbackURL, err in
-            Task { @MainActor in
-                guard let callbackURL else {
-                    // User canceled or session failed
-                    if let err = err as? ASWebAuthenticationSessionError, err.code == .canceledLogin {
-                        // Silent cancel — user dismissed the browser
-                    } else if let err {
-                        error = err.localizedDescription
-                        Haptics.error()
+            // ASWebAuthenticationSession invokes its completion from Safari's
+            // XPC queue on macOS. Creating a @MainActor Task directly there
+            // inherits an invalid executor and trips Swift 6's runtime
+            // isolation assertion (EXC_BREAKPOINT). Hop to the main dispatch
+            // queue first, then touch SwiftUI state or the AppModel.
+            DispatchQueue.main.async {
+                Task { @MainActor in
+                    guard let callbackURL else {
+                        // User canceled or session failed
+                        if let err = err as? ASWebAuthenticationSessionError, err.code == .canceledLogin {
+                            // Silent cancel — user dismissed the browser
+                        } else if let err {
+                            error = err.localizedDescription
+                            Haptics.error()
+                        }
+                        return
                     }
-                    return
+                    await handleCallback(callbackURL)
                 }
-                await handleCallback(callbackURL)
             }
         }
         session.prefersEphemeralWebBrowserSession = false
