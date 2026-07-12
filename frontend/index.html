@@ -21,11 +21,33 @@
     <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Social / share -->
-    <title>Waynode AI</title>
-    <meta name="description" content="Open-source, self-hosted coding-agent workspace. Each space is a real cloned repo. pi is the engine." />
+    <title>Waynode — Open-source, self-hosted coding-agent workspace</title>
+    <meta name="description" content="Waynode gives coding agents a persistent Git workspace: real cloned repos, agent-native diffs and push, desktop to mobile. Self-host free (MIT) or use Waynode Cloud." />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Waynode AI" />
-    <meta property="og:description" content="Open-source, self-hosted coding-agent workspace. pi is the engine." />
+    <meta property="og:title" content="Waynode — Open-source, self-hosted coding-agent workspace" />
+    <meta property="og:description" content="A persistent Git workspace for coding agents: real cloned repos, agent-native diffs and push, desktop to mobile." />
+
+    <!-- Agent-readable twins of this site: /index.md, /llms.txt, /llms-full.txt -->
+    <link rel="alternate" type="text/markdown" title="Markdown version for LLMs" href="/index.md" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Waynode",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Web, macOS, iOS",
+      "url": "https://waynode.fornace.net",
+      "sameAs": ["https://github.com/fornace/waynode"],
+      "description": "Open-source, self-hosted coding-agent workspace. Each workspace is a real cloned Git repository with a persistent worktree, terminal, and agent session, reachable from desktop and mobile.",
+      "license": "https://opensource.org/licenses/MIT",
+      "offers": [
+        { "@type": "Offer", "name": "Self-hosted", "price": "0", "priceCurrency": "USD" },
+        { "@type": "Offer", "name": "Starter", "price": "39", "priceCurrency": "USD" },
+        { "@type": "Offer", "name": "Pro", "price": "99", "priceCurrency": "USD" },
+        { "@type": "Offer", "name": "Team", "price": "249", "priceCurrency": "USD" }
+      ]
+    }
+    </script>
     <meta property="og:image" content="/og-image.png" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Waynode AI" />

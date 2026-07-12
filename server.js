@@ -25,6 +25,7 @@ import gitRoutes from "./routes/git.js";
 import apiTokenRoutes from "./routes/api-tokens.js";
 import billingRoutes, { webhookRouter as billingWebhookRoutes } from "./routes/billing.js";
 import appStoreRoutes from "./routes/app-store.js";
+import contentRoutes from "./routes/content.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -135,6 +136,9 @@ app.use(gitRoutes);
 app.use(apiTokenRoutes);
 app.use(billingRoutes);
 app.use(appStoreRoutes);
+// Public content hub (guides, comparisons, llms.txt) — server-rendered, no
+// auth, must be mounted before the SPA catch-all so its paths win.
+app.use(contentRoutes);
 
 // Model listing endpoint
 app.get("/api/models", (req, res) => {

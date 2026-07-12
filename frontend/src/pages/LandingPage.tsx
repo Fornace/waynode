@@ -18,7 +18,7 @@ export function LandingPage() {
     <main className="launch-page">
       <header className="launch-nav">
         <a className="launch-brand" href="#top" aria-label="Waynode home"><WaynodeMark size={30} /><span>Waynode</span></a>
-        <nav aria-label="Primary navigation"><a href="#how-it-works">How it works</a><a href="#compare">Why Waynode</a><a href="#pricing">Pricing</a><a className="launch-nav-github" href="https://github.com/fornace/waynode" target="_blank" rel="noreferrer">View on GitHub <span>↗</span></a></nav>
+        <nav aria-label="Primary navigation"><a href="#how-it-works">How it works</a><a href="#compare">Why Waynode</a><a href="#pricing">Pricing</a><a href="/learn">Learn</a><a className="launch-nav-github" href="https://github.com/fornace/waynode" target="_blank" rel="noreferrer">View on GitHub <span>↗</span></a></nav>
       </header>
 
       <section className="launch-hero" id="top">
@@ -68,7 +68,7 @@ export function LandingPage() {
       <section className="launch-pricing" id="pricing"><div className="launch-section-heading"><p className="launch-kicker">Simple hosted pricing</p><h2>A room for every build team.</h2><p>Every hosted plan starts with 15 free days. Upgrade only when Waynode earns a permanent place in your workflow.</p></div><div className="launch-pricing-grid">{PLANS.map((plan) => <article className={`launch-price-card ${plan.featured ? "is-featured" : ""}`} key={plan.name}>{plan.featured && <div className="launch-popular">Most popular</div>}<h3>{plan.name}</h3><p>{plan.detail}</p><div className="launch-price"><b>{plan.price}</b><span>/ month</span></div><ul>{plan.specs.map((spec) => <li key={spec}>✓ {spec}</li>)}</ul><a className={plan.featured ? "launch-primary" : "launch-secondary"} href="#auth">Start free trial <span>→</span></a></article>)}</div><p className="launch-pricing-note">Web checkout is powered by Stripe. Mobile subscriptions are available through the App Store where supported.</p></section>
 
       <section className="launch-auth" id="auth"><div><p className="launch-kicker">Your next repo is ready</p><h2>Stop carrying<br />your workspace around.</h2><p>Sign in to start your hosted trial. Prefer full infrastructure control? Waynode is MIT licensed and ready to self-host.</p></div><LoginPage /></section>
-      <footer className="launch-footer"><a className="launch-brand" href="#top"><WaynodeMark size={25} /><span>Waynode</span></a><span>Open source, persistent agent workspaces.</span><div><a href="https://github.com/fornace/waynode" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/fornace/waynode#readme" target="_blank" rel="noreferrer">Docs</a></div></footer>
+      <footer className="launch-footer"><a className="launch-brand" href="#top"><WaynodeMark size={25} /><span>Waynode</span></a><span>Open source, persistent agent workspaces.</span><div><a href="https://github.com/fornace/waynode" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/fornace/waynode#readme" target="_blank" rel="noreferrer">Docs</a><a href="/learn">Guides &amp; comparisons</a><a href="/llms.txt" title="Agent-readable index of this site">llms.txt</a><a href="/index.md" title="This page as markdown, for AI assistants">Read as markdown</a></div></footer>
     </main>
   );
 }
