@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: waynode vs cursor, cursor background agents alternative, cursor cloud agent self-hosted
+cover: /covers/waynode-vs-cursor-background-agents.png
 ---
+
+![Waynode vs Cursor background agents Cover Image](/covers/waynode-vs-cursor-background-agents.png)
 
 # Waynode vs Cursor background agents
 

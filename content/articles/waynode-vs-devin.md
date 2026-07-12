@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: waynode vs devin, devin alternative, open source devin alternative, self-hosted ai software engineer
+cover: /covers/waynode-vs-devin.png
 ---
+
+![Waynode vs Devin Cover Image](/covers/waynode-vs-devin.png)
 
 # Waynode vs Devin
 

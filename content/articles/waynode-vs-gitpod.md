@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: waynode vs gitpod, gitpod alternative, ona alternative, self-hosted gitpod alternative
+cover: /covers/waynode-vs-gitpod.png
 ---
+
+![Waynode vs Gitpod (Ona) Cover Image](/covers/waynode-vs-gitpod.png)
 
 # Waynode vs Gitpod (Ona)
 

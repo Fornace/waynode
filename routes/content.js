@@ -62,6 +62,7 @@ function loadArticle(file) {
     updated: meta.updated || meta.date || "",
     keywords: meta.keywords || "",
     author: meta.author || "",
+    cover: meta.cover || "",
     body,
     raw,
     html: marked.parse(body),
@@ -130,10 +131,12 @@ const PAGE_CSS = `
   article th, article td { border:1px solid var(--border); padding:9px 12px; text-align:left; vertical-align:top; }
   article th { background:var(--surface); }
   article blockquote { border-left:3px solid var(--accent); padding-left:16px; color:var(--dim); margin:16px 0; }
+  article img { max-width:100%; height:auto; border-radius:12px; border:1px solid var(--border); }
   .mdlink { margin-top:48px; padding-top:20px; border-top:1px solid var(--border); font-size:14px; color:var(--dim); }
   .cards { display:grid; grid-template-columns:1fr; gap:14px; margin:20px 0 40px; }
-  .card { border:1px solid var(--border); border-radius:12px; padding:18px 20px; background:var(--surface); display:block; color:var(--text); }
+  .card { border:1px solid var(--border); border-radius:12px; padding:18px 20px; background:var(--surface); display:block; color:var(--text); overflow:hidden; }
   .card:hover { border-color:var(--accent); text-decoration:none; }
+  .card img { width:calc(100% + 40px); margin:-18px -20px 14px; display:block; aspect-ratio:16/9; object-fit:cover; }
   .card b { display:block; margin-bottom:4px; }
   .card span { color:var(--dim); font-size:14px; }
   .cat { margin:36px 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); }
@@ -141,7 +144,7 @@ const PAGE_CSS = `
   footer.site a { color:var(--dim); margin:0 8px; }
 `;
 
-function pageShell({ title, description, canonicalPath, mdPath, jsonLd, bodyHtml }) {
+function pageShell({ title, description, canonicalPath, mdPath, jsonLd, bodyHtml, ogImage }) {
   const base = siteUrl();
   return `<!doctype html>
 <html lang="en">
@@ -156,7 +159,8 @@ ${mdPath ? `<link rel="alternate" type="text/markdown" title="Markdown version f
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:type" content="article">
 <meta property="og:url" content="${base}${canonicalPath}">
-<meta name="twitter:card" content="summary">
+${ogImage ? `<meta property="og:image" content="${base}${ogImage}">` : ""}
+<meta name="twitter:card" content="${ogImage ? "summary_large_image" : "summary"}">
 ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ""}
 <style>${PAGE_CSS}</style>
 </head>
@@ -192,6 +196,7 @@ function articleJsonLd(a) {
       : { "@type": "Organization", name: "Waynode", url: base },
     publisher: { "@type": "Organization", name: "Waynode", url: base },
     mainEntityOfPage: `${base}${a.path}`,
+    ...(a.cover ? { image: `${base}${a.cover}` } : {}),
   }, {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -241,7 +246,7 @@ router.get("/learn", (req, res) => {
     const items = articles.filter((a) => a.category === key);
     if (!items.length) return "";
     return `<p class="cat">${cat.label}</p><div class="cards">${items.map((a) =>
-      `<a class="card" href="${a.path}"><b>${esc(a.title)}</b><span>${esc(a.description)}</span></a>`).join("")}</div>`;
+      `<a class="card" href="${a.path}">${a.cover ? `<img src="${a.cover}" alt="" loading="lazy">` : ""}<b>${esc(a.title)}</b><span>${esc(a.description)}</span></a>`).join("")}</div>`;
   }).join("");
   res.type("html").send(pageShell({
     title: "Waynode Guides & Comparisons",
@@ -283,6 +288,7 @@ for (const category of Object.keys(CATEGORIES)) {
       description: a.description,
       canonicalPath: a.path,
       mdPath: `${a.path}.md`,
+      ogImage: a.cover,
       jsonLd: articleJsonLd(a),
       bodyHtml: `<div class="crumbs"><a href="/">Waynode</a> / <a href="/learn">${CATEGORIES[category].label}</a></div><article>${dateLine}${a.html}</article><p class="mdlink">Reading this with an AI assistant? Fetch the raw markdown at <a href="${a.path}.md">${a.path}.md</a> or the whole site at <a href="/llms-full.txt">/llms-full.txt</a>.</p>`,
     }));

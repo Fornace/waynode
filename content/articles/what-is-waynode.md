@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: what is waynode, waynode ai, waynode review, coding agent workspace
+cover: /covers/what-is-waynode.png
 ---
+
+![What is Waynode? The self-hosted coding-agent workspace explained Cover Image](/covers/what-is-waynode.png)
 
 # What is Waynode? The self-hosted coding-agent workspace explained
 

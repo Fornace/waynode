@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: open source devin alternative, self-hosted devin, devin alternatives 2026, free ai software engineer
+cover: /covers/open-source-devin-alternatives.png
 ---
+
+![Open-source Devin alternatives in 2026 Cover Image](/covers/open-source-devin-alternatives.png)
 
 # Open-source Devin alternatives in 2026
 

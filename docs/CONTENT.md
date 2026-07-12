@@ -56,3 +56,9 @@ landing on one page can discover the rest.
   updated, never from a model's memory. Bump `updated:` when you touch a page.
 - No em dashes anywhere. Use a comma, colon, period, or parentheses instead;
   for title separators use ":" or "|".
+- Cover images live in `frontend/public/covers/<slug>.png` (16:9), referenced
+  by `cover:` frontmatter and prepended to the body. They are generated with
+  the same locked pipeline as trendwalker-sentia: model
+  `gemini-3.1-flash-image-preview` via `generateContent`, using sentia's exact
+  Bauhaus prompt template (see `.cursor/rules/image-generation.mdc` in that
+  repo). Do not restyle or embellish the prompt.

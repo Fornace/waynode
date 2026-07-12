@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: waynode vs coder, coder.com alternative, self-hosted dev environment coding agent
+cover: /covers/waynode-vs-coder.png
 ---
+
+![Waynode vs Coder Cover Image](/covers/waynode-vs-coder.png)
 
 # Waynode vs Coder
 

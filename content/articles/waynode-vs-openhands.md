@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: waynode vs openhands, openhands alternative, open source coding agent comparison
+cover: /covers/waynode-vs-openhands.png
 ---
+
+![Waynode vs OpenHands Cover Image](/covers/waynode-vs-openhands.png)
 
 # Waynode vs OpenHands
 

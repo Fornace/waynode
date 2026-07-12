@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: coding agent mobile, run claude code from phone, review code on phone ai agent, mobile ai development workflow
+cover: /covers/coding-agents-on-your-phone.png
 ---
+
+![Running coding agents from your phone Cover Image](/covers/coding-agents-on-your-phone.png)
 
 # Running coding agents from your phone
 

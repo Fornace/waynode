@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: self-host coding agent, self-hosted ai coding assistant docker, run coding agent on your own server
+cover: /covers/self-host-coding-agent-docker.png
 ---
+
+![How to self-host a coding agent with Docker Cover Image](/covers/self-host-coding-agent-docker.png)
 
 # How to self-host a coding agent with Docker
 

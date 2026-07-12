@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: waynode vs github codespaces, github codespaces alternative, self-hosted codespaces alternative
+cover: /covers/waynode-vs-github-codespaces.png
 ---
+
+![Waynode vs GitHub Codespaces Cover Image](/covers/waynode-vs-github-codespaces.png)
 
 # Waynode vs GitHub Codespaces
 

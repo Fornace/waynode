@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: persistent workspace coding agent, coding agent git worktree, stateful vs ephemeral ai agents
+cover: /covers/persistent-workspaces-for-coding-agents.png
 ---
+
+![Why coding agents need persistent workspaces Cover Image](/covers/persistent-workspaces-for-coding-agents.png)
 
 # Why coding agents need persistent workspaces
 

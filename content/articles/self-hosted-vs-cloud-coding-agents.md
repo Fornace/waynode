@@ -7,7 +7,10 @@ date: 2026-07-12
 updated: 2026-07-12
 author: Francesco Frapporti
 keywords: self-hosted vs cloud ai coding agent, should i self-host coding agent, coding agent data privacy
+cover: /covers/self-hosted-vs-cloud-coding-agents.png
 ---
+
+!["Self-hosted vs cloud coding agents: how to choose" Cover Image](/covers/self-hosted-vs-cloud-coding-agents.png)
 
 # Self-hosted vs cloud coding agents: how to choose
 
