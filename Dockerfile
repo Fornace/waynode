@@ -65,6 +65,9 @@ COPY lib/ ./lib/
 COPY routes/ ./routes/
 COPY server.js ./
 
+# Public content hub (articles + agent-readable markdown, routes/content.js)
+COPY content/ ./content/
+
 # Copy built frontend
 COPY --from=builder /build/frontend/dist ./frontend/dist
 
