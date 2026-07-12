@@ -56,6 +56,13 @@ landing on one page can discover the rest.
   updated, never from a model's memory. Bump `updated:` when you touch a page.
 - No em dashes anywhere. Use a comma, colon, period, or parentheses instead;
   for title separators use ":" or "|".
+- No other machine-writing tells (list measured in the eu-sovereign-ai style
+  eval): no Kobak focal words (delve, robust, seamless, leverage, pivotal,
+  landscape, journey, harness, utilize, and the rest of that set); no
+  correlative filler ("not only X but Y", "it's not just X, it's Y"); no
+  bold-label bullet scaffolding where the label adds nothing; no "&" in
+  titles; no hedge-and-reassure stacking. If removing a phrase changes
+  nothing, remove it.
 - Cover images live in `frontend/public/covers/<slug>.png` (16:9), referenced
   by `cover:` frontmatter and prepended to the body. They are generated with
   the same locked pipeline as trendwalker-sentia: model

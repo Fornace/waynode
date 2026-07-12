@@ -28,10 +28,10 @@ Self-hosting a coding agent means running the agent's server, workspaces, and cr
 
 Four things:
 
-1. **A host with Docker.** Any machine that runs Docker Engine and Docker Compose v2: a home server, a VPS, or your laptop for a first test. A coding agent workspace clones real Git repositories to disk, so budget disk space for the repos you plan to work on plus the container image.
-2. **A Git provider OAuth app.** Waynode authenticates users and clones repositories via GitHub or GitLab OAuth. You create the OAuth app in your own GitHub/GitLab account, so tokens are issued to *your* deployment, not to a vendor.
-3. **An LLM API key.** Self-hosted deployments bring their own model provider key (for example an Anthropic key for the default configuration). The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs.
-4. **Optionally, a domain name.** Only needed if you want HTTPS access from outside the machine, which is most of the point if you want to steer the agent from a phone.
+1. A host with Docker. Any machine that runs Docker Engine and Docker Compose v2: a home server, a VPS, or your laptop for a first test. A coding agent workspace clones real Git repositories to disk, so budget disk space for the repos you plan to work on plus the container image.
+2. A Git provider OAuth app. Waynode authenticates users and clones repositories via GitHub or GitLab OAuth. You create the OAuth app in your own GitHub/GitLab account, so tokens are issued to *your* deployment, not to a vendor.
+3. An LLM API key. Self-hosted deployments bring their own model provider key (for example an Anthropic key for the default configuration). The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs.
+4. Optionally, a domain name. Only needed if you want HTTPS access from outside the machine, which is most of the point if you want to steer the agent from a phone.
 
 For sandboxed execution, Waynode has a microVM execution path that activates when KVM is available on the host; it is optional, not a prerequisite.
 
@@ -66,15 +66,15 @@ Everything is configured through `.env`. The security-relevant variables:
 
 Two rules that prevent most self-hosting incidents:
 
-- **Never reuse or commit the secrets.** If `SESSION_SECRET` leaks, sessions can be forged; if `ENCRYPTION_KEY` leaks alongside a database copy, stored credentials can be decrypted. Keep `.env` out of Git and, for production, load these from a secret manager.
-- **Do not enable hosted-billing variables.** The Stripe variables in `.env.example` exist only for the managed waynode.fornace.net deployment. Left unset, the billing UI is hidden and billing routes 404; a self-hosted install has no payment or metering code active.
+- Never reuse or commit the secrets. If `SESSION_SECRET` leaks, sessions can be forged; if `ENCRYPTION_KEY` leaks alongside a database copy, stored credentials can be decrypted. Keep `.env` out of Git and, for production, load these from a secret manager.
+- Do not enable hosted-billing variables. The Stripe variables in `.env.example` exist only for the managed waynode.fornace.net deployment. Left unset, the billing UI is hidden and billing routes 404; a self-hosted install has no payment or metering code active.
 
 ## How do you set up GitHub or GitLab OAuth?
 
 Create an OAuth app in the provider, pointing back at your deployment:
 
-- **GitHub:** Settings → Developer settings → OAuth Apps → New OAuth App. Set the callback URL to `${APP_URL}/auth/github/callback`.
-- **GitLab:** User Settings → Applications. Set the redirect URI to `${APP_URL}/auth/gitlab/callback`. For self-managed GitLab, also set `GITLAB_BASE_URL`.
+- GitHub: Settings → Developer settings → OAuth Apps → New OAuth App. Set the callback URL to `${APP_URL}/auth/github/callback`.
+- GitLab: User Settings → Applications. Set the redirect URI to `${APP_URL}/auth/gitlab/callback`. For self-managed GitLab, also set `GITLAB_BASE_URL`.
 
 The callback URL must match `APP_URL` exactly: scheme, host, and port. This is the most common setup failure: the app works on localhost, then OAuth breaks after moving behind a domain because the OAuth app still points at `http://localhost:3000`. When you add HTTPS (next section), update both `APP_URL` and the provider-side callback URL, then restart the container.
 
@@ -104,11 +104,11 @@ This is the main economic difference from managed agent products: your spend tra
 
 A minimal checklist:
 
-- **Secrets:** generate `SESSION_SECRET` and `ENCRYPTION_KEY` with `openssl rand -hex 32`; store them in a secret manager; never commit `.env`, OAuth client secrets, or provider tokens.
-- **Transport:** HTTPS at the reverse proxy for anything beyond localhost. OAuth flows and repo tokens must never cross plain HTTP.
-- **Blast radius:** an agent workspace holds cloned repos and can run commands. Run it on a dedicated host or VM where possible; enable the KVM-backed microVM sandbox path if your host supports it.
-- **OAuth hygiene:** grant the OAuth app only the scopes your provider flow requires, and keep it pointed at your deployment's exact callback URL.
-- **Updates:** the stack is a normal Git repo, so `git pull` and rebuild on your own schedule, and read the diff first, which is the audit ability self-hosting buys you.
+- Generate `SESSION_SECRET` and `ENCRYPTION_KEY` with `openssl rand -hex 32`; store them in a secret manager; never commit `.env`, OAuth client secrets, or provider tokens.
+- Use HTTPS at the reverse proxy for anything beyond localhost. OAuth flows and repo tokens must never cross plain HTTP.
+- An agent workspace holds cloned repos and can run commands. Run it on a dedicated host or VM where possible; enable the KVM-backed microVM sandbox path if your host supports it.
+- Grant the OAuth app only the scopes your provider flow requires, and keep it pointed at your deployment's exact callback URL.
+- The stack is a normal Git repo, so `git pull` and rebuild on your own schedule, and read the diff first, which is the audit ability self-hosting buys you.
 
 ## Does this recipe work for other self-hosted coding agents?
 

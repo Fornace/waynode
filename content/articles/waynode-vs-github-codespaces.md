@@ -20,9 +20,9 @@ GitHub Codespaces is a managed cloud development environment: it spins up a cont
 
 - **Codespaces** = ephemeral, metered compute for a human editing in VS Code. Stops after 30 minutes of inactivity by default; stopped codespaces are deleted after 30 days by default.
 - **Waynode** = a durable "space" that is a persistent Git worktree on disk. The agent session, files, branches, and terminal state survive between visits.
-- **Who's driving:** in Codespaces, you; in Waynode, an agent (the open-source pi engine, with pi-codex-goal for autonomous goal runs): you chat, assign goals, or drop into a terminal.
-- **Hosting:** Codespaces is GitHub-hosted only. Waynode is `docker compose up -d` on your own hardware (free), or Waynode Cloud from $39/mo.
-- **Cost model:** Codespaces bills usage: $0.18/hr for a 2-core machine, $0.07/GB-month storage. Waynode self-host is free (bring your own model keys); Waynode Cloud is a flat monthly plan with token quotas.
+- In Codespaces, you drive; in Waynode, an agent does (the open-source pi engine, with pi-codex-goal for autonomous goal runs): you chat, assign goals, or drop into a terminal.
+- Codespaces is GitHub-hosted only. Waynode is `docker compose up -d` on your own hardware (free), or Waynode Cloud from $39/mo.
+- Codespaces bills usage: $0.18/hr for a 2-core machine, $0.07/GB-month storage. Waynode self-host is free (bring your own model keys); Waynode Cloud is a flat monthly plan with token quotas.
 - They are complementary more than competitive: many teams will keep Codespaces for hands-on-keyboard work and use Waynode for delegated agent work.
 
 ## What is GitHub Codespaces?
@@ -58,18 +58,18 @@ Partially, and only for a specific use. If what you want from Codespaces is *a f
 
 ## When is Codespaces the better choice?
 
-- **Hands-on development.** You are writing and debugging code yourself and want a full VS Code environment with extensions, port forwarding, and devcontainer reproducibility.
-- **Deep GitHub integration.** One-click environments from any GitHub repo or pull request, prebuilds, org-level policies.
-- **Occasional, bursty use on a personal account.** The free quota (120 core hours/month on GitHub Free) covers a lot of casual use before any bill appears ([docs](https://docs.github.com/en/billing/concepts/product-billing/github-codespaces)).
-- **Zero infrastructure appetite.** There is nothing to operate; GitHub runs everything.
+- You are writing and debugging code yourself and want a full VS Code environment with extensions, port forwarding, and devcontainer reproducibility.
+- You want deep GitHub integration: one-click environments from any GitHub repo or pull request, prebuilds, org-level policies.
+- Your use is occasional and bursty on a personal account. The free quota (120 core hours/month on GitHub Free) covers a lot of casual use before any bill appears ([docs](https://docs.github.com/en/billing/concepts/product-billing/github-codespaces)).
+- You have no appetite for infrastructure. There is nothing to operate; GitHub runs everything.
 
 ## When is Waynode the better choice?
 
-- **Delegated work.** You want to hand a goal to an agent, close the laptop, and come back to a reviewable branch, not keep an editor session alive.
-- **Review from anywhere.** Following a live task, reading diffs, steering the agent, and pushing a reviewed change from a phone is the designed-for path, not an afterthought.
-- **Continuity.** The 30-minute idle stop and 30-day deletion defaults that make Codespaces cheap to operate are exactly what you don't want for long-running, resumable agent sessions. A Waynode space just stays.
-- **Self-hosting and data control.** MIT-licensed, runs on your Docker host, GitLab as well as GitHub, and no usage meter.
-- **Predictable team cost.** Since orgs get no free Codespaces quota, per-core-hour billing for a team is open-ended; Waynode Cloud is a flat monthly plan, and self-host is free.
+- You want to hand a goal to an agent, close the laptop, and come back to a reviewable branch, not keep an editor session alive.
+- You review from anywhere: following a live task, reading diffs, steering the agent, and pushing a reviewed change from a phone is the designed-for path, not an afterthought.
+- You need continuity. The 30-minute idle stop and 30-day deletion defaults that make Codespaces cheap to operate are exactly what you don't want for long-running, resumable agent sessions. A Waynode space just stays.
+- You want self-hosting and data control: MIT-licensed, runs on your Docker host, GitLab as well as GitHub, and no usage meter.
+- You want predictable team cost. Since orgs get no free Codespaces quota, per-core-hour billing for a team is open-ended; Waynode Cloud is a flat monthly plan, and self-host is free.
 
 Both tools can coexist: Codespaces for the code you write, Waynode for the code you delegate. For adjacent comparisons, see [/compare/waynode-vs-gitpod](/compare/waynode-vs-gitpod) and [/compare/waynode-vs-coder](/compare/waynode-vs-coder).
 

@@ -6,10 +6,10 @@ Waynode gives coding work a real, durable place. Start a task at your desk, insp
 
 ## What Waynode is
 
-- A **persistent repo workspace**, not a coding chat. Every space is a real cloned GitHub or GitLab repository on disk.
-- An **agent-native Git surface**: changed files, hunks, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
-- **Mobile-first**: the same workspace, session, and diff on your phone. Follow a live task, review changed files, send the next instruction.
-- **Open source (MIT)** and self-hostable with Docker. The agent engine is [pi](https://github.com/anthropics/pi), with pi-codex-goal for autonomous goals.
+- A persistent repo workspace, not a coding chat. Every space is a real cloned GitHub or GitLab repository on disk.
+- An agent-native Git surface: changed files, hunks, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
+- Mobile-first: the same workspace, session, and diff on your phone. Follow a live task, review changed files, send the next instruction.
+- Open source (MIT) and self-hostable with Docker. The agent engine is [pi](https://github.com/anthropics/pi), with pi-codex-goal for autonomous goals.
 
 ## Two ways to run it
 
@@ -47,4 +47,4 @@ Web checkout is powered by Stripe.
 
 - Website: https://waynode.fornace.net
 - GitHub: https://github.com/fornace/waynode
-- Guides & comparisons: /learn
+- Guides and comparisons: /learn

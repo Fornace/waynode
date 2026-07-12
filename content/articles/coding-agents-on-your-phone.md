@@ -34,10 +34,10 @@ This inverts the old assumption that mobile coding is a gimmick. Writing code on
 
 Four capabilities, in decreasing order of how often you use them:
 
-1. **Live task following.** A stream of what the agent is doing right now (commands run, files touched, reasoning summaries) that survives you locking the phone and coming back.
-2. **Diff review.** File-by-file, hunk-by-hunk changes rendered legibly on a small screen. A wall of unified diff in a chat bubble does not count; you need changed-file lists you can drill into.
-3. **Steering.** The ability to send a correction mid-task ("use the existing retry helper, don't write a new one") and have it land in the same session, not spawn a fresh context-free run.
-4. **Push and hand-off.** Notification when the agent finishes or blocks, and a way to either finish the loop on the phone (approve, push, open a PR) or pick up the exact session later at a desk.
+1. Live task following: a stream of what the agent is doing right now (commands run, files touched, reasoning summaries) that survives you locking the phone and coming back.
+2. Diff review: file-by-file, hunk-by-hunk changes rendered legibly on a small screen. A wall of unified diff in a chat bubble does not count; you need changed-file lists you can drill into.
+3. Steering: the ability to send a correction mid-task ("use the existing retry helper, don't write a new one") and have it land in the same session, not spawn a fresh context-free run.
+4. Push and hand-off: notification when the agent finishes or blocks, and a way to either finish the loop on the phone (approve, push, open a PR) or pick up the exact session later at a desk.
 
 Anything missing from this list turns the phone into a read-only status page, which is better than nothing but does not close the loop.
 
@@ -59,10 +59,10 @@ The hosted tools share a design: ephemeral or vendor-managed execution environme
 
 Waynode's unit is a **space**: a real cloned Git repository on disk, persistent across sessions rather than recreated per task. The phone gets the same workspace as the desktop, not a companion view:
 
-- **Follow a live task.** Chat with the agent (the engine is the open-source pi agent) or dispatch an autonomous goal via pi-codex-goal, and watch it work; the session survives closing the browser or switching devices.
-- **Review changes.** Changed files, hunks, diffs, commits, and branches are rendered beside the conversation. In Waynode's model, "done" means ready for review, not merely finished running.
-- **Steer.** Messages land in the same persistent session, with the same worktree state, whether sent from a laptop or a phone.
-- **Push.** A reviewed change can be pushed to GitHub or GitLab (connected via OAuth) directly from the mobile view.
+- Chat with the agent (the engine is the open-source pi agent) or dispatch an autonomous goal via pi-codex-goal, and watch it work; the session survives closing the browser or switching devices.
+- Changed files, hunks, diffs, commits, and branches are rendered beside the conversation. In Waynode's model, "done" means ready for review, not merely finished running.
+- Steering messages land in the same persistent session, with the same worktree state, whether sent from a laptop or a phone.
+- A reviewed change can be pushed to GitHub or GitLab (connected via OAuth) directly from the mobile view.
 
 Because sessions persist, the desk-to-phone hand-off is simple: start a task at your desk, check the diff from your phone an hour later, resume in a terminal the next morning. Native macOS and iOS clients are planned (a native app exists in the repository).
 
@@ -72,10 +72,10 @@ You can self-host it for free (`git clone` → `docker compose up -d`; MIT-licen
 
 Candidly, a fair amount:
 
-- **Deep debugging.** Stepping through a failure, reading long stack traces, and cross-referencing five files does not fit a 6-inch screen. Waynode exposes a full terminal in the workspace, and Codex Remote can drive a paired desktop host, but a terminal on a phone is an escape hatch, not a workflow.
-- **Large-diff review.** A 40-file refactor should not be approved from a phone. Mobile review works for the shape of a change and for small-to-medium diffs; big changes deserve a desk.
-- **Writing significant code yourself.** If the agent's output is wrong enough that you need to write the fix, that is a signal to defer, not to thumb-type a patch.
-- **Initial task scoping for complex work.** Well-scoped tasks come from context: reading the code, checking the issue history. Phones are for dispatching tasks you already understand.
+- Deep debugging. Stepping through a failure, reading long stack traces, and cross-referencing five files does not fit a 6-inch screen. Waynode exposes a full terminal in the workspace, and Codex Remote can drive a paired desktop host, but a terminal on a phone is an escape hatch, not a workflow.
+- Large-diff review. A 40-file refactor should not be approved from a phone. Mobile review works for the shape of a change and for small-to-medium diffs; big changes deserve a desk.
+- Writing significant code yourself. If the agent's output is wrong enough that you need to write the fix, that is a signal to defer, not to thumb-type a patch.
+- Initial task scoping for complex work. Well-scoped tasks come from context: reading the code, checking the issue history. Phones are for dispatching tasks you already understand.
 
 The honest framing: mobile turns agent downtime into progress by removing review latency. It does not replace the desk; it makes the time between desks productive.
 

@@ -30,10 +30,10 @@ OpenHands is an open-source AI software-development agent that began as OpenDevi
 
 The product today has several layers ([docs.openhands.dev](https://docs.openhands.dev/)):
 
-- **Agent SDK**: a composable Python library containing the agentic core; agents are defined in code and run locally or at scale.
-- **Agent Canvas**: a browser workspace started with a single `agent-canvas` command (npm or Docker). It runs the OpenHands agent out of the box and can also drive third-party agents such as Claude Code, Codex, and Gemini via the Agent-Client Protocol ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)).
-- **CLI and legacy GUI**: a terminal interface and an older Docker-based GUI.
-- **OpenHands Cloud**: managed hosting with deeper GitHub, GitLab, and Bitbucket integrations plus Slack, Jira, and Linear, multi-user support, and collaboration tools.
+- Agent SDK: a composable Python library containing the agentic core; agents are defined in code and run locally or at scale.
+- Agent Canvas: a browser workspace started with a single `agent-canvas` command (npm or Docker). It runs the OpenHands agent out of the box and can also drive third-party agents such as Claude Code, Codex, and Gemini via the Agent-Client Protocol ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)).
+- CLI and legacy GUI: a terminal interface and an older Docker-based GUI.
+- OpenHands Cloud: managed hosting with deeper GitHub, GitLab, and Bitbucket integrations plus Slack, Jira, and Linear, multi-user support, and collaboration tools.
 
 Sandboxed execution uses Docker; the Docker sandbox is the default and recommended isolation model for most users ([docs.openhands.dev/openhands/usage/sandboxes/docker](https://docs.openhands.dev/openhands/usage/sandboxes/docker)).
 
@@ -43,10 +43,10 @@ Waynode is an open-source (MIT), self-hosted coding-agent workspace ([github.com
 
 Its defining features:
 
-- **Agent-native Git surface**: changed files, hunks, diffs, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
-- **Persistent sessions**: conversation, files, branches, and terminal state survive between visits; start at your desk, resume from any device.
-- **Mobile-first**: the same workspace, session, and diff on a phone; macOS and iOS native clients are planned (a native app exists in the repo).
-- **GitHub and GitLab** repo providers via OAuth.
+- An agent-native Git surface: changed files, hunks, diffs, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
+- Persistent sessions: conversation, files, branches, and terminal state survive between visits; start at your desk, resume from any device.
+- Mobile-first: the same workspace, session, and diff on a phone; macOS and iOS native clients are planned (a native app exists in the repo).
+- GitHub and GitLab repo providers via OAuth.
 
 See [/learn](/learn) for the full product overview.
 
@@ -76,8 +76,8 @@ Waynode does not ask you to build agents. It runs pi (open source) as the engine
 
 Both self-host for free with Docker.
 
-- **Waynode**: `git clone` → `cp .env.example .env` → `docker compose up -d` → localhost:3000. Your repos, database, credentials, LLM keys, and billing stay with you; no hosted-billing code is active on self-host. A sandboxed microVM execution path exists when KVM is available.
-- **OpenHands**: `npm install -g @openhands/agent-canvas` or a single `docker run` of the agent-canvas image, serving a web UI on localhost:8000 ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)). Sandboxed execution runs in Docker, the default and recommended isolation model ([docs.openhands.dev/openhands/usage/sandboxes/docker](https://docs.openhands.dev/openhands/usage/sandboxes/docker)).
+- Waynode: `git clone` → `cp .env.example .env` → `docker compose up -d` → localhost:3000. Your repos, database, credentials, LLM keys, and billing stay with you; no hosted-billing code is active on self-host. A sandboxed microVM execution path exists when KVM is available.
+- OpenHands: `npm install -g @openhands/agent-canvas` or a single `docker run` of the agent-canvas image, serving a web UI on localhost:8000 ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)). Sandboxed execution runs in Docker, the default and recommended isolation model ([docs.openhands.dev/openhands/usage/sandboxes/docker](https://docs.openhands.dev/openhands/usage/sandboxes/docker)).
 
 One licensing nuance: OpenHands' work is MIT-licensed except for the repository's `enterprise/` directory, which carries a separate license requiring purchase for use beyond one month ([docs.openhands.dev](https://docs.openhands.dev/)). Waynode's entire repository is MIT.
 

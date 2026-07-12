@@ -84,7 +84,7 @@ Pick Devin if you want delegation with no infrastructure: tag an agent from Slac
 
 Pick Waynode if you need the agent to work inside infrastructure you own, whether for code custody, model choice (including local or low-cost models), or cost control, or if you want a durable workspace rather than task-scoped sessions: start a change at your desk, follow the live task from your phone, review the diff, and push, all in the same persistent space. It is also the practical option if you specifically want an open-source, self-hosted alternative in this category; Devin has no equivalent self-serve deployment.
 
-For the broader landscape (cloud agents like Claude Code and Codex, and cloud dev environments like Codespaces and Coder), see [/learn](/learn).
+For the rest of the category (cloud agents like Claude Code and Codex, and cloud dev environments like Codespaces and Coder), see [/learn](/learn).
 
 ## FAQ
 

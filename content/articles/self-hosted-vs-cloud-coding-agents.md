@@ -52,9 +52,9 @@ With any cloud agent, at minimum two parties process your source: the agent vend
 
 Training opt-outs are not the whole story. The practical exposure surface also includes:
 
-- **Git credentials**: the OAuth token that lets the agent push branches is held and exercised by the vendor.
-- **Secrets in the repo or environment**: `.env` files, internal URLs, and infrastructure details visible to the sandbox.
-- **Retention and logs**: prompts, diffs, and terminal output may be retained per the vendor's policy, which you should read rather than assume.
+- The OAuth token that lets the agent push branches is held and exercised by the vendor.
+- `.env` files, internal URLs, and other infrastructure details in the repo or environment are visible to the sandbox.
+- Prompts, diffs, and terminal output may be retained per the vendor's policy, which you should read rather than assume.
 
 Self-hosting collapses this surface to one party: the model provider you choose to send prompts to. If you run local models, it collapses to zero. This is the core answer to "should I self-host a coding agent": self-host when reducing that surface is a requirement, not a preference.
 
@@ -76,10 +76,10 @@ Self-hosting inverts the structure: the software is often free (open source), an
 
 Be honest about the burden before choosing it:
 
-- **Initial setup**: cloning, environment configuration, creating GitHub/GitLab OAuth apps, DNS/TLS if you expose it beyond localhost. Budget an afternoon, not five minutes.
-- **Updates**: you pull new images and migrate when releases ship; nobody does it for you.
-- **Backups**: workspace state, database, and secrets are yours to back up and restore.
-- **Security**: session secrets and encryption keys are operator-owned, a genuine control and a genuine responsibility. Sandboxing agent execution (e.g. microVMs where KVM is available) is on you to enable.
+- Initial setup means cloning, environment configuration, creating GitHub/GitLab OAuth apps, and DNS/TLS if you expose it beyond localhost. Budget an afternoon, not five minutes.
+- You pull new images and migrate when releases ship; nobody does it for you.
+- Workspace state, database, and secrets are yours to back up and restore.
+- Session secrets and encryption keys are operator-owned: you control them and you have to protect them. Sandboxing agent execution (e.g. microVMs where KVM is available) is on you to enable.
 
 If your team has no one willing to own this, a managed offering is the more truthful choice even if self-hosting looks free on paper.
 

@@ -38,8 +38,8 @@ Then, on June 11, 2026, [OpenAI announced it is acquiring Ona](https://siliconan
 
 Two properties distinguish it from the CDE lineage Gitpod came from:
 
-- **Persistence.** The conversation, files, branches, and terminal state survive between visits. Start at your desk, resume from a phone. Ona Environments are ephemeral by design (Core-plan environments auto-delete after 7 days of inactivity, per the [pricing page](https://ona.com/pricing)).
-- **An agent-native Git surface.** Changed files, hunks, diffs, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
+- The workspace persists. The conversation, files, branches, and terminal state survive between visits. Start at your desk, resume from a phone. Ona Environments are ephemeral by design (Core-plan environments auto-delete after 7 days of inactivity, per the [pricing page](https://ona.com/pricing)).
+- The Git surface is agent-native. Changed files, hunks, diffs, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
 
 Waynode connects to GitHub and GitLab via OAuth, and a sandboxed microVM execution path exists when KVM is available.
 
@@ -74,18 +74,18 @@ Waynode self-hosts by design: `git clone` the [repo](https://github.com/fornace/
 
 ## When is Ona the better choice?
 
-- **Fleet-scale ephemeral environments.** Ona inherits years of CDE engineering; if you want many parallel, disposable, `devcontainer.json`-standardized environments, that is what the platform is built for.
-- **Enterprise compliance out of the box.** Guardrails ships SSO/OIDC, audit trails, RBAC, and command deny lists ([source](https://ona.com/stories/gitpod-is-now-ona)). Waynode does not claim these; its security posture is operator-owned keys and per-deployment OAuth.
-- **Big machines on demand.** Core supports up to 32 cores / 128 GB RAM / 200 GB disk and GPUs ([source](https://ona.com/pricing)).
-- **Codex-centric teams.** Post-acquisition, Ona's technology is set to become the execution layer for long-running Codex tasks; if you are committed to OpenAI's agent stack, that alignment works in your favor.
+- You want fleet-scale ephemeral environments. Ona inherits years of CDE engineering; if you want many parallel, disposable, `devcontainer.json`-standardized environments, that is what the platform is built for.
+- You need enterprise compliance out of the box. Guardrails ships SSO/OIDC, audit trails, RBAC, and command deny lists ([source](https://ona.com/stories/gitpod-is-now-ona)). Waynode does not claim these; its security posture is operator-owned keys and per-deployment OAuth.
+- You need big machines on demand. Core supports up to 32 cores / 128 GB RAM / 200 GB disk and GPUs ([source](https://ona.com/pricing)).
+- Your team is committed to Codex. Post-acquisition, Ona's technology is set to become the execution layer for long-running Codex tasks; if you are on OpenAI's agent stack, that alignment works in your favor.
 
 ## When is Waynode the better choice?
 
-- **You want the workspace to outlive the task.** Waynode sessions (conversation, branches, terminal) persist between visits and across devices, versus Ona's ephemeral model.
-- **You want real self-hosting without an enterprise contract.** MIT license, Docker Compose, your keys.
-- **You review from a phone.** The same workspace, session, and diff render mobile-first; you can follow a live task, steer the agent, and push a reviewed change from a phone.
-- **You want vendor independence.** Gitpod users have absorbed a rebrand, a forced migration, a product sunset, and an acquisition announcement within ten months. An MIT-licensed stack you run yourself cannot be sunset out from under you.
-- **You care about the Git surface.** Diffs, hunks, commits, and push live beside the agent conversation; the unit of "done" is a reviewable change.
+- You want the workspace to outlive the task. Waynode sessions (conversation, branches, terminal) persist between visits and across devices, versus Ona's ephemeral model.
+- You want real self-hosting without an enterprise contract: MIT license, Docker Compose, your keys.
+- You review from a phone. The same workspace, session, and diff render mobile-first; you can follow a live task, steer the agent, and push a reviewed change from a phone.
+- You want vendor independence. Gitpod users have absorbed a rebrand, a forced migration, a product sunset, and an acquisition announcement within ten months. An MIT-licensed stack you run yourself cannot be sunset out from under you.
+- You care about the Git surface. Diffs, hunks, commits, and push live beside the agent conversation; the unit of "done" is a reviewable change.
 
 See [/learn](/learn) for how Waynode workspaces work.
 

@@ -19,9 +19,9 @@ Coder is a self-hosted platform for provisioning cloud development environments 
 **TL;DR**
 
 - **Coder**: AGPL-3.0 core plus enterprise license, workspaces defined in Terraform, runs on Kubernetes/EC2/Docker, ~13.8k GitHub stars as of July 2026. Built for platform teams managing fleets of dev environments; AI agents are a feature of that platform ([github.com/coder/coder](https://github.com/coder/coder)).
-- **Coder's agent story is in transition**: Coder Tasks is deprecated (removed from releases starting v2.37, September 1, 2026) in favor of Coder Agents, a control-plane-native agent currently in beta ([Coder Tasks docs](https://coder.com/docs/ai-coder/tasks)).
+- Coder's agent story is in transition: Coder Tasks is deprecated (removed from releases starting v2.37, September 1, 2026) in favor of Coder Agents, a control-plane-native agent currently in beta ([Coder Tasks docs](https://coder.com/docs/ai-coder/tasks)).
 - **Waynode**: MIT, `docker compose up -d` to self-host, agent-first design (pi engine, autonomous goal runs), persistent Git-native workspaces, mobile-first review-and-steer. No Terraform, no Kubernetes required.
-- **Pick Coder** for enterprise scale, governance (audit logs, RBAC, quotas: Premium tier), and IDE-centric cloud dev environments. **Pick Waynode** for small-team simplicity where the agent is the primary worker and you review from anywhere.
+- Pick Coder for enterprise scale, governance (audit logs, RBAC, quotas: Premium tier), and IDE-centric cloud dev environments. Pick Waynode for small-team simplicity where the agent is the primary worker and you review from anywhere.
 
 ## What is Coder?
 
@@ -72,18 +72,18 @@ Self-hosting is `git clone`, `cp .env.example .env`, `docker compose up -d`, ope
 
 Coder wins when:
 
-- **You have a platform team and many developers.** Terraform templates, quotas, autostop scheduling, and multi-cloud provisioning exist precisely to manage fleets of environments. Waynode has none of that machinery.
-- **Governance is a requirement.** Audit logging, RBAC, resource quotas, and multi-organization controls are Premium features Waynode does not claim to offer.
-- **The IDE is central.** Coder workspaces are built for VS Code and JetBrains connections; agents assist inside a human-first environment.
-- **You need network-isolated agent execution at org scale.** Coder Agents' control-plane loop keeps LLM credentials out of workspaces entirely, a strong design for regulated environments.
+- You have a platform team and many developers. Terraform templates, quotas, autostop scheduling, and multi-cloud provisioning exist precisely to manage fleets of environments. Waynode has none of that machinery.
+- Governance is a requirement. Audit logging, RBAC, resource quotas, and multi-organization controls are Premium features Waynode does not claim to offer.
+- The IDE is central. Coder workspaces are built for VS Code and JetBrains connections; agents assist inside a human-first environment.
+- You need network-isolated agent execution at org scale. Coder Agents' control-plane loop keeps LLM credentials out of workspaces entirely, a strong design for regulated environments.
 
 ## When is Waynode the better choice?
 
-- **You are a small team without platform engineers.** One docker-compose stack versus a control plane and Terraform template authoring is a real operational difference.
-- **The agent is the primary worker.** Waynode's whole surface (goals, live diffs, branch/push beside the chat) is organized around delegating work and reviewing it, not around provisioning IDE backends.
-- **You want durable, resumable agent sessions across devices.** Start a goal at your desk, check the diff from your phone, push after review. Persistence of the worktree and conversation is the core primitive.
-- **You want a stable agent surface today.** Coder's agent layer is mid-transition (Tasks deprecated, Agents in beta); Waynode's agent loop is the product, not an add-on.
-- **License simplicity matters.** MIT versus AGPL-3.0-plus-enterprise is relevant if you embed or modify the stack.
+- You are a small team without platform engineers. One docker-compose stack versus a control plane and Terraform template authoring is a real operational difference.
+- The agent is the primary worker. Waynode's whole surface (goals, live diffs, branch/push beside the chat) is organized around delegating work and reviewing it, not around provisioning IDE backends.
+- You want durable, resumable agent sessions across devices. Start a goal at your desk, check the diff from your phone, push after review. Persistence of the worktree and conversation is the core primitive.
+- You want a stable agent surface today. Coder's agent layer is mid-transition (Tasks deprecated, Agents in beta); Waynode's agent loop is the product, not an add-on.
+- License simplicity matters. MIT versus AGPL-3.0-plus-enterprise is relevant if you embed or modify the stack.
 
 Waynode Cloud offers the same open-source stack managed: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations. That is flat pricing rather than per-user annual quotes.
 
