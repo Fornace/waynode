@@ -1,7 +1,7 @@
-# Content hub — guides, comparisons, and agent-readable endpoints
+# Content hub: guides, comparisons, and agent-readable endpoints
 
 Waynode serves a public content hub designed for both classic SEO and AI answer
-engines (AEO/GEO). Everything is server-rendered by `routes/content.js` — no
+engines (AEO/GEO). Everything is server-rendered by `routes/content.js`; no
 SPA JavaScript is needed to read it, which is what AI crawlers require.
 
 ## Where articles live
@@ -21,7 +21,7 @@ keywords: comma, separated, target queries
 ---
 ```
 
-Files are cached by mtime — edit a file and the next request re-reads it, no
+Files are cached by mtime: edit a file and the next request re-reads it, no
 restart needed.
 
 ## URL surface
@@ -43,14 +43,16 @@ landing on one page can discover the rest.
 
 ## Article conventions (why they look the way they do)
 
-- Definitive 2–3 sentence answer immediately after the H1, then a TL;DR —
+- Definitive 2–3 sentence answer immediately after the H1, then a TL;DR, because
   LLMs cite the top of the page far more than the middle.
-- Question-shaped H2s, each section self-contained — answer engines retrieve
+- Question-shaped H2s, each section self-contained, because answer engines retrieve
   chunks, not pages.
-- A `## FAQ` section with `### question` subsections at the end — parsed into
+- A `## FAQ` section with `### question` subsections at the end, parsed into
   FAQPage JSON-LD automatically by `routes/content.js`.
 - Comparison tables, concrete numbers, and source links for all competitor
   claims; neutral declarative tone (promotional language measurably lowers
   LLM citation rates).
 - Competitor facts must be verified against live pages when written or
   updated, never from a model's memory. Bump `updated:` when you touch a page.
+- No em dashes anywhere. Use a comma, colon, period, or parentheses instead;
+  for title separators use ":" or "|".

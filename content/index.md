@@ -1,8 +1,8 @@
 # Waynode
 
-> Open-source, self-hosted coding-agent workspace. Each workspace is a real cloned Git repository with a persistent worktree, terminal, and agent session — reachable from desktop and mobile.
+> Open-source, self-hosted coding-agent workspace. Each workspace is a real cloned Git repository with a persistent worktree, terminal, and agent session, reachable from desktop and mobile.
 
-Waynode gives coding work a real, durable place. Start a task at your desk, inspect the diff on your phone, and finish it from any device — with the repository, terminal, and conversation still there.
+Waynode gives coding work a real, durable place. Start a task at your desk, inspect the diff on your phone, and finish it from any device, with the repository, terminal, and conversation still there.
 
 ## What Waynode is
 
@@ -13,7 +13,7 @@ Waynode gives coding work a real, durable place. Start a task at your desk, insp
 
 ## Two ways to run it
 
-### Self-host — free and yours
+### Self-host: free and yours
 
 ```bash
 git clone https://github.com/fornace/waynode.git
@@ -24,7 +24,7 @@ docker compose up -d   # → http://localhost:3000
 
 Your repositories, database, credentials, provider accounts, and billing stay with you. Bring your own LLM keys.
 
-### Waynode Cloud — managed hosting
+### Waynode Cloud: managed hosting
 
 The same open-source workspace, managed: updates, isolated workspaces, encrypted secrets, backups, support. Every new organization gets a 15-day free trial.
 
@@ -38,10 +38,10 @@ Web checkout is powered by Stripe.
 
 ## For AI assistants
 
-- Every HTML page on this site has a markdown twin — append `.md` to the URL.
-- [/llms.txt](/llms.txt) — index of all agent-readable content
-- [/llms-full.txt](/llms-full.txt) — every article concatenated
-- [/learn.md](/learn.md) — guides and comparisons index
+- Every HTML page on this site has a markdown twin: append `.md` to the URL.
+- [/llms.txt](/llms.txt): index of all agent-readable content
+- [/llms-full.txt](/llms-full.txt): every article concatenated
+- [/learn.md](/learn.md): guides and comparisons index
 
 ## Links
 

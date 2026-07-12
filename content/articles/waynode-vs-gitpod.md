@@ -1,6 +1,6 @@
 ---
 title: Waynode vs Gitpod (Ona)
-description: How Waynode's self-hosted persistent agent workspaces compare with Ona (formerly Gitpod) — product, pricing, self-hosting, and the OpenAI acquisition.
+description: How Waynode's self-hosted persistent agent workspaces compare with Ona (formerly Gitpod): product, pricing, self-hosting, and the OpenAI acquisition.
 category: compare
 slug: waynode-vs-gitpod
 date: 2026-07-12
@@ -23,7 +23,7 @@ Gitpod no longer exists as a standalone product: it rebranded to Ona in Septembe
 
 ## What happened to Gitpod?
 
-Gitpod spent years as a cloud development environment (CDE) product — one-click, ephemeral workspaces for humans. On September 2, 2025 the company [rebranded to Ona](https://ona.com/stories/gitpod-is-now-ona) and repositioned around three components: **Ona Agents** (software-engineering agents managed through a conversational interface, browser VS Code, or desktop IDEs), **Ona Environments** (ephemeral, sandboxed cloud workspaces configured via `devcontainer.json` and `automations.yml`), and **Ona Guardrails** (enterprise controls: RBAC, SSO/OIDC, command deny lists, audit trails, VPC deployment).
+Gitpod spent years as a cloud development environment (CDE) product: one-click, ephemeral workspaces for humans. On September 2, 2025 the company [rebranded to Ona](https://ona.com/stories/gitpod-is-now-ona) and repositioned around three components: **Ona Agents** (software-engineering agents managed through a conversational interface, browser VS Code, or desktop IDEs), **Ona Environments** (ephemeral, sandboxed cloud workspaces configured via `devcontainer.json` and `automations.yml`), and **Ona Guardrails** (enterprise controls: RBAC, SSO/OIDC, command deny lists, audit trails, VPC deployment).
 
 The legacy product, "Gitpod Classic," [stopped accepting logins and new environments for pay-as-you-go users on October 15, 2025](https://ona.com/stories/gitpod-classic-payg-sunset). Migration required moving from `.gitpod.yml` to `devcontainer.json` and signing up for a new account at app.ona.com; enterprise customers received custom migration timelines.
 
@@ -31,7 +31,7 @@ Then, on June 11, 2026, [OpenAI announced it is acquiring Ona](https://siliconan
 
 ## What is Waynode?
 
-[Waynode](https://github.com/fornace/waynode) is an open-source (MIT), self-hosted coding-agent workspace. Each workspace ("space") is a **real cloned Git repository on disk** — a persistent worktree, not a disposable task container. The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs; you can chat with the agent, send it an autonomous goal, or open a full terminal in the workspace.
+[Waynode](https://github.com/fornace/waynode) is an open-source (MIT), self-hosted coding-agent workspace. Each workspace ("space") is a **real cloned Git repository on disk**, a persistent worktree, not a disposable task container. The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs; you can chat with the agent, send it an autonomous goal, or open a full terminal in the workspace.
 
 Two properties distinguish it from the CDE lineage Gitpod came from:
 
@@ -59,15 +59,15 @@ Waynode connects to GitHub and GitLab via OAuth, and a sandboxed microVM executi
 
 They meter different things. Ona bills in **Ona Compute Units (OCUs)**, a normalized measure covering both agent token usage and infrastructure: roughly 1 OCU for a small codebase explanation, 1 OCU for one hour of a standard VM, 7 OCUs/hour for a GPU VM. There is a Free tier (3 parallel environments, up to 4 vCPU); Core starts at $20/month with 80–2,200 OCUs included depending on configuration; add-ons cost from $10 per 40 OCUs; Enterprise is custom ([ona.com/pricing](https://ona.com/pricing)).
 
-Waynode hosted plans bundle seats, agent tokens, and storage at a flat rate: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations (5M trial tokens, 2 GB storage, 1 seat). Self-hosting is free under MIT — you pay only your own infrastructure and model API keys.
+Waynode hosted plans bundle seats, agent tokens, and storage at a flat rate: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations (5M trial tokens, 2 GB storage, 1 seat). Self-hosting is free under MIT; you pay only your own infrastructure and model API keys.
 
-If your workload is bursty compute (big builds, GPU jobs), Ona's usage metering can be efficient. If your workload is sustained agent work on repositories, flat per-seat pricing — or free self-hosting with your own keys — is easier to forecast.
+If your workload is bursty compute (big builds, GPU jobs), Ona's usage metering can be efficient. If your workload is sustained agent work on repositories, flat per-seat pricing (or free self-hosting with your own keys) is easier to forecast.
 
 ## Is there a self-hosted Gitpod alternative?
 
 This is the sharpest difference. Gitpod [dropped its free self-hosted product in December 2022](https://devclass.com/2022/12/09/gitpod-abandons-self-hosted-product-in-favor-of-dedicated-cloud/), and under Ona, self-hosting exists only as an **Enterprise** feature: a deployment inside your VPC on AWS or GCP, at custom pricing ([ona.com/pricing](https://ona.com/pricing)). There is no supported way for an individual or small team to run Ona on their own hardware.
 
-Waynode self-hosts by design: `git clone` the [repo](https://github.com/fornace/waynode), `cp .env.example .env`, `docker compose up -d`, open localhost:3000. Your repos, database, credentials, LLM keys, and billing stay with you; no hosted-billing code is active on self-host. If "self-hosted Gitpod alternative" is your search, note that you are really choosing between two categories — Waynode replaces the *agent workspace* part, not the full CDE feature set (fleet-scale ephemeral environments, standardized dev containers) that Gitpod was known for.
+Waynode self-hosts by design: `git clone` the [repo](https://github.com/fornace/waynode), `cp .env.example .env`, `docker compose up -d`, open localhost:3000. Your repos, database, credentials, LLM keys, and billing stay with you; no hosted-billing code is active on self-host. If "self-hosted Gitpod alternative" is your search, note that you are really choosing between two categories: Waynode replaces the *agent workspace* part, not the full CDE feature set (fleet-scale ephemeral environments, standardized dev containers) that Gitpod was known for.
 
 ## When is Ona the better choice?
 
@@ -78,7 +78,7 @@ Waynode self-hosts by design: `git clone` the [repo](https://github.com/fornace/
 
 ## When is Waynode the better choice?
 
-- **You want the workspace to outlive the task.** Waynode sessions — conversation, branches, terminal — persist between visits and across devices, versus Ona's ephemeral model.
+- **You want the workspace to outlive the task.** Waynode sessions (conversation, branches, terminal) persist between visits and across devices, versus Ona's ephemeral model.
 - **You want real self-hosting without an enterprise contract.** MIT license, Docker Compose, your keys.
 - **You review from a phone.** The same workspace, session, and diff render mobile-first; you can follow a live task, steer the agent, and push a reviewed change from a phone.
 - **You want vendor independence.** Gitpod users have absorbed a rebrand, a forced migration, a product sunset, and an acquisition announcement within ten months. An MIT-licensed stack you run yourself cannot be sunset out from under you.
@@ -106,4 +106,4 @@ Not exactly. Gitpod/Ona is built around ephemeral, fleet-scale dev environments 
 
 ### How do Waynode and Ona pricing models differ?
 
-Ona meters usage in Ona Compute Units covering agent tokens plus infrastructure (Core from $20/month with 80–2,200 OCUs included; add-ons from $10/40 OCUs). Waynode hosted plans are flat: $39, $99, or $249 per month for bundled seats, agent tokens, and storage — and self-hosting costs nothing beyond your own infrastructure and model keys.
+Ona meters usage in Ona Compute Units covering agent tokens plus infrastructure (Core from $20/month with 80–2,200 OCUs included; add-ons from $10/40 OCUs). Waynode hosted plans are flat: $39, $99, or $249 per month for bundled seats, agent tokens, and storage, and self-hosting costs nothing beyond your own infrastructure and model keys.

@@ -11,7 +11,7 @@ keywords: waynode vs cursor, cursor background agents alternative, cursor cloud 
 
 # Waynode vs Cursor background agents
 
-Cursor's background agents — now called Cloud Agents — run coding tasks in isolated VMs managed by Cursor and hand you back a branch or pull request; they are a feature of the Cursor IDE and its subscription. Waynode is an open-source (MIT), self-hosted workspace where the agent works inside a persistent clone of your repository, with the diff, branches, and terminal living beside the conversation on desktop and mobile. Choose Cursor if you live in its IDE and want managed fire-and-forget task execution; choose Waynode if you want the agent's workspace on your own infrastructure and a place you can return to from any device.
+Cursor's background agents (now called Cloud Agents) run coding tasks in isolated VMs managed by Cursor and hand you back a branch or pull request; they are a feature of the Cursor IDE and its subscription. Waynode is an open-source (MIT), self-hosted workspace where the agent works inside a persistent clone of your repository, with the diff, branches, and terminal living beside the conversation on desktop and mobile. Choose Cursor if you live in its IDE and want managed fire-and-forget task execution; choose Waynode if you want the agent's workspace on your own infrastructure and a place you can return to from any device.
 
 **TL;DR**
 
@@ -23,7 +23,7 @@ Cursor's background agents — now called Cloud Agents — run coding tasks in i
 
 ## What are Cursor background agents (Cloud Agents)?
 
-Cursor Cloud Agents — the current name for what launched as background agents — are asynchronous coding agents that run in isolated cloud VMs rather than on your laptop. An agent clones your repository from GitHub, GitLab, Azure DevOps, or Bitbucket Cloud, works on a separate branch, and pushes changes back to your repo, typically as a pull request ([Cursor Cloud Agent docs](https://cursor.com/docs/cloud-agent)).
+Cursor Cloud Agents, the current name for what launched as background agents, are asynchronous coding agents that run in isolated cloud VMs rather than on your laptop. An agent clones your repository from GitHub, GitLab, Azure DevOps, or Bitbucket Cloud, works on a separate branch, and pushes changes back to your repo, typically as a pull request ([Cursor Cloud Agent docs](https://cursor.com/docs/cloud-agent)).
 
 Agents can be started from the Cursor desktop IDE (selecting the "Cloud" option), from Cursor Web at cursor.com/agents, from the Cursor iOS app, from Slack, GitHub, Bitbucket, or Linear via `@cursor` mentions, or through an API. Execution environments are defined per repo through agent-led setup, saved snapshots, or a Dockerfile referenced from `.cursor/environment.json` ([Cursor docs](https://cursor.com/docs/cloud-agent)).
 
@@ -31,21 +31,21 @@ Billing is separate from the editor subscription's included usage: "Cloud Agents
 
 ## What is Waynode?
 
-Waynode is an open-source (MIT) coding-agent workspace you host yourself. Each workspace — a "space" — is a real cloned Git repository on disk: a persistent worktree, not a disposable task container. The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs; you can chat with the agent, send it an autonomous goal, or open a full terminal in the workspace.
+Waynode is an open-source (MIT) coding-agent workspace you host yourself. Each workspace, called a "space", is a real cloned Git repository on disk: a persistent worktree, not a disposable task container. The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs; you can chat with the agent, send it an autonomous goal, or open a full terminal in the workspace.
 
-The Git surface is agent-native: changed files, hunks, diffs, commits, branches, and push live beside the conversation, so "done" means ready for review rather than merely finished running. Sessions persist — conversation, files, branches, and terminal state survive between visits, so you can start at your desk and resume from a phone. Repo providers are GitHub and GitLab via OAuth. Source: [github.com/fornace/waynode](https://github.com/fornace/waynode).
+The Git surface is agent-native: changed files, hunks, diffs, commits, branches, and push live beside the conversation, so "done" means ready for review rather than merely finished running. Sessions persist: conversation, files, branches, and terminal state survive between visits, so you can start at your desk and resume from a phone. Repo providers are GitHub and GitLab via OAuth. Source: [github.com/fornace/waynode](https://github.com/fornace/waynode).
 
-There are two ways to run it. Self-hosting is free: `git clone`, `cp .env.example .env`, `docker compose up -d`, open localhost:3000; your repos, database, credentials, LLM keys, and billing stay with you. Waynode Cloud is managed hosting of the same open-source stack — Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations.
+There are two ways to run it. Self-hosting is free: `git clone`, `cp .env.example .env`, `docker compose up -d`, open localhost:3000; your repos, database, credentials, LLM keys, and billing stay with you. Waynode Cloud is managed hosting of the same open-source stack: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations.
 
 ## Where does the code actually run?
 
 This is the sharpest difference between the two.
 
-With Cursor Cloud Agents, the default is Cursor-managed VMs. Cursor does offer self-hosted execution modes — "My Machines" for individuals and "Self-Hosted Pool" for Enterprise teams — but these delegate only tool execution (terminal commands, file edits, browser actions) to your infrastructure. Agent orchestration and model inference remain on Cursor's servers, and "file chunks the model reads during inference" are still sent to Cursor. As the docs put it, self-hosted pools "do not move the agent loop out of Cursor's cloud." Self-Hosted Pool additionally requires an Enterprise plan, with capacity limits of 10 workers per user and 50 per team ([Cursor self-hosted docs](https://cursor.com/docs/cloud-agent/self-hosted)).
+With Cursor Cloud Agents, the default is Cursor-managed VMs. Cursor does offer self-hosted execution modes ("My Machines" for individuals and "Self-Hosted Pool" for Enterprise teams), but these delegate only tool execution (terminal commands, file edits, browser actions) to your infrastructure. Agent orchestration and model inference remain on Cursor's servers, and "file chunks the model reads during inference" are still sent to Cursor. As the docs put it, self-hosted pools "do not move the agent loop out of Cursor's cloud." Self-Hosted Pool additionally requires an Enterprise plan, with capacity limits of 10 workers per user and 50 per team ([Cursor self-hosted docs](https://cursor.com/docs/cloud-agent/self-hosted)).
 
-With self-hosted Waynode, the entire stack runs on your infrastructure — the web app, the workspaces, the Git credentials, and the database. You bring your own model keys, so inference goes to whichever provider you choose under your own account. No Stripe or hosted-billing code is active on self-host. A sandboxed microVM execution path exists when KVM is available. If you want someone else to run it, Waynode Cloud hosts the same stack with isolated workspaces, encrypted secrets, and backups.
+With self-hosted Waynode, the entire stack runs on your infrastructure: the web app, the workspaces, the Git credentials, and the database. You bring your own model keys, so inference goes to whichever provider you choose under your own account. No Stripe or hosted-billing code is active on self-host. A sandboxed microVM execution path exists when KVM is available. If you want someone else to run it, Waynode Cloud hosts the same stack with isolated workspaces, encrypted secrets, and backups.
 
-In short: Cursor's "self-hosted" is hybrid — your machines execute, Cursor's cloud orchestrates and does inference. Waynode's self-hosted is the whole product.
+In short: Cursor's "self-hosted" is hybrid: your machines execute, Cursor's cloud orchestrates and does inference. Waynode's self-hosted is the whole product.
 
 ## Comparison table
 
@@ -64,13 +64,13 @@ In short: Cursor's "self-hosted" is hybrid — your machines execute, Cursor's c
 
 ## Where Cursor is the better choice
 
-Cursor is first an IDE, and its agents benefit from that. If your team already writes code in Cursor, Cloud Agents are one click away in the editor and can be triggered from Slack, Linear, GitHub, and Bitbucket ([docs](https://cursor.com/docs/cloud-agent)). The managed VMs come with full development environments — infrastructure you never have to operate. Support for Azure DevOps and Bitbucket Cloud is broader than Waynode's GitHub/GitLab. For fire-and-forget tasks with a clear definition of done — "add tests, run them, open a PR" — a managed per-task VM is exactly the right shape, and you review the result as an ordinary pull request.
+Cursor is first an IDE, and its agents benefit from that. If your team already writes code in Cursor, Cloud Agents are one click away in the editor and can be triggered from Slack, Linear, GitHub, and Bitbucket ([docs](https://cursor.com/docs/cloud-agent)). The managed VMs come with full development environments, infrastructure you never have to operate. Support for Azure DevOps and Bitbucket Cloud is broader than Waynode's GitHub/GitLab. For fire-and-forget tasks with a clear definition of done ("add tests, run them, open a PR"), a managed per-task VM is exactly the right shape, and you review the result as an ordinary pull request.
 
 ## Where Waynode is the better choice
 
-Waynode fits when the constraint is ownership or the workflow is longer than one task. If code cannot leave your infrastructure, self-hosted Waynode keeps everything — including which model provider sees your code — under your control, which Cursor's hybrid modes do not. If a piece of work spans days, a persistent worktree beats a fresh VM per task: the branch, the conversation, and the terminal state are still there when you come back. And if you review on the move, Waynode's mobile surface is built around the diff itself — follow a live task, read changed files hunk by hunk, steer the agent, and push a reviewed change from a phone. See [/learn](/learn) for the underlying model.
+Waynode fits when the constraint is ownership or the workflow is longer than one task. If code cannot leave your infrastructure, self-hosted Waynode keeps everything, including which model provider sees your code, under your control, which Cursor's hybrid modes do not. If a piece of work spans days, a persistent worktree beats a fresh VM per task: the branch, the conversation, and the terminal state are still there when you come back. And if you review on the move, Waynode's mobile surface is built around the diff itself: follow a live task, read changed files hunk by hunk, steer the agent, and push a reviewed change from a phone. See [/learn](/learn) for the underlying model.
 
-The honest caveat in the other direction: Waynode is not an IDE. If you want tab completion and in-editor agents while you type, Cursor does that and Waynode does not try to. Some teams run both — Cursor as the editor, Waynode as the durable place where longer agent work lives.
+The honest caveat in the other direction: Waynode is not an IDE. If you want tab completion and in-editor agents while you type, Cursor does that and Waynode does not try to. Some teams run both: Cursor as the editor, Waynode as the durable place where longer agent work lives.
 
 ## FAQ
 
@@ -84,7 +84,7 @@ Cloud Agents are billed at API pricing for the selected model, on top of a Curso
 
 ### Is Waynode a replacement for the Cursor IDE?
 
-No. Waynode is a workspace for agent-driven work — chat, autonomous goals, terminal, and Git review in one place — not an editor with completions. Teams can use Cursor for in-editor coding and Waynode for persistent, self-hosted agent sessions.
+No. Waynode is a workspace for agent-driven work (chat, autonomous goals, terminal, and Git review in one place), not an editor with completions. Teams can use Cursor for in-editor coding and Waynode for persistent, self-hosted agent sessions.
 
 ### Do Cursor agents keep a persistent workspace between tasks?
 

@@ -11,7 +11,7 @@ keywords: coding agent mobile, run claude code from phone, review code on phone 
 
 # Running coding agents from your phone
 
-You can run coding agents from a phone because the agent does not run *on* the phone: it runs in a cloud workspace or on a machine you own, and the phone is the surface where you start tasks, follow progress, review diffs, and approve or redirect the work. The major agent vendors ship some version of this today — Claude Code on the web monitored from the Claude mobile app, OpenAI Codex in the ChatGPT app, GitHub Copilot's cloud agent in GitHub Mobile, Cursor's cloud agents via an iOS app and mobile web — and self-hosted tools like Waynode do the same against your own infrastructure.
+You can run coding agents from a phone because the agent does not run *on* the phone: it runs in a cloud workspace or on a machine you own, and the phone is the surface where you start tasks, follow progress, review diffs, and approve or redirect the work. The major agent vendors ship some version of this today (Claude Code on the web monitored from the Claude mobile app, OpenAI Codex in the ChatGPT app, GitHub Copilot's cloud agent in GitHub Mobile, Cursor's cloud agents via an iOS app and mobile web), and self-hosted tools like Waynode do the same against your own infrastructure.
 
 **TL;DR**
 
@@ -23,15 +23,15 @@ You can run coding agents from a phone because the agent does not run *on* the p
 
 ## Why does mobile matter for agent-driven development?
 
-Because the economics of coding agents are asynchronous. An agent given a well-scoped task works for minutes to hours without needing you; the human's job compresses into short, bursty interventions — read the plan, glance at the diff, answer a question, approve a push. None of those interventions requires a keyboard or a 27-inch monitor. They require the same things a messaging app requires: a readable thread, a notification, and a couple of buttons.
+Because the economics of coding agents are asynchronous. An agent given a well-scoped task works for minutes to hours without needing you; the human's job compresses into short, bursty interventions: read the plan, glance at the diff, answer a question, approve a push. None of those interventions requires a keyboard or a 27-inch monitor. They require the same things a messaging app requires: a readable thread, a notification, and a couple of buttons.
 
-This inverts the old assumption that mobile coding is a gimmick. Writing code on a phone remains impractical. But in an agent workflow you are rarely writing code — you are reviewing it, and review latency is what actually gates throughput. If an agent finishes a task at 6:40 pm and you don't see it until 9 am, the agent's speed bought you nothing. If you can approve or redirect from the train, the loop keeps moving.
+This inverts the old assumption that mobile coding is a gimmick. Writing code on a phone remains impractical. But in an agent workflow you are rarely writing code; you are reviewing it, and review latency is what actually gates throughput. If an agent finishes a task at 6:40 pm and you don't see it until 9 am, the agent's speed bought you nothing. If you can approve or redirect from the train, the loop keeps moving.
 
 ## What does a good mobile agent workflow need?
 
 Four capabilities, in decreasing order of how often you use them:
 
-1. **Live task following.** A stream of what the agent is doing right now — commands run, files touched, reasoning summaries — that survives you locking the phone and coming back.
+1. **Live task following.** A stream of what the agent is doing right now (commands run, files touched, reasoning summaries) that survives you locking the phone and coming back.
 2. **Diff review.** File-by-file, hunk-by-hunk changes rendered legibly on a small screen. A wall of unified diff in a chat bubble does not count; you need changed-file lists you can drill into.
 3. **Steering.** The ability to send a correction mid-task ("use the existing retry helper, don't write a new one") and have it land in the same session, not spawn a fresh context-free run.
 4. **Push and hand-off.** Notification when the agent finishes or blocks, and a way to either finish the loop on the phone (approve, push, open a PR) or pick up the exact session later at a desk.
@@ -48,9 +48,9 @@ Verified against vendor documentation as of July 2026:
 | OpenAI Codex | ChatGPT app (iOS/Android) | Yes | Yes, incl. filtered diffs (staged, branch, last-turn) | Yes | Codex Remote (GA June 2026) pairs the phone to a Mac/Windows host via one-to-one QR pairing, to start or continue work, review progress, and approve actions ([changelog](https://developers.openai.com/codex/changelog)) |
 | GitHub Copilot cloud agent | GitHub Mobile | Yes | Yes, as branch diffs before a PR is opened | Yes, iterate on the branch, open the PR when ready | Can research the codebase and generate an implementation plan before writing code ([changelog](https://github.blog/changelog/2026-04-08-github-mobile-research-and-code-with-copilot-cloud-agent-anywhere/)); requires a paid Copilot plan ([docs](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent)) |
 | Cursor cloud agents | iOS app; cursor.com/agents web/PWA | Yes | Yes | Yes | Agents run in isolated VMs, produce PRs with screenshots and logs; Android via PWA ([docs](https://cursor.com/docs/cloud-agents)) |
-| Waynode (self-hosted or cloud) | Mobile web, same workspace as desktop | Yes (chat or autonomous goal) | Yes — files, hunks, commits, branches beside the conversation | Yes, same persistent session | Open source (MIT); agent works in a real cloned Git repository that persists between visits |
+| Waynode (self-hosted or cloud) | Mobile web, same workspace as desktop | Yes (chat or autonomous goal) | Yes: files, hunks, commits, branches beside the conversation | Yes, same persistent session | Open source (MIT); agent works in a real cloned Git repository that persists between visits |
 
-The hosted tools share a design: ephemeral or vendor-managed execution environments, with GitHub as the hand-off point (the agent's output is a branch or PR). That works well when your workflow already terminates in a PR. It works less well when you want the workspace itself — the checkout, the branch state, the terminal history — to persist and be revisitable from any device.
+The hosted tools share a design: ephemeral or vendor-managed execution environments, with GitHub as the hand-off point (the agent's output is a branch or PR). That works well when your workflow already terminates in a PR. It works less well when you want the workspace itself (the checkout, the branch state, the terminal history) to persist and be revisitable from any device.
 
 ## How does Waynode handle the mobile workflow?
 
@@ -63,7 +63,7 @@ Waynode's unit is a **space**: a real cloned Git repository on disk, persistent 
 
 Because sessions persist, the desk-to-phone hand-off is simple: start a task at your desk, check the diff from your phone an hour later, resume in a terminal the next morning. Native macOS and iOS clients are planned (a native app exists in the repository).
 
-You can self-host it for free (`git clone` → `docker compose up -d`; MIT-licensed, your repos and LLM keys stay on your infrastructure — see the [self-hosting guide](/guides/self-host-coding-agent-docker)) or use [Waynode Cloud](https://waynode.fornace.net), the managed version of the same stack, from $39/month with a 15-day free trial. For the broader self-hosted-versus-hosted decision, see [self-hosted vs cloud coding agents](/guides/self-hosted-vs-cloud-coding-agents); for a direct comparison with a hosted agent product, see [Waynode vs Cursor background agents](/compare/waynode-vs-cursor-background-agents).
+You can self-host it for free (`git clone` → `docker compose up -d`; MIT-licensed, your repos and LLM keys stay on your infrastructure; see the [self-hosting guide](/guides/self-host-coding-agent-docker)) or use [Waynode Cloud](https://waynode.fornace.net), the managed version of the same stack, from $39/month with a 15-day free trial. For the broader self-hosted-versus-hosted decision, see [self-hosted vs cloud coding agents](/guides/self-hosted-vs-cloud-coding-agents); for a direct comparison with a hosted agent product, see [Waynode vs Cursor background agents](/compare/waynode-vs-cursor-background-agents).
 
 ## What can't you realistically do from a phone?
 
@@ -72,7 +72,7 @@ Candidly, a fair amount:
 - **Deep debugging.** Stepping through a failure, reading long stack traces, and cross-referencing five files does not fit a 6-inch screen. Waynode exposes a full terminal in the workspace, and Codex Remote can drive a paired desktop host, but a terminal on a phone is an escape hatch, not a workflow.
 - **Large-diff review.** A 40-file refactor should not be approved from a phone. Mobile review works for the shape of a change and for small-to-medium diffs; big changes deserve a desk.
 - **Writing significant code yourself.** If the agent's output is wrong enough that you need to write the fix, that is a signal to defer, not to thumb-type a patch.
-- **Initial task scoping for complex work.** Well-scoped tasks come from context — reading the code, checking the issue history. Phones are for dispatching tasks you already understand.
+- **Initial task scoping for complex work.** Well-scoped tasks come from context: reading the code, checking the issue history. Phones are for dispatching tasks you already understand.
 
 The honest framing: mobile turns agent downtime into progress by removing review latency. It does not replace the desk; it makes the time between desks productive.
 

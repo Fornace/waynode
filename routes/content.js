@@ -171,7 +171,7 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script
 </header>
 <main>${bodyHtml}</main>
 <footer class="site">
-  Waynode — open-source, self-hosted coding-agent workspaces.
+  Waynode: open-source, self-hosted coding-agent workspaces.
   <div><a href="/">Home</a><a href="/learn">Learn</a><a href="/index.md">Home (markdown)</a><a href="/llms-full.txt">llms-full.txt</a></div>
 </footer>
 </body>
@@ -221,7 +221,7 @@ function articleJsonLd(a) {
 // Every .md response opens with a discovery pointer so an agent landing on
 // one page can find the whole corpus (the Resend pattern).
 function mdWithPointer(md) {
-  return `> Full index of Waynode's agent-readable content: ${siteUrl()}/llms.txt — fetch it to discover every page.\n\n${md}`;
+  return `> Full index of Waynode's agent-readable content: ${siteUrl()}/llms.txt (fetch it to discover every page).\n\n${md}`;
 }
 
 // Content negotiation: a client that asks for text/markdown on an HTML page
@@ -244,19 +244,19 @@ router.get("/learn", (req, res) => {
       `<a class="card" href="${a.path}"><b>${esc(a.title)}</b><span>${esc(a.description)}</span></a>`).join("")}</div>`;
   }).join("");
   res.type("html").send(pageShell({
-    title: "Waynode — Guides & Comparisons",
+    title: "Waynode Guides & Comparisons",
     description: "Guides and comparisons for self-hosted, persistent coding-agent workspaces: Waynode vs Codespaces, Devin, Cursor, and more.",
     canonicalPath: "/learn",
     mdPath: "/learn.md",
     jsonLd: null,
-    bodyHtml: `<article><h1>Guides &amp; comparisons</h1><p>Everything about persistent, self-hosted coding-agent workspaces — and how Waynode compares to the rest of the ecosystem. Every page has a <a href="/llms.txt">markdown twin for LLMs</a>.</p>${sections}</article>`,
+    bodyHtml: `<article><h1>Guides &amp; comparisons</h1><p>Everything about persistent, self-hosted coding-agent workspaces, and how Waynode compares to the rest of the ecosystem. Every page has a <a href="/llms.txt">markdown twin for LLMs</a>.</p>${sections}</article>`,
   }));
 });
 
 router.get("/learn.md", (req, res) => {
   const base = siteUrl();
   const articles = allArticles();
-  const lines = ["# Waynode — Guides & Comparisons", ""];
+  const lines = ["# Waynode Guides & Comparisons", ""];
   for (const [key, cat] of Object.entries(CATEGORIES)) {
     const items = articles.filter((a) => a.category === key);
     if (!items.length) continue;
@@ -279,7 +279,7 @@ for (const category of Object.keys(CATEGORIES)) {
     const byline = [a.author && `By ${esc(a.author)}`, a.updated && `Updated ${esc(a.updated)}`].filter(Boolean).join(" · ");
     const dateLine = byline ? `<p class="meta">${byline} · <a href="${a.path}.md">Markdown version</a></p>` : "";
     res.type("html").send(pageShell({
-      title: `${a.title} — Waynode`,
+      title: `${a.title} | Waynode`,
       description: a.description,
       canonicalPath: a.path,
       mdPath: `${a.path}.md`,

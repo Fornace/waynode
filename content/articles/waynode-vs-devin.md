@@ -19,7 +19,7 @@ Devin is a hosted autonomous AI software engineer from Cognition: you hand it a 
 - **Waynode** is MIT-licensed software: `docker compose up -d`, your repos, your database, your LLM keys. A managed Waynode Cloud tier exists (Starter $39/mo, Pro $99/mo, Team $249/mo) for teams that want the same stack hosted.
 - Devin's workspace is a task-scoped session on Cognition's infrastructure; Waynode's workspace is a persistent Git worktree on disk that survives between visits and devices.
 - Devin cannot be self-hosted; Waynode's self-hosted deployment is the primary, free way to run it.
-- Pick Devin for hands-off delegation with zero operations. Pick Waynode for code custody, model choice, and a durable place to work with an agent — including from a phone.
+- Pick Devin for hands-off delegation with zero operations. Pick Waynode for code custody, model choice, and a durable place to work with an agent, including from a phone.
 
 ## What is Devin?
 
@@ -31,9 +31,9 @@ In April 2026 Cognition retired the earlier Core ($20 pay-as-you-go) and Team ($
 
 ## What is Waynode?
 
-Waynode is an open-source (MIT), self-hosted coding-agent workspace ([GitHub](https://github.com/fornace/waynode)). Each workspace — a "space" — is a real cloned Git repository on disk: a persistent worktree, not a disposable task container. The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs. You can chat with the agent, hand it an autonomous goal, or open a full terminal in the workspace.
+Waynode is an open-source (MIT), self-hosted coding-agent workspace ([GitHub](https://github.com/fornace/waynode)). Each workspace (a "space") is a real cloned Git repository on disk: a persistent worktree, not a disposable task container. The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs. You can chat with the agent, hand it an autonomous goal, or open a full terminal in the workspace.
 
-Git is the primary surface: changed files, hunks, diffs, commits, branches, and push sit beside the conversation, so "done" means ready for review rather than merely finished running. Sessions persist — conversation, files, branches, and terminal state survive between visits, and the same workspace, session, and diff work on a phone. GitHub and GitLab connect via OAuth.
+Git is the primary surface: changed files, hunks, diffs, commits, branches, and push sit beside the conversation, so "done" means ready for review rather than merely finished running. Sessions persist: conversation, files, branches, and terminal state survive between visits, and the same workspace, session, and diff work on a phone. GitHub and GitLab connect via OAuth.
 
 Two ways to run it:
 
@@ -46,7 +46,7 @@ Two ways to run it:
 |---|---|---|
 | Model | Open-source software you run (plus optional managed cloud) | Hosted product only |
 | License | MIT | Proprietary |
-| Self-hosting | Yes — primary deployment path, free | No self-serve option; Enterprise lists a "dedicated deployment option" ([pricing](https://devin.ai/pricing/)) |
+| Self-hosting | Yes, the primary deployment path, free | No self-serve option; Enterprise lists a "dedicated deployment option" ([pricing](https://devin.ai/pricing/)) |
 | Where the agent works | A persistent Git worktree on your infrastructure | A session VM on Cognition's infrastructure |
 | Workspace lifetime | Persists between visits and devices | Task/session-scoped |
 | Interaction | Chat, autonomous goals, full terminal, Git panel; mobile web | Web app, Slack/Teams, CLI; shell/IDE/browser inside the session ([docs](https://docs.devin.ai/get-started/devin-intro)) |
@@ -61,7 +61,7 @@ Two ways to run it:
 
 The models are hard to compare line-by-line because they meter different things.
 
-Devin's self-serve plans bundle a usage quota that refreshes automatically; when you exceed it, overages are billed at API pricing that varies by model and task complexity ([devin.ai/pricing](https://devin.ai/pricing/)). Heavy autonomous use is therefore variable-cost by design — the April 2026 restructure lowered the team entry point from $500/mo to $80/mo but kept consumption billing underneath ([Cognition](https://cognition.com/blog/new-self-serve-plans-for-devin)).
+Devin's self-serve plans bundle a usage quota that refreshes automatically; when you exceed it, overages are billed at API pricing that varies by model and task complexity ([devin.ai/pricing](https://devin.ai/pricing/)). Heavy autonomous use is therefore variable-cost by design: the April 2026 restructure lowered the team entry point from $500/mo to $80/mo but kept consumption billing underneath ([Cognition](https://cognition.com/blog/new-self-serve-plans-for-devin)).
 
 Self-hosted Waynode has no software cost at all: you pay your own LLM API bills and server costs directly, with no markup and no intermediary metering. Waynode Cloud uses flat monthly tiers with included token allowances ($39/$99/$249). If your organization's constraint is predictable spend or the ability to route work to cheap or local models, self-hosting is the structural answer rather than a plan choice.
 
@@ -69,19 +69,19 @@ Self-hosted Waynode has no software cost at all: you pay your own LLM API bills 
 
 This is the core architectural difference, more than any feature.
 
-With Devin, your code is cloned into Cognition's session VMs, the models are Cognition's, and the workspace exists for the duration of the task. That is precisely what makes it zero-operations: environment blueprints, VM provisioning, and model routing are all someone else's job. The trade-off is that the entire loop — code, credentials, execution — runs on infrastructure you don't operate, and the public docs don't detail self-hosting; a dedicated deployment is an Enterprise conversation.
+With Devin, your code is cloned into Cognition's session VMs, the models are Cognition's, and the workspace exists for the duration of the task. That is precisely what makes it zero-operations: environment blueprints, VM provisioning, and model routing are all someone else's job. The trade-off is that the entire loop (code, credentials, execution) runs on infrastructure you don't operate, and the public docs don't detail self-hosting; a dedicated deployment is an Enterprise conversation.
 
-With Waynode, the workspace is a directory on a machine you control. The session secret and encryption key are operator-owned, OAuth apps are configured per deployment, and a sandboxed microVM execution path exists when KVM is available. The agent's work is ordinary Git state you can inspect with any tool. The trade-off runs the other way: you operate it — Docker, updates, keys — and you don't get Devin's managed extras like orchestrated fleets of agents or a turnkey PR-review product.
+With Waynode, the workspace is a directory on a machine you control. The session secret and encryption key are operator-owned, OAuth apps are configured per deployment, and a sandboxed microVM execution path exists when KVM is available. The agent's work is ordinary Git state you can inspect with any tool. The trade-off runs the other way: you operate it (Docker, updates, keys), and you don't get Devin's managed extras like orchestrated fleets of agents or a turnkey PR-review product.
 
 ## When should you pick Devin?
 
-Pick Devin if you want delegation with no infrastructure: tag an agent from Slack on a bug, have it open a PR, and review the result. Its multi-session orchestration, Devin Review, and integrations (Jira, Linear, Azure DevOps, MCP connectors — see the [release notes](https://docs.devin.ai/release-notes/overview)) are mature managed features Waynode does not offer. If your team's bottleneck is a backlog of small, well-scoped tasks and you're comfortable with code executing on Cognition's cloud under consumption billing, Devin is built for exactly that.
+Pick Devin if you want delegation with no infrastructure: tag an agent from Slack on a bug, have it open a PR, and review the result. Its multi-session orchestration, Devin Review, and integrations (Jira, Linear, Azure DevOps, MCP connectors; see the [release notes](https://docs.devin.ai/release-notes/overview)) are mature managed features Waynode does not offer. If your team's bottleneck is a backlog of small, well-scoped tasks and you're comfortable with code executing on Cognition's cloud under consumption billing, Devin is built for exactly that.
 
 ## When should you pick Waynode?
 
-Pick Waynode if you need the agent to work inside infrastructure you own — for code custody, model choice (including local or low-cost models), or cost control — or if you want a durable workspace rather than task-scoped sessions: start a change at your desk, follow the live task from your phone, review the diff, and push, all in the same persistent space. It is also the practical option if you specifically want an open-source, self-hosted alternative in this category; Devin has no equivalent self-serve deployment.
+Pick Waynode if you need the agent to work inside infrastructure you own, whether for code custody, model choice (including local or low-cost models), or cost control, or if you want a durable workspace rather than task-scoped sessions: start a change at your desk, follow the live task from your phone, review the diff, and push, all in the same persistent space. It is also the practical option if you specifically want an open-source, self-hosted alternative in this category; Devin has no equivalent self-serve deployment.
 
-For the broader landscape — cloud agents like Claude Code and Codex, and cloud dev environments like Codespaces and Coder — see [/learn](/learn).
+For the broader landscape (cloud agents like Claude Code and Codex, and cloud dev environments like Codespaces and Coder), see [/learn](/learn).
 
 ## FAQ
 
@@ -99,7 +99,7 @@ As of the April 2026 restructure: Free, Pro $20/mo, Max $200/mo, Teams $80/mo pl
 
 ### How much does Waynode cost?
 
-Self-hosting is free under the MIT license — you pay only your own LLM API and server costs. Waynode Cloud, the managed option, is $39/mo (Starter), $99/mo (Pro), or $249/mo (Team), with a 15-day free trial for new organizations.
+Self-hosting is free under the MIT license; you pay only your own LLM API and server costs. Waynode Cloud, the managed option, is $39/mo (Starter), $99/mo (Pro), or $249/mo (Team), with a 15-day free trial for new organizations.
 
 ### Do Waynode and Devin work with the same repo hosts?
 

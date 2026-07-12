@@ -25,7 +25,7 @@ export function LandingPage() {
         <div className="launch-hero-copy">
           <div className="launch-kicker"><i /> Your codebase, ready wherever you are</div>
           <h1>Leave the laptop.<br /><em>Not the worktree.</em></h1>
-          <p>Waynode gives coding work a real, persistent Git workspace. Start a task at your desk, inspect the diff on your phone, and finish it from any device—with the repository, terminal, and conversation still there.</p>
+          <p>Waynode gives coding work a real, persistent Git workspace. Start a task at your desk, inspect the diff on your phone, and finish it from any device, with the repository, terminal, and conversation still there.</p>
           <div className="launch-actions"><a className="launch-primary" href="#auth">Start free for 15 days <span>→</span></a><a className="launch-secondary" href="#how-it-works">See the workspace <span>↓</span></a></div>
           <div className="launch-hero-proof"><span><b>✓</b> Real cloned repositories</span><span><b>✓</b> GitHub &amp; GitLab</span><span><b>✓</b> Open source</span></div>
         </div>
@@ -49,7 +49,7 @@ export function LandingPage() {
       </section>
 
       <section className="launch-worktree-showcase">
-        <div className="launch-worktree-copy"><p className="launch-kicker">The worktree is the product</p><h2>See the agent’s work<br />before it leaves the repo.</h2><p>Every space has an inspectable Git surface. Changed files, hunks, commits, and push all live beside the conversation—so “done” means ready for review, not merely finished running.</p><a className="launch-text-link" href="#auth">Bring a repository to Waynode <span>→</span></a></div>
+        <div className="launch-worktree-copy"><p className="launch-kicker">The worktree is the product</p><h2>See the agent’s work<br />before it leaves the repo.</h2><p>Every space has an inspectable Git surface. Changed files, hunks, commits, and push all live beside the conversation, so “done” means ready for review, not merely finished running.</p><a className="launch-text-link" href="#auth">Bring a repository to Waynode <span>→</span></a></div>
         <GitWorktree />
       </section>
 

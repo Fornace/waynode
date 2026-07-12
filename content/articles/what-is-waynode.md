@@ -15,18 +15,18 @@ Waynode is an open-source (MIT), self-hosted **coding-agent workspace**: a place
 
 **TL;DR**
 
-- Each workspace ("space") is a **real cloned Git repository** on disk — a persistent worktree, not a disposable task container.
+- Each workspace ("space") is a **real cloned Git repository** on disk: a persistent worktree, not a disposable task container.
 - The agent engine is **pi** (open source), with **pi-codex-goal** for autonomous goal-driven runs. You can chat with the agent, send it an autonomous goal, or open a full terminal.
-- An **agent-native Git surface** — changed files, hunks, diffs, commits, branches, push — lives beside the conversation. "Done" means ready for review, not merely finished running.
+- An **agent-native Git surface** (changed files, hunks, diffs, commits, branches, push) lives beside the conversation. "Done" means ready for review, not merely finished running.
 - **Persistent, mobile-first sessions**: start at your desk, resume from a phone; the same workspace, session, and diff everywhere.
 - **Self-host free** (MIT, `docker compose up -d`) or **Waynode Cloud** from $39/mo with a 15-day free trial.
 - Source: [github.com/fornace/waynode](https://github.com/fornace/waynode).
 
 ## What problem does Waynode solve?
 
-Coding agents and cloud dev environments each solve part of the loop, but the loop itself is fragmented. Cloud agents such as [Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web) run tasks on Anthropic-managed cloud infrastructure — effective for firing off parallel tasks, but the environment belongs to the provider and is scoped to the session, not a durable workspace you own. Cloud dev environments such as [GitHub Codespaces](https://docs.github.com/billing/managing-billing-for-github-codespaces/about-billing-for-github-codespaces) or [Ona](https://ona.com/pricing) (formerly Gitpod) give you a full machine, but the agent workflow is not the organizing principle, and on Ona's Core tier environments auto-delete after 7 days of inactivity.
+Coding agents and cloud dev environments each solve part of the loop, but the loop itself is fragmented. Cloud agents such as [Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web) run tasks on Anthropic-managed cloud infrastructure. That is effective for firing off parallel tasks, but the environment belongs to the provider and is scoped to the session, not a durable workspace you own. Cloud dev environments such as [GitHub Codespaces](https://docs.github.com/billing/managing-billing-for-github-codespaces/about-billing-for-github-codespaces) or [Ona](https://ona.com/pricing) (formerly Gitpod) give you a full machine, but the agent workflow is not the organizing principle, and on Ona's Core tier environments auto-delete after 7 days of inactivity.
 
-Waynode sits in the gap: a **durable, self-hostable place** where an agent works in your actual repository, the work survives between sessions, and you can return from any device — desktop browser or phone — to review, steer, and push. It is not better at everything; it is specifically built for the review-and-return loop around agent work.
+Waynode sits in the gap: a **durable, self-hostable place** where an agent works in your actual repository, the work survives between sessions, and you can return from any device, desktop browser or phone, to review, steer, and push. It is not better at everything; it is specifically built for the review-and-return loop around agent work.
 
 ## How does Waynode work?
 
@@ -38,15 +38,15 @@ When you create a space, Waynode clones your repository (GitHub or GitLab, via O
 
 The agent inside each space is **pi**, an open-source engine, with **pi-codex-goal** handling autonomous goal-driven runs. Three interaction modes cover the spectrum of control:
 
-1. **Chat** — converse with the agent about the code, iteratively.
-2. **Goal** — hand the agent an autonomous objective and let it run.
-3. **Terminal** — open a full terminal in the workspace and do it yourself.
+1. **Chat**: converse with the agent about the code, iteratively.
+2. **Goal**: hand the agent an autonomous objective and let it run.
+3. **Terminal**: open a full terminal in the workspace and do it yourself.
 
 Because all three operate on the same persistent worktree, you can mix them freely: start a goal, watch it in chat, drop to the terminal to fix something by hand, then resume.
 
 ### The Git surface: "done" means reviewable
 
-Waynode treats Git as a first-class part of the agent UI, not an export step. Changed files, hunks, diffs, commits, branches, and push live beside the conversation. When an agent run finishes, what you see is a reviewable change — you inspect the diff, adjust, commit, and push from the same screen. The standard Waynode framing: **"done" means ready for review, not merely finished running.**
+Waynode treats Git as a first-class part of the agent UI, not an export step. Changed files, hunks, diffs, commits, branches, and push live beside the conversation. When an agent run finishes, what you see is a reviewable change: you inspect the diff, adjust, commit, and push from the same screen. The standard Waynode framing: **"done" means ready for review, not merely finished running.**
 
 ### Mobile: the same workspace on a phone
 
@@ -58,7 +58,7 @@ The same space, session, and diff render on a phone. In practice this means you 
 - **Teams with self-hosting requirements.** Repos, database, credentials, and LLM keys stay on your infrastructure. No Stripe or hosted-billing code is active on self-host.
 - **People who review agent output on the go.** The mobile-first session model is aimed at the "agent finished while I was away from my desk" moment.
 
-It is a weaker fit if you mainly want many short, parallel, fire-and-forget tasks with zero infrastructure — a managed cloud agent is simpler for that (see the comparison pages under [/learn](/learn) for specific matchups).
+It is a weaker fit if you mainly want many short, parallel, fire-and-forget tasks with zero infrastructure; a managed cloud agent is simpler for that (see the comparison pages under [/learn](/learn) for specific matchups).
 
 ## Self-host vs Waynode Cloud
 
@@ -87,7 +87,7 @@ These categories overlap but optimize for different things. Competitor figures b
 | [Ona](https://ona.com/pricing) (ex-Gitpod) | Agent + cloud dev environment | Managed environments; Core tier auto-deletes after 7 days idle | Enterprise VPC option | Core from $20/mo |
 | [Coder](https://coder.com/pricing) | Self-hosted dev environments | Template-provisioned workspaces on your infra | Yes (open source) | Free Community edition; Premium priced annually per user |
 
-Honest read: Devin and Claude Code are stronger for hands-off autonomous task volume on managed infrastructure. Codespaces, Ona, and Coder are stronger as general-purpose dev machines. Waynode's distinct offer is the combination — an agent-first workspace that is also a real, persistent repo you own, reachable from any device. Detailed matchups live under [/learn](/learn).
+Honest read: Devin and Claude Code are stronger for hands-off autonomous task volume on managed infrastructure. Codespaces, Ona, and Coder are stronger as general-purpose dev machines. Waynode's distinct offer is the combination: an agent-first workspace that is also a real, persistent repo you own, reachable from any device. Detailed matchups live under [/learn](/learn).
 
 ## How do I get started?
 
@@ -110,7 +110,7 @@ Yes. Waynode is MIT-licensed and free to self-host; your repos, database, creden
 
 ### What is a Waynode "space"?
 
-A space is a real cloned Git repository on disk — a persistent worktree where the agent works. Files, branches, conversation, and terminal state survive between visits, unlike disposable per-task containers.
+A space is a real cloned Git repository on disk: a persistent worktree where the agent works. Files, branches, conversation, and terminal state survive between visits, unlike disposable per-task containers.
 
 ### What AI agent does Waynode use?
 
@@ -118,8 +118,8 @@ Waynode runs the open-source **pi** engine, with **pi-codex-goal** for autonomou
 
 ### Does Waynode work on mobile?
 
-Yes. The same workspace, session, and diff are usable from a phone — you can follow a live task, review changed files, steer the agent, and push a reviewed change. Native macOS and iOS clients are planned.
+Yes. The same workspace, session, and diff are usable from a phone: you can follow a live task, review changed files, steer the agent, and push a reviewed change. Native macOS and iOS clients are planned.
 
 ### Which Git providers does Waynode support?
 
-GitHub and GitLab, connected via OAuth configured per deployment. The Git surface — diffs, commits, branches, push — is built into the workspace next to the agent conversation.
+GitHub and GitLab, connected via OAuth configured per deployment. The Git surface (diffs, commits, branches, push) is built into the workspace next to the agent conversation.

@@ -1,6 +1,6 @@
 ---
 title: Waynode vs OpenHands
-description: How Waynode's persistent Git workspace compares to OpenHands' agent platform — engines, self-hosting, UI, mobile, and pricing, with sources.
+description: How Waynode's persistent Git workspace compares to OpenHands' agent platform: engines, self-hosting, UI, mobile, and pricing, with sources.
 category: compare
 slug: waynode-vs-openhands
 date: 2026-07-12
@@ -27,22 +27,22 @@ OpenHands is an open-source AI software-development agent that began as OpenDevi
 
 The product today has several layers ([docs.openhands.dev](https://docs.openhands.dev/)):
 
-- **Agent SDK** — a composable Python library containing the agentic core; agents are defined in code and run locally or at scale.
-- **Agent Canvas** — a browser workspace started with a single `agent-canvas` command (npm or Docker). It runs the OpenHands agent out of the box and can also drive third-party agents such as Claude Code, Codex, and Gemini via the Agent-Client Protocol ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)).
-- **CLI and legacy GUI** — a terminal interface and an older Docker-based GUI.
-- **OpenHands Cloud** — managed hosting with deeper GitHub, GitLab, and Bitbucket integrations plus Slack, Jira, and Linear, multi-user support, and collaboration tools.
+- **Agent SDK**: a composable Python library containing the agentic core; agents are defined in code and run locally or at scale.
+- **Agent Canvas**: a browser workspace started with a single `agent-canvas` command (npm or Docker). It runs the OpenHands agent out of the box and can also drive third-party agents such as Claude Code, Codex, and Gemini via the Agent-Client Protocol ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)).
+- **CLI and legacy GUI**: a terminal interface and an older Docker-based GUI.
+- **OpenHands Cloud**: managed hosting with deeper GitHub, GitLab, and Bitbucket integrations plus Slack, Jira, and Linear, multi-user support, and collaboration tools.
 
 Sandboxed execution uses Docker; the Docker sandbox is the default and recommended isolation model for most users ([docs.openhands.dev/openhands/usage/sandboxes/docker](https://docs.openhands.dev/openhands/usage/sandboxes/docker)).
 
 ## What is Waynode?
 
-Waynode is an open-source (MIT), self-hosted coding-agent workspace ([github.com/fornace/waynode](https://github.com/fornace/waynode)). Each workspace ("space") is a real cloned Git repository on disk — a persistent worktree rather than a disposable task container. The agent engine is pi, with pi-codex-goal for autonomous goal-driven runs; you can chat with the agent, send it an autonomous goal, or open a full terminal in the workspace.
+Waynode is an open-source (MIT), self-hosted coding-agent workspace ([github.com/fornace/waynode](https://github.com/fornace/waynode)). Each workspace ("space") is a real cloned Git repository on disk, a persistent worktree rather than a disposable task container. The agent engine is pi, with pi-codex-goal for autonomous goal-driven runs; you can chat with the agent, send it an autonomous goal, or open a full terminal in the workspace.
 
 Its defining features:
 
-- **Agent-native Git surface** — changed files, hunks, diffs, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
-- **Persistent sessions** — conversation, files, branches, and terminal state survive between visits; start at your desk, resume from any device.
-- **Mobile-first** — the same workspace, session, and diff on a phone; macOS and iOS native clients are planned (a native app exists in the repo).
+- **Agent-native Git surface**: changed files, hunks, diffs, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
+- **Persistent sessions**: conversation, files, branches, and terminal state survive between visits; start at your desk, resume from any device.
+- **Mobile-first**: the same workspace, session, and diff on a phone; macOS and iOS native clients are planned (a native app exists in the repo).
 - **GitHub and GitLab** repo providers via OAuth.
 
 See [/learn](/learn) for the full product overview.
@@ -65,7 +65,7 @@ See [/learn](/learn) for the full product overview.
 
 ## Which agent engine do you get?
 
-OpenHands ships its own agent as a Python SDK — the same agentic core powers the CLI, Canvas, and Cloud — and Agent Canvas can additionally orchestrate third-party agents such as Claude Code, Codex, and Gemini via the Agent-Client Protocol ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)). If you want to define custom agents in code, evaluate them, or build automations on top of an agent framework, this is OpenHands' strongest territory.
+OpenHands ships its own agent as a Python SDK (the same agentic core powers the CLI, Canvas, and Cloud), and Agent Canvas can additionally orchestrate third-party agents such as Claude Code, Codex, and Gemini via the Agent-Client Protocol ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)). If you want to define custom agents in code, evaluate them, or build automations on top of an agent framework, this is OpenHands' strongest territory.
 
 Waynode does not ask you to build agents. It runs pi (open source) as the engine and pi-codex-goal for autonomous runs, and puts its effort into the surface around the agent: the persistent repo, the review-grade Git panel, the terminal, and session continuity. You configure model keys (self-host) or pick from hosted fast/reasoning/max tiers (Waynode Cloud) rather than programming agent behavior.
 
@@ -80,7 +80,7 @@ One licensing nuance: OpenHands' work is MIT-licensed except for the repository'
 
 ## What do the hosted offerings cost?
 
-OpenHands Cloud has a free Individual plan — one user, up to 10 daily conversations, bring your own LLM key or use OpenHands' provider at cost with no markup — and a custom-priced Enterprise plan with SAML/SSO, SaaS or self-hosted-in-your-VPC deployment, and unlimited concurrent conversations ([openhands.dev/pricing](https://www.openhands.dev/pricing)). There is no published mid-tier price between free and Enterprise as of July 2026.
+OpenHands Cloud has a free Individual plan (one user, up to 10 daily conversations, bring your own LLM key or use OpenHands' provider at cost with no markup) and a custom-priced Enterprise plan with SAML/SSO, SaaS or self-hosted-in-your-VPC deployment, and unlimited concurrent conversations ([openhands.dev/pricing](https://www.openhands.dev/pricing)). There is no published mid-tier price between free and Enterprise as of July 2026.
 
 Waynode Cloud is managed hosting of the same open-source stack: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations (5M trial tokens, 2 GB storage, 1 seat).
 
@@ -96,7 +96,7 @@ The models differ: OpenHands passes LLM cost through (or you bring keys); Waynod
 
 **Pick Waynode if:**
 
-- You want the agent working in a real, persistent clone of your repository rather than disposable sandboxes — branches and terminal state intact when you come back.
+- You want the agent working in a real, persistent clone of your repository rather than disposable sandboxes, with branches and terminal state intact when you come back.
 - Review is the bottleneck: you want diffs, hunks, commits, and push next to the conversation, on desktop or phone.
 - You want a small-team hosted plan with predictable flat pricing, or a fully MIT stack with no separately licensed directories.
 
