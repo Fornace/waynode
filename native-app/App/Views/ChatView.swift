@@ -112,7 +112,8 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     if store.reducer.items.isEmpty && !store.isLoadingHistory {
-                        EmptyChatState {
+                        EmptyChatState { suggestion in
+                            composerText = suggestion
                             composerFocused = true
                         }
                         .frame(maxWidth: .infinity)
@@ -221,7 +222,7 @@ struct ChatView: View {
 // MARK: - Empty Chat State
 
 struct EmptyChatState: View {
-    var onTap: () -> Void
+    var onTap: (String) -> Void
 
     var body: some View {
         VStack(spacing: 20) {
@@ -239,14 +240,13 @@ struct EmptyChatState: View {
 
             // Suggestion chips — tap to pre-fill the composer
             VStack(spacing: 8) {
-                SuggestionChip(icon: "doc.text.magnifyingglass", text: "Explain this codebase", onTap: onTap)
-                SuggestionChip(icon: "bug", text: "Find and fix bugs", onTap: onTap)
-                SuggestionChip(icon: "wand.and.stars", text: "Add a feature", onTap: onTap)
+                SuggestionChip(icon: "doc.text.magnifyingglass", text: "Explain this codebase") { onTap("Explain this codebase") }
+                SuggestionChip(icon: "bug", text: "Find and fix bugs") { onTap("Find and fix bugs") }
+                SuggestionChip(icon: "wand.and.stars", text: "Add a feature") { onTap("Add a feature") }
             }
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
-        .onTapGesture { onTap() }
     }
 }
 
