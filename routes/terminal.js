@@ -43,15 +43,19 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
     // Resolve the URL early so the dev-token (?t=) path can short-circuit
     // before the session-cookie requirement — mirrors the sseAuth helper on
     // the chat/clone/git SSE routes, so the terminal WS is drivable in
-    // automated E2E the same way those streams are.
+    // automated E2E the same way those streams are. Native URLSession clients
+    // use Authorization instead: URL query tokens leak into proxy access logs.
     const url = new URL(req.url, "http://localhost");
-    const tok = url.searchParams.get("t");
+    const queryToken = url.searchParams.get("t");
+    const authorization = req.headers.authorization || "";
+    const bearerToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : null;
+    const tok = bearerToken || queryToken;
 
     sessionMiddleware(req, {}, async () => {
       let authedUserId = null;
 
-      // Bearer API-token path (?t=wn_...): native apps pass their personal
-      // token as a query param since WebSocket/EventSource can't set headers.
+      // Bearer API-token path: native URLSession clients send an Authorization
+      // header; the query form remains only for browser/dev compatibility.
       if (tok && tok.startsWith("wn_")) {
         const user = resolveApiToken(tok);
         if (user) authedUserId = user.id;

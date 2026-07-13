@@ -11,8 +11,9 @@ import Foundation
 //   • Cooperative cancellation (task cancellation tears down the stream)
 //   • Heartbeat watchdog (if no events arrive for 90s, the connection is
 //     considered stale and force-reconnected via session invalidation)
-//   • Bearer token passed as `?t=` query param (EventSource cannot set
-//     custom headers, and our native client mirrors the web transport)
+//   • Bearer token sent in an Authorization header. Unlike browser
+//     EventSource, URLSession can set headers; keeping it out of the URL
+//     prevents a credential from being recorded in proxy access logs.
 
 public actor SSEClient {
     public nonisolated let url: URL
@@ -94,12 +95,21 @@ public actor SSEClient {
                 attempt = 0
             } catch is CancellationError {
                 break
+            } catch let error as StreamHTTPError {
+                // Authentication, authorization, billing, and a missing
+                // session cannot be repaired by retrying the same request.
+                // Surface the actual server decision rather than misleading
+                // people with an endless "Reconnecting…" loop.
+                onStateChange.yield(.failed(reason: error.userMessage))
+                return
             } catch {
                 onStateChange.yield(.failed(reason: error.localizedDescription))
                 attempt += 1
             }
         }
-        onStateChange.yield(.disconnected)
+        if Task.isCancelled {
+            onStateChange.yield(.disconnected)
+        }
         // NOTE: do NOT call continuation.finish() here — only stop() finishes
         // the continuation. This allows forceReconnect() to invalidate the
         // session (causing connectOnce to throw) without permanently killing
@@ -107,15 +117,10 @@ public actor SSEClient {
     }
 
     private func connectOnce() async throws {
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
-        if let token {
-            let existing = components.queryItems ?? []
-            components.queryItems = existing + [URLQueryItem(name: "t", value: token)]
-        }
-
-        var req = URLRequest(url: components.url ?? url)
+        var req = URLRequest(url: url)
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
 
         // Create a fresh session per connection so forceReconnect() can
         // invalidate it without affecting the task.
@@ -131,16 +136,8 @@ public actor SSEClient {
         guard let http = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
-        if http.statusCode == 401 {
-            // Token is invalid — throw so run() backs off with exponential
-            // backoff instead of tight-looping. The AppModel's 401 handler
-            // (wired via the REST client's unauthorizedStream) will log the
-            // user out.
-            onStateChange.yield(.failed(reason: "Unauthorized"))
-            throw URLError(.userAuthenticationRequired)
-        }
         guard (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
+            throw StreamHTTPError(statusCode: http.statusCode)
         }
 
         onStateChange.yield(.connected)
@@ -204,6 +201,25 @@ public actor SSEClient {
     private func forceReconnect() {
         currentSession?.invalidateAndCancel()
     }
+}
+
+/// An HTTP response is a server decision, not a transient transport error.
+/// Keeping it typed lets the reconnect loop distinguish a real outage from a
+/// condition the person must resolve (for example an expired subscription).
+private struct StreamHTTPError: LocalizedError, Sendable {
+    let statusCode: Int
+
+    var userMessage: String {
+        switch statusCode {
+        case 401: return "Session expired. Sign in again."
+        case 402: return "Subscription inactive. Update billing to continue."
+        case 403: return "You no longer have access to this workspace."
+        case 404: return "This session is no longer available."
+        default: return "The server rejected this connection (HTTP \(statusCode))."
+        }
+    }
+
+    var errorDescription: String? { userMessage }
 }
 
 // MARK: - Sleep helper

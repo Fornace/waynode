@@ -13,7 +13,9 @@ import Foundation
 //     {"type":"output","data":"..."}
 //     {"type":"exited","exitCode":0}
 //
-// Auth: token passed as ?t= query param.
+// Auth: token sent as an Authorization header. URLSession supports headers on
+// WebSocket handshakes, so there is no reason to expose a bearer token in the
+// URL (and therefore in proxy logs).
 
 public actor WSClient {
     public nonisolated let url: URL
@@ -48,12 +50,10 @@ public actor WSClient {
         // Convert https/http so callers can pass the REST baseURL directly.
         if components.scheme == "https" { components.scheme = "wss" }
         else if components.scheme == "http" { components.scheme = "ws" }
-        if let token {
-            let existing = components.queryItems ?? []
-            components.queryItems = existing + [URLQueryItem(name: "t", value: token)]
-        }
         let wsURL = components.url ?? url
-        task = session.webSocketTask(with: wsURL)
+        var request = URLRequest(url: wsURL)
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        task = session.webSocketTask(with: request)
         task?.resume()
         startListening()
     }
