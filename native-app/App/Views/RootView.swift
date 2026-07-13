@@ -26,8 +26,8 @@ struct RootView: View {
                     .transition(.opacity.combined(with: .move(edge: .leading)))
             }
         }
-        // Force dark mode — Waynode is a developer tool, dark is the right default.
-        .preferredColorScheme(.dark)
+        // Respect the system appearance. A workbench must remain legible with
+        // the user's contrast, transparency, and light/dark preferences.
         .animation(.smooth(duration: 0.4), value: appModel.auth.isAuthenticated)
         .animation(.smooth(duration: 0.3), value: appModel.auth.hasCompletedLaunchCheck)
         .onOpenURL { url in
