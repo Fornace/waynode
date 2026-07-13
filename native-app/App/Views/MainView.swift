@@ -114,26 +114,74 @@ struct MainView: View {
 
 private struct WorkbenchView: View {
     @Environment(AppModel.self) private var appModel
+    @State private var showingAccount = false
+    @State private var showingNewSession = false
+    @State private var newSessionTitle = ""
+    @State private var sessionError: String?
 
     var body: some View {
         @Bindable var model = appModel
         NavigationSplitView {
             List(selection: $model.selectedSpaceId) {
                 ForEach(model.spaces) { space in
-                    Label(space.repoName, systemImage: "arrow.triangle.branch")
+                    SpaceRow(space: space)
                         .tag(space.id)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                 }
             }
-            .navigationTitle("Spaces")
+            .listStyle(.sidebar)
+            .navigationTitle("Workspaces")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingAccount = true
+                    } label: {
+                        Label("Account", systemImage: "person.crop.circle")
+                    }
+                    .accessibilityHint("Open server, billing, and account settings")
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if let error = model.spacesError {
+                    Label(error, systemImage: "wifi.exclamationmark")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.thinMaterial)
+                }
+            }
         } content: {
             List(selection: $model.selectedSessionId) {
                 if let spaceId = model.selectedSpaceId {
                     ForEach(model.sessions(forSpace: spaceId)) { session in
-                        Text(session.title).tag(session.id)
+                        SessionRow(session: session)
+                            .tag(session.id)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                     }
+                } else {
+                    ContentUnavailableView("Choose a workspace", systemImage: "folder")
+                        .listRowBackground(Color.clear)
                 }
             }
             .navigationTitle("Sessions")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        newSessionTitle = ""
+                        sessionError = nil
+                        showingNewSession = true
+                    } label: {
+                        Label("New Session", systemImage: "plus.bubble")
+                    }
+                    .disabled(model.selectedSpaceId == nil)
+                }
+            }
             .task(id: model.selectedSpaceId) {
                 if let id = model.selectedSpaceId { await model.refreshSessions(spaceId: id) }
             }
@@ -145,6 +193,36 @@ private struct WorkbenchView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .sheet(isPresented: $showingAccount) {
+            NavigationStack { AccountScene() }
+        }
+        .sheet(isPresented: $showingNewSession) {
+            NewSessionSheet(
+                title: $newSessionTitle,
+                error: $sessionError,
+                onCreate: createSession,
+                onCancel: { showingNewSession = false }
+            )
+            .presentationDetents([.medium])
+        }
+    }
+
+    private func createSession() {
+        guard let spaceId = appModel.selectedSpaceId else { return }
+        Task {
+            do {
+                let session = try await appModel.createSession(
+                    spaceId: spaceId,
+                    title: newSessionTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newSessionTitle
+                )
+                appModel.selectedSessionId = session.id
+                showingNewSession = false
+                Haptics.success()
+            } catch {
+                sessionError = error.localizedDescription
+                Haptics.error()
+            }
+        }
     }
 }
 
