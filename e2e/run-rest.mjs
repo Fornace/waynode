@@ -131,8 +131,8 @@ try {
     } else {
       await call("browser_click", { selector: ".space-sessions .new-session-btn", timeout: 8000 });
     }
-    await call("browser_wait", { selector: ".tabs", timeout: 10000 });
-    const r = await call("browser_evaluate", { script: "return { url: location.href, tabs: !!document.querySelector('.tabs') }" });
+    await call("browser_wait", { selector: ".workspace-tabs", timeout: 10000 });
+    const r = await call("browser_evaluate", { script: "return { url: location.href, tabs: !!document.querySelector('.workspace-tabs') }" });
     const v = await jval(r);
     if (!v?.tabs) throw new Error("session tabs did not render");
     sessionUrl = v.url;
@@ -176,9 +176,7 @@ try {
       if (!busy) break;
       await call("browser_wait", { time: 3000 });
     }
-    // The tab-btn texts are "Chat"/"Terminal" but the icon-only settings/git
-    // buttons also carry .tab-btn. Scope the Terminal click precisely via text.
-    await call("browser_evaluate", { script: "[...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.trim()==='Terminal')?.click()" });
+    await call("browser_evaluate", { script: "[...document.querySelectorAll('.workspace-tabs button')].find(b=>b.textContent.trim()==='Terminal')?.click()" });
     await call("browser_wait", { selector: ".terminal-container", timeout: 12000 });
     // wait until xterm has rendered rows (pi TUI painted)
     let ok = false;
@@ -189,7 +187,7 @@ try {
     }
     if (!ok) {
       const disabled = await jval(await call("browser_evaluate", {
-        script: "return document.querySelector('.terminal-container')?.textContent?.includes('Terminal is unavailable') || false",
+        script: "return /terminal unavailable|temporarily unavailable/i.test(document.querySelector('.terminal-container')?.textContent || '')",
       }));
       if (disabled) {
         terminalAvailable = false;
@@ -219,7 +217,7 @@ try {
     await call("browser_clear_session", {});
     await call("browser_evaluate", { script: INJECT });
     await call("browser_navigate", { url: sessionUrl, waitUntil: "networkidle", timeout: 30000 });
-    await call("browser_evaluate", { script: "[...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.trim()==='Terminal')?.click()" });
+    await call("browser_evaluate", { script: "[...document.querySelectorAll('.workspace-tabs button')].find(b=>b.textContent.trim()==='Terminal')?.click()" });
     await call("browser_wait", { selector: ".terminal-container", timeout: 12000 });
     let ok = false;
     for (let i = 0; i < 14; i++) {
@@ -234,7 +232,7 @@ try {
   });
 
   await flow("mutex", async () => {
-    await call("browser_evaluate", { script: "[...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.trim()==='Chat')?.click()" });
+    await call("browser_evaluate", { script: "[...document.querySelectorAll('.workspace-tabs button')].find(b=>b.textContent.trim()==='Chat')?.click()" });
     await call("browser_wait", { selector: ".composer-input", timeout: 10000 });
     await shot("08-back-to-chat");
     console.log("   chat re-acquired (terminal reclaimed)");
