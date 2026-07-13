@@ -81,6 +81,8 @@ input, textarea {
   box-sizing: border-box;
   background-color: var(--bg);
 }
+.workspace-error { position: fixed; z-index: 100; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: min(620px, calc(100vw - 32px)); padding: 10px 12px; border: 1px solid #8a5a30; border-radius: 10px; color: #ffe2bd; background: #2b1d15; box-shadow: 0 14px 35px rgba(0,0,0,.3); font-size: 13px; }
+.workspace-error span { font-weight: 750; white-space: nowrap; }.workspace-error p { margin: 0; color: #e7c6a4; }.workspace-error button { margin-left: auto; padding: 6px 9px; border: 1px solid #ad7b48; border-radius: 6px; color: #fff0df; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
 
 .app-layout.sidebar-open .sidebar {
   transform: translateX(0);

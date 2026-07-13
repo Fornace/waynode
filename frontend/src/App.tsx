@@ -45,6 +45,7 @@ function AppContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [onboardingError, setOnboardingError] = useState("");
   const [onboardingCloning, setOnboardingCloning] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -63,12 +64,13 @@ function AppContent() {
         .then((d) => { if (d.user?.role === "admin") setIsAdmin(true); })
         .catch(() => {});
       fetch("/api/orgs", { headers: getAuthHeaders(), credentials: "include" })
-        .then((r) => r.json())
+        .then(async (r) => { if (!r.ok) throw new Error(`Could not load workspaces (${r.status})`); return r.json(); })
         .then((data: Org[]) => {
           setOrgs(data);
+          setWorkspaceError("");
           if (data.length > 0 && !activeOrgId) setActiveOrgId(data[0].id);
         })
-        .catch(() => {});
+        .catch((error) => setWorkspaceError(error instanceof Error ? error.message : "Could not load workspaces."));
     }
   }, [user]);
 
@@ -76,9 +78,13 @@ function AppContent() {
     if (!activeOrgId) return;
     try {
       const res = await fetch(`/api/spaces?orgId=${activeOrgId}`, { headers: getAuthHeaders(), credentials: "include" });
+      if (!res.ok) throw new Error(`Could not load repositories (${res.status})`);
       const data = await res.json();
       setSpaces(data);
-    } catch {}
+      setWorkspaceError("");
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "Could not load repositories.");
+    }
   }, [activeOrgId]);
 
   useEffect(() => {
@@ -225,6 +231,8 @@ function AppContent() {
 
   const activeOrg = orgs.find((o) => o.id === activeOrgId);
 
+  const workspaceNotice = workspaceError ? <div className="workspace-error" role="alert"><span>Connection problem</span><p>{workspaceError}</p><button type="button" onClick={() => { setWorkspaceError(""); if (activeOrgId) loadSpaces(); }}>Retry</button></div> : null;
+
   if (loading) {
     return (
       <div className="empty-state">
@@ -275,6 +283,7 @@ function AppContent() {
 
   return (
     <div className={`app-layout ${sidebarOpen ? "sidebar-open" : ""}`}>
+      {workspaceNotice}
       <div className="sidebar-overlay" onClick={handleToggleSidebar} />
       <Sidebar
         spaces={spaces}
