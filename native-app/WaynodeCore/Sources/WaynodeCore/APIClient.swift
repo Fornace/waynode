@@ -473,6 +473,49 @@ public actor APIClient {
         try await requestVoid("/api/tokens/\(id)", method: "DELETE")
     }
 
+    // MARK: - Hosted billing
+
+    public struct BillingEnabledResponse: Decodable, Sendable {
+        public let enabled: Bool
+    }
+
+    public struct BillingInfo: Decodable, Sendable {
+        public let plan: String
+        public let status: String
+        public let currentPeriodEnd: String?
+
+        enum CodingKeys: String, CodingKey {
+            case plan, status
+            case currentPeriodEnd = "current_period_end"
+        }
+    }
+
+    private struct CheckoutResponse: Decodable, Sendable { let url: URL }
+
+    public func hostedBillingEnabled() async throws -> Bool {
+        let response: BillingEnabledResponse = try await request("/api/billing/enabled")
+        return response.enabled
+    }
+
+    public func billing(orgId: String) async throws -> BillingInfo {
+        try await request("/api/orgs/\(orgId)/billing")
+    }
+
+    public func startCheckout(orgId: String, plan: String) async throws -> URL {
+        struct Body: Encodable, Sendable { let plan: String }
+        let response: CheckoutResponse = try await request(
+            "/api/orgs/\(orgId)/billing/checkout", method: "POST", body: Body(plan: plan)
+        )
+        return response.url
+    }
+
+    public func openBillingPortal(orgId: String) async throws -> URL {
+        let response: CheckoutResponse = try await request(
+            "/api/orgs/\(orgId)/billing/portal", method: "POST"
+        )
+        return response.url
+    }
+
     // MARK: - Models
 
     public func listModels() async throws -> ModelsResponse {

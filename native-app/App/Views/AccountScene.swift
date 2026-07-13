@@ -13,6 +13,7 @@ import WaynodeCore
 
 struct AccountScene: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.openURL) private var openURL
     @State private var tokens: [APIClient.TokenInfo] = []
     @State private var newToken: String?
     @State private var isLoadingTokens = false
@@ -23,6 +24,11 @@ struct AccountScene: View {
     @State private var tokenToRevoke: APIClient.TokenInfo?
     @State private var showingLogoutConfirm = false
     @State private var showingNewTokenSheet = false
+    @State private var hostedBillingEnabled = false
+    @State private var billing: APIClient.BillingInfo?
+    @State private var isLoadingBilling = false
+    @State private var billingBusy = false
+    @State private var billingError: String?
 
     var body: some View {
         List {
@@ -37,6 +43,7 @@ struct AccountScene: View {
         .navigationTitle("Account")
         .task {
             await loadTokens()
+            await loadBilling()
         }
         .confirmationDialog(
             "Log Out?",
@@ -225,30 +232,53 @@ struct AccountScene: View {
 
     // MARK: - Billing
 
-    /// Billing is deliberately informational until the hosted service exposes
-    /// its server-verified App Store entitlement contract. In particular, do
-    /// not infer access from a device-local StoreKit transaction: plans grant
-    /// organization-scoped server capacity, not a local app feature.
     private var billingSection: some View {
         Section {
-            Label("Hosted plans are managed on the web", systemImage: "safari")
-                .foregroundStyle(.secondary)
-
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "app.badge.checkmark")
+            if isLoadingBilling {
+                HStack { Spacer(); ProgressView(); Spacer() }
+            } else if !hostedBillingEnabled {
+                Label("This server is self-hosted", systemImage: "server.rack")
                     .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("App Store subscriptions are coming soon")
-                        .font(.subheadline.weight(.medium))
-                    Text("They will be tied to a workspace and verified by Waynode before access changes.")
+            } else if let billing, let org = appModel.orgs.first {
+                LabeledContent("Plan", value: billing.plan.capitalized)
+                LabeledContent("Status", value: billing.status.capitalized)
+                if billing.status != "active" && billing.status != "trialing" {
+                    Text("Agent work is paused until this workspace has an active plan.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.orange)
                 }
+
+                if billing.plan == "free" || billing.status == "expired" {
+                    Menu {
+                        Button("Starter · $39/month") { Task { await beginCheckout(org.id, plan: "starter") } }
+                        Button("Pro · $99/month") { Task { await beginCheckout(org.id, plan: "pro") } }
+                        Button("Team · $249/month") { Task { await beginCheckout(org.id, plan: "team") } }
+                    } label: {
+                        Label(billingBusy ? "Opening checkout…" : "Choose a plan", systemImage: "creditcard")
+                    }
+                    .disabled(billingBusy)
+                } else {
+                    Button {
+                        Task { await manageBilling(org.id) }
+                    } label: {
+                        Label(billingBusy ? "Opening billing…" : "Manage billing", systemImage: "creditcard")
+                    }
+                    .disabled(billingBusy)
+                }
+            } else {
+                Text("No organization is available for billing.")
+                    .foregroundStyle(.secondary)
+            }
+
+            if let billingError {
+                Text(billingError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         } header: {
             Text("Hosted Billing")
         } footer: {
-            Text("Self-hosted Waynode has no subscription requirement. This app never treats a local purchase as proof of hosted access.")
+            Text("Plans apply to the whole workspace. App Store subscriptions remain separate until server verification is available.")
         }
     }
 
@@ -284,7 +314,7 @@ struct AccountScene: View {
         Section("About") {
             LabeledContent("Version", value: appVersion)
             LabeledContent("Build", value: buildNumber)
-            Link(destination: URL(string: "https://github.com/earendil-works/waynode")!) {
+            Link(destination: URL(string: "https://github.com/Fornace/waynode")!) {
                 Label("View on GitHub", systemImage: "chevron.left.slash.chevron.right")
             }
         }
@@ -296,6 +326,46 @@ struct AccountScene: View {
 
     private var buildNumber: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    // MARK: - Hosted billing actions
+
+    private func loadBilling() async {
+        guard let api = appModel.currentAPI() else { return }
+        isLoadingBilling = true
+        billingError = nil
+        defer { isLoadingBilling = false }
+        do {
+            hostedBillingEnabled = try await api.hostedBillingEnabled()
+            guard hostedBillingEnabled, let org = appModel.orgs.first else { return }
+            billing = try await api.billing(orgId: org.id)
+        } catch {
+            billingError = error.localizedDescription
+        }
+    }
+
+    private func beginCheckout(_ orgId: String, plan: String) async {
+        guard let api = appModel.currentAPI() else { return }
+        billingBusy = true
+        billingError = nil
+        defer { billingBusy = false }
+        do {
+            openURL(try await api.startCheckout(orgId: orgId, plan: plan))
+        } catch {
+            billingError = error.localizedDescription
+        }
+    }
+
+    private func manageBilling(_ orgId: String) async {
+        guard let api = appModel.currentAPI() else { return }
+        billingBusy = true
+        billingError = nil
+        defer { billingBusy = false }
+        do {
+            openURL(try await api.openBillingPortal(orgId: orgId))
+        } catch {
+            billingError = error.localizedDescription
+        }
     }
 
     // MARK: - Logout
