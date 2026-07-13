@@ -20,6 +20,7 @@ import WaynodeCore
 
 struct MainView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selection: TopLevelTab? = .spaces
     @State private var spacesPath = NavigationPath()
 
@@ -42,6 +43,23 @@ struct MainView: View {
     }
 
     var body: some View {
+        Group {
+            if horizontalSizeClass == .regular {
+                WorkbenchView()
+            } else {
+                compactShell
+            }
+        }
+        // Deep-link handling: when pendingDeepLink changes, push it.
+        .onChange(of: appModel.pendingDeepLink) {
+            handleDeepLink()
+        }
+        .onAppear {
+            handleDeepLink()
+        }
+    }
+
+    private var compactShell: some View {
         TabView(selection: $selection) {
             // Spaces tab: drill-down navigation (Spaces → Sessions → Chat)
             NavigationStack(path: $spacesPath) {
@@ -69,13 +87,6 @@ struct MainView: View {
             }
             .tag(TopLevelTab.account)
         }
-        // Deep-link handling: when pendingDeepLink changes, push it.
-        .onChange(of: appModel.pendingDeepLink) {
-            handleDeepLink()
-        }
-        .onAppear {
-            handleDeepLink()
-        }
     }
 
     // MARK: - Deep Link
@@ -98,6 +109,42 @@ struct MainView: View {
         }
         // Clear the pending link so it doesn't re-trigger
         appModel.pendingDeepLink = nil
+    }
+}
+
+private struct WorkbenchView: View {
+    @Environment(AppModel.self) private var appModel
+
+    var body: some View {
+        @Bindable var model = appModel
+        NavigationSplitView {
+            List(selection: $model.selectedSpaceId) {
+                ForEach(model.spaces) { space in
+                    Label(space.repoName, systemImage: "arrow.triangle.branch")
+                        .tag(space.id)
+                }
+            }
+            .navigationTitle("Spaces")
+        } content: {
+            List(selection: $model.selectedSessionId) {
+                if let spaceId = model.selectedSpaceId {
+                    ForEach(model.sessions(forSpace: spaceId)) { session in
+                        Text(session.title).tag(session.id)
+                    }
+                }
+            }
+            .navigationTitle("Sessions")
+            .task(id: model.selectedSpaceId) {
+                if let id = model.selectedSpaceId { await model.refreshSessions(spaceId: id) }
+            }
+        } detail: {
+            if let spaceId = model.selectedSpaceId, let sessionId = model.selectedSessionId {
+                SessionDetail(sessionId: sessionId, spaceId: spaceId)
+            } else {
+                ContentUnavailableView("Choose a session", systemImage: "rectangle.3.group", description: Text("Your worktree, conversation, and review stay together here."))
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
     }
 }
 
