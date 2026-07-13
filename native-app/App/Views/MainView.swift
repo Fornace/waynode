@@ -85,8 +85,12 @@ struct MainView: View {
         selection = .spaces
         switch link {
         case .sessionsList(let spaceId):
+            appModel.selectedSpaceId = spaceId
+            appModel.selectedSessionId = nil
             spacesPath = NavigationPath([DeepLink.sessionsList(spaceId: spaceId)])
         case .sessionDetail(let spaceId, let sessionId):
+            appModel.selectedSpaceId = spaceId
+            appModel.selectedSessionId = sessionId
             spacesPath = NavigationPath([
                 DeepLink.sessionsList(spaceId: spaceId),
                 DeepLink.sessionDetail(spaceId: spaceId, sessionId: sessionId)
