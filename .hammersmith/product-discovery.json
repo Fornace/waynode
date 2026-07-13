@@ -1,0 +1,18 @@
+{
+  "run_name": "waynode-product-discovery",
+  "project": "waynode-productization",
+  "workdir": "/tmp/waynode-hammersmith/product-discovery",
+  "max_parallel": 1,
+  "tasks": [
+    {
+      "key": "independent-product-roadmap",
+      "task_type": "product-strategy",
+      "spec": "You are the independent principal product lead for Waynode. The founder's complete brief is: 'Now I want to truly take Waynode and productize it. Improve UIs and UX in both Mac and iOS. Re-check the website, perhaps make it less generic tech startup. I want a fully battle-tested, amazing app in every small detail, every nook and cranny.' You have decision authority for analysis, prioritization, visual direction, task design, and acceptance standards. Do not ask the founder follow-up questions and do not make any changes. Independently inspect the real product at https://waynode.fornace.net, the source at /Users/ffrappo/works/repos/waynode, existing tests, native architecture, and relevant product materials. Identify the actual product, its strongest differentiated promise, its failure points, and the highest-leverage route to a genuinely excellent Mac, iOS/iPadOS, and web experience. Avoid generic startup conventions unless independently justified by evidence. Produce ./product-roadmap.md as a decisive execution document, not a brainstorm. It must contain: (1) a short product thesis and visual/interaction direction; (2) an evidence-led audit of current web and native experiences; (3) a prioritized, dependency-aware task graph that you author yourself, with clear independently-owned work packages; (4) a test and observability strategy that makes every package genuinely battle-tested; (5) explicit launch-quality acceptance criteria by platform; and (6) risks, assumptions, and intentional non-goals. Make concrete decisions wherever the evidence permits. Keep it below 2,500 words. Read-only rules: never modify, create, delete, format, install, run migrations, or commit inside the Waynode repository. You may only write ./product-roadmap.md in your assigned task directory.",
+      "check": "python3 -c \"from pathlib import Path; p=Path('product-roadmap.md'); text=p.read_text() if p.exists() else ''; required=['#', 'Product', 'Audit', 'Task', 'Test', 'Acceptance', 'Risk']; missing=[x for x in required if x.lower() not in text.lower()]; assert p.is_file() and p.stat().st_size > 1800, 'roadmap is missing or too small'; assert not missing, 'roadmap missing required decision areas: ' + ', '.join(missing); print('product roadmap validated:', len(text), 'bytes')\"",
+      "expect_files": ["product-roadmap.md"],
+      "timeout_s": 1800,
+      "max_attempts": 2,
+      "verified": "An independently authored, substantive product roadmap exists with an audit, owned task graph, platform acceptance criteria, and a battle-testing strategy."
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import { LoginPage } from "./LoginPage";
 
 const PLANS = [
   { name: "Starter", price: "$39", detail: "For a focused build loop", specs: ["3 seats", "3M agent tokens / month", "10 GB workspace storage"] },
-  { name: "Pro", price: "$99", detail: "For the team that ships daily", specs: ["10 seats", "8M agent tokens / month", "50 GB workspace storage"], featured: true },
+  { name: "Pro", price: "$99", detail: "For the team that ships daily", specs: ["10 seats", "8M agent tokens / month", "50 GB workspace storage"] },
   { name: "Team", price: "$249", detail: "For a whole engineering team", specs: ["25 seats", "20M agent tokens / month", "200 GB workspace storage"] },
 ];
 
@@ -29,11 +29,8 @@ export function LandingPage() {
           <div className="launch-actions"><a className="launch-primary" href="#auth">Start free for 15 days <span>→</span></a><a className="launch-secondary" href="#how-it-works">See the workspace <span>↓</span></a></div>
           <div className="launch-hero-proof"><span><b>✓</b> Real cloned repositories</span><span><b>✓</b> GitHub &amp; GitLab</span><span><b>✓</b> Open source</span></div>
         </div>
-        <div className="launch-hero-stage" aria-label="Waynode workspace mockup">
-          <div className="launch-aurora launch-aurora-one" /><div className="launch-aurora launch-aurora-two" />
-          <DesktopWorkspace />
-          <div className="launch-device-chip launch-device-chip-top"><span className="launch-dot" /> Synced worktree <b>api-server</b></div>
-          <div className="launch-device-chip launch-device-chip-bottom"><span>⌘</span><div><b>7 files changed</b><small>Ready to review</small></div></div>
+        <div className="launch-hero-stage" aria-label="Waynode workspace capture">
+          <ProductCapture src="/marketing/screenshot-chat.png" alt="Waynode workspace with an active agent conversation" label="A real workspace, not a remote task" />
         </div>
       </section>
 
@@ -50,7 +47,7 @@ export function LandingPage() {
 
       <section className="launch-worktree-showcase">
         <div className="launch-worktree-copy"><p className="launch-kicker">The worktree is the product</p><h2>See the agent’s work<br />before it leaves the repo.</h2><p>Every space has an inspectable Git surface. Changed files, hunks, commits, and push all live beside the conversation, so “done” means ready for review, not merely finished running.</p><a className="launch-text-link" href="#auth">Bring a repository to Waynode <span>→</span></a></div>
-        <GitWorktree />
+        <ProductCapture src="/marketing/screenshot-terminal.png" alt="Waynode terminal running inside a persistent workspace" label="The terminal stays with the worktree" />
       </section>
 
       <section className="launch-mobile-section">
@@ -65,12 +62,16 @@ export function LandingPage() {
 
       <section className="launch-choice"><div className="launch-choice-card launch-choice-cloud"><p className="launch-kicker">Waynode Cloud</p><h3>Get a persistent workspace in minutes.</h3><p>We run the workspace, encrypted secrets, updates, and billing. You bring the repositories and the work.</p><a className="launch-text-link" href="#auth">Start a 15-day trial <span>→</span></a></div><div className="launch-choice-card"><p className="launch-kicker">Self-hosted</p><h3>Keep the whole control plane close.</h3><p>Run the open-source stack in your own environment with your own network controls, models, and credentials.</p><a className="launch-text-link" href="https://github.com/fornace/waynode#readme" target="_blank" rel="noreferrer">Read the install guide <span>↗</span></a></div></section>
 
-      <section className="launch-pricing" id="pricing"><div className="launch-section-heading"><p className="launch-kicker">Simple hosted pricing</p><h2>A room for every build team.</h2><p>Every hosted plan starts with 15 free days. Upgrade only when Waynode earns a permanent place in your workflow.</p></div><div className="launch-pricing-grid">{PLANS.map((plan) => <article className={`launch-price-card ${plan.featured ? "is-featured" : ""}`} key={plan.name}>{plan.featured && <div className="launch-popular">Most popular</div>}<h3>{plan.name}</h3><p>{plan.detail}</p><div className="launch-price"><b>{plan.price}</b><span>/ month</span></div><ul>{plan.specs.map((spec) => <li key={spec}>✓ {spec}</li>)}</ul><a className={plan.featured ? "launch-primary" : "launch-secondary"} href="#auth">Start free trial <span>→</span></a></article>)}</div><p className="launch-pricing-note">Web checkout is powered by Stripe. Mobile subscriptions are available through the App Store where supported.</p></section>
+      <section className="launch-pricing" id="pricing"><div className="launch-section-heading"><p className="launch-kicker">Simple hosted pricing</p><h2>A room for every build team.</h2><p>Every hosted plan starts with 15 free days. Upgrade only when Waynode earns a permanent place in your workflow.</p></div><div className="launch-pricing-grid">{PLANS.map((plan) => <article className="launch-price-card" key={plan.name}><h3>{plan.name}</h3><p>{plan.detail}</p><div className="launch-price"><b>{plan.price}</b><span>/ month</span></div><ul>{plan.specs.map((spec) => <li key={spec}>✓ {spec}</li>)}</ul><a className="launch-secondary" href="#auth">Start free trial <span>→</span></a></article>)}</div><p className="launch-pricing-note">Hosted billing uses secure web checkout. Mobile billing availability is shown inside the app when it is supported.</p></section>
 
       <section className="launch-auth" id="auth"><div><p className="launch-kicker">Your next repo is ready</p><h2>Stop carrying<br />your workspace around.</h2><p>Sign in to start your hosted trial. Prefer full infrastructure control? Waynode is MIT licensed and ready to self-host.</p></div><LoginPage /></section>
       <footer className="launch-footer"><a className="launch-brand" href="#top"><WaynodeMark size={25} /><span>Waynode</span></a><span>Open source, persistent agent workspaces.</span><div><a href="https://github.com/fornace/waynode" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/fornace/waynode#readme" target="_blank" rel="noreferrer">Docs</a><a href="/learn">Guides &amp; comparisons</a><a href="/llms.txt" title="Agent-readable index of this site">llms.txt</a><a href="/index.md" title="This page as markdown, for AI assistants">Read as markdown</a></div></footer>
     </main>
   );
+}
+
+function ProductCapture({ src, alt, label }: { src: string; alt: string; label: string }) {
+  return <figure className="launch-product-capture"><img src={src} alt={alt} /><figcaption><span className="launch-dot" /> {label}</figcaption></figure>;
 }
 
 function DesktopWorkspace() { return <div className="mock-desktop"><div className="mock-topbar"><span className="mock-traffic"><i /><i /><i /></span><b>waynode</b><span>api-server <em>/</em> OAuth callback</span><div className="mock-top-actions"><span>Fornace Fast⌄</span><b>Git</b><b>Chat</b></div></div><div className="mock-desktop-body"><aside className="mock-sidebar"><div className="mock-workspace"><WaynodeMark size={16} /><b>Francesco’s Workspace</b></div><button type="button">＋ Clone repository</button><p>SPACES</p><div className="mock-space active"><span>⌄</span><b>api-server</b><i>7</i></div><div className="mock-session active">OAuth diagnostics</div><div className="mock-session">Add audit events</div><div className="mock-session">Refine callback flow</div><div className="mock-space"><span>›</span><b>dashboard</b></div><div className="mock-space"><span>›</span><b>waynode</b></div></aside><section className="mock-chat"><div className="mock-chat-head"><div><b>OAuth callback</b><small>api-server · main</small></div><span className="mock-live"><i /> Agent working</span></div><div className="mock-message mock-user">The Mac app crashes after GitHub login. Find the cause, fix it, and leave a clean diff.</div><div className="mock-agent"><div className="mock-agent-title"><WaynodeMark size={17} /> Waynode agent <span>just now</span></div><p>I traced the callback onto Safari’s XPC queue. I’m moving presentation safely to the main actor and adding correlated push diagnostics.</p><div className="mock-tool"><span>⌘</span><div><b>Investigating AuthView.swift</b><small>Read 3 files · found 1 unsafe presentation path</small></div><i>✓</i></div><div className="mock-tool"><span>⌁</span><div><b>Running Mac Catalyst build</b><small>Building…</small></div><i className="is-running" /></div></div><div className="mock-composer">Message the agent… <b>↗</b></div></section></div></div>; }

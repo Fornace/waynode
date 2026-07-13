@@ -1,0 +1,18 @@
+{
+  "run_name": "waynode-product-truth-contract",
+  "project": "waynode-productization",
+  "workdir": "/tmp/waynode-hammersmith/product-truth-contract",
+  "max_parallel": 1,
+  "tasks": [
+    {
+      "key": "canonical-product-contract",
+      "task_type": "product-specification",
+      "spec": "You are the product-design authority for Waynode. Work from the independently verified roadmap at /tmp/waynode-hammersmith/product-discovery/product-roadmap.md and the current repository at /Users/ffrappo/works/repos/waynode. Do not alter the repository. Author ./product-contract.md: a concise canonical contract for the product team. Independently decide precise wording and states. It must define the actual Waynode promise; the authoritative Space, Session, Worktree, Run, Connection, Sync, and single-writer states; a hosted/self-hosted and platform capability/claim matrix; six task-based golden journeys (first repo, normal turn, autonomous goal, away/return, review/push, failure recovery), each with observable acceptance evidence; and product copy/interaction rules that make public web, web app, and native surfaces honest and coherent. Resolve contradictions in the existing code/docs explicitly. Do not propose implementation details beyond what the contract requires. You may only write product-contract.md in your task directory. Avoid Graphify, Honcho, browser automation, nested agents, and nested orchestration; use compact direct read-only source inspection only.",
+      "check": "python3 -c \"from pathlib import Path; p=Path('product-contract.md'); text=p.read_text() if p.exists() else ''; required=['Space', 'Session', 'Worktree', 'Run', 'Connection', 'Golden', 'Capability', 'Hosted', 'Self-hosted']; missing=[x for x in required if x.lower() not in text.lower()]; assert p.is_file() and p.stat().st_size > 2200, 'contract missing or too small'; assert not missing, 'missing: ' + ', '.join(missing); print('product contract validated:', len(text), 'bytes')\"",
+      "expect_files": ["product-contract.md"],
+      "timeout_s": 900,
+      "max_attempts": 1,
+      "verified": "A substantive, cross-platform product truth contract defines states, claims, six golden journeys, and observable acceptance evidence."
+    }
+  ]
+}
