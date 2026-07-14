@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		000186C4EC52022640BC6843 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B954C00B60D3DB33B2A804F /* AuthView.swift */; };
 		07686D0CE347E928BD9CD197 /* WaynodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9668F08A2E898BABC66081 /* WaynodeApp.swift */; };
+		2880115F18769261C6BE0BBE /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 26B83464C0A62DBEC630A979 /* SwiftTerm */; };
 		370881664556AF549C6AB785 /* SessionsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B759E8CE22B0B375BB475282 /* SessionsList.swift */; };
 		6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A89D5250119F107505CA318 /* GitInspector.swift */; };
 		7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */; };
@@ -24,17 +25,19 @@
 		D445BFA0F669F13B6334FC75 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7365BF994B13B6120DA3165B /* Assets.xcassets */; };
 		D9DC71A2E65BCC8A13B48A9C /* SpacesSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B382C33134DF897FD4C618 /* SpacesSidebar.swift */; };
 		E6F247329523B034DB67E46A /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD24C4235EFD2CABF8A6565 /* MainView.swift */; };
+		EF7DDCEFE3EBB7368D1EF045 /* NativeTerminalSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		05DEA2882D8C1DF151489327 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0B954C00B60D3DB33B2A804F /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
-		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
+		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WaynodeCore; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
 		156A741D0EA8E9804E056580 /* SessionDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetail.swift; sourceTree = "<group>"; };
+		15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTerminalSurface.swift; sourceTree = "<group>"; };
 		3C9668F08A2E898BABC66081 /* WaynodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaynodeApp.swift; sourceTree = "<group>"; };
 		3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformUtilities.swift; sourceTree = "<group>"; };
 		4429524F93F2D7BAD0B11C7F /* AccountScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountScene.swift; sourceTree = "<group>"; };
-		46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Waynode.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Waynode.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B76EABB353F48ADBB9E9A5A /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatItemView.swift; sourceTree = "<group>"; };
 		54B382C33134DF897FD4C618 /* SpacesSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesSidebar.swift; sourceTree = "<group>"; };
@@ -55,6 +58,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD06B8C7096720EA43E77579 /* WaynodeCore in Frameworks */,
+				2880115F18769261C6BE0BBE /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +93,7 @@
 				7A89D5250119F107505CA318 /* GitInspector.swift */,
 				7CD24C4235EFD2CABF8A6565 /* MainView.swift */,
 				E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */,
+				15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */,
 				BAF14352DE276CEE0FD2DEEC /* RootView.swift */,
 				156A741D0EA8E9804E056580 /* SessionDetail.swift */,
 				B759E8CE22B0B375BB475282 /* SessionsList.swift */,
@@ -137,6 +142,7 @@
 			name = Waynode;
 			packageProductDependencies = (
 				94F593349EDED17C7E44778A /* WaynodeCore */,
+				26B83464C0A62DBEC630A979 /* SwiftTerm */,
 			);
 			productName = Waynode;
 			productReference = 46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */;
@@ -167,6 +173,7 @@
 			mainGroup = 17828DD8790D53F6BF9E92A5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				E398647E422B3FFACF6EDEC1 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 				99CB13A050CE261162F679BE /* XCLocalSwiftPackageReference "WaynodeCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -203,6 +210,7 @@
 				6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */,
 				E6F247329523B034DB67E46A /* MainView.swift in Sources */,
 				C54BD14AA6CFE0287ED26646 /* MarkdownView.swift in Sources */,
+				EF7DDCEFE3EBB7368D1EF045 /* NativeTerminalSurface.swift in Sources */,
 				C30EDF89EAFFF22AE8FBA5EA /* PlatformUtilities.swift in Sources */,
 				8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */,
 				D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */,
@@ -417,7 +425,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		E398647E422B3FFACF6EDEC1 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.14.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		26B83464C0A62DBEC630A979 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E398647E422B3FFACF6EDEC1 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
 		94F593349EDED17C7E44778A /* WaynodeCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WaynodeCore;

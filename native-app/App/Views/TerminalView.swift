@@ -4,15 +4,13 @@ import WaynodeCore
 // MARK: - TerminalView
 //
 // A native terminal view using the WSClient to connect to the server's
-// terminal WebSocket. We use a custom text-based rendering (not xterm.js)
-// since this is native — no need for a web-based terminal emulator.
+// terminal WebSocket. SwiftTerm provides the real VT/xterm renderer; this
+// view owns only Waynode's transport lifecycle and connection controls.
 //
 // Features:
-//   • Monospace output rendering
-//   • Input field at the bottom
-//   • Auto-scroll
-//   • Connection status
-//   • Copy output
+//   • VT/xterm parsing, ANSI colours, cursor motion and scrollback
+//   • Native keyboard input, selection, hyperlinks and terminal resize
+//   • Connection status, reconnect, and copy fallback
 
 struct TerminalView: View {
     let sessionId: String
@@ -20,13 +18,10 @@ struct TerminalView: View {
 
     @Environment(AppModel.self) private var appModel
     @State private var output: String = ""
-    @State private var input: String = ""
+    @State private var streamID = UUID()
     @State private var connectionState: TerminalConnection = .disconnected
-    @State private var scrollTarget: Int = 0
-    @State private var outputLines: [String] = []
     @State private var wsClient: WSClient?
     @State private var listenTask: Task<Void, Never>?
-    @FocusState private var inputFocused: Bool
     @State private var hasExited: Bool = false
 
     enum TerminalConnection: Equatable {
@@ -65,14 +60,14 @@ struct TerminalView: View {
                 }
 
                 Button {
-                    copyToClipboard(outputLines.joined(separator: "\n"))
+                    copyToClipboard(output)
                     Haptics.success()
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .font(.caption2)
                 }
                 .buttonStyle(.plain)
-                .disabled(outputLines.isEmpty)
+                .disabled(output.isEmpty)
 
                 Button {
                     Task { await reconnect() }
@@ -87,59 +82,20 @@ struct TerminalView: View {
 
             Divider()
 
-            // Terminal output
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(outputLines.enumerated()), id: \.offset) { _, line in
-                            Text(line.isEmpty ? " " : line)
-                                .font(.system(.caption, design: .monospaced))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
-                        }
-                        Color.clear.frame(height: 1).id(bottomID)
-                    }
-                    .padding(8)
+            NativeTerminalSurface(
+                output: output,
+                streamID: streamID,
+                onInput: sendTerminalBytes,
+                onResize: { cols, rows in
+                    Task { await wsClient?.sendResize(cols: cols, rows: rows) }
                 }
-                .background(Color.black.opacity(0.9))
-                .defaultScrollAnchor(.bottom)
-                .onChange(of: outputLines.count) {
-                    withAnimation(.smooth) {
-                        proxy.scrollTo(bottomID, anchor: .bottom)
-                    }
-                }
-            }
+            )
+            .background(Color.black)
 
-            // Input bar
+            // SwiftTerm supplies its own keyboard input. This footer only
+            // appears after the server-side PTY has reached a terminal state.
             if !hasExited {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.green)
-
-                    TextField("Type a command…", text: $input, axis: .vertical)
-                        .font(.system(.caption, design: .monospaced))
-                        .lineLimit(1...4)
-                        .focused($inputFocused)
-                        .onSubmit {
-                            sendInput()
-                        }
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding(.vertical, 4)
-
-                    Button {
-                        sendInput()
-                    } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.caption.bold())
-                    }
-                    .buttonStyle(.glassProminent)
-                    .controlSize(.small)
-                    .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || connectionState != .connected)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                EmptyView()
             } else if case .failed(let msg) = connectionState {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")
@@ -210,7 +166,8 @@ struct TerminalView: View {
     private func connect() async {
         guard let api = appModel.currentAPI() else { return }
         connectionState = .connecting
-        outputLines = []
+        output = "\u{1B}[2J\u{1B}[H"
+        streamID = UUID()
         hasExited = false
 
         // The server's terminal WebSocket lives at /ws/terminal and takes
@@ -247,7 +204,6 @@ struct TerminalView: View {
             }
         }
         connectionState = .connected
-        inputFocused = true
     }
 
     private func reconnect() async {
@@ -261,23 +217,13 @@ struct TerminalView: View {
     private func handleMessage(_ msg: WSClient.TerminalMessage) async {
         switch msg {
         case .output(let data):
-            // Strip ANSI escape sequences (colors, cursor movement, etc.)
-            // for clean text rendering. The native view doesn't emulate a
-            // full terminal — we show readable text output.
-            let cleaned = TerminalView.stripANSI(data)
-            // Split on newlines and append
-            let newLines = cleaned.components(separatedBy: "\n")
-            for (i, line) in newLines.enumerated() {
-                if i == 0 && !outputLines.isEmpty {
-                    // Append to last line
-                    outputLines[outputLines.count - 1] += line
-                } else {
-                    outputLines.append(line)
-                }
-            }
-            // Cap output to last 1000 lines to avoid memory bloat
-            if outputLines.count > 1000 {
-                outputLines.removeFirst(outputLines.count - 1000)
+            output.append(data)
+            // Transport retention guard. SwiftTerm owns visual scrollback;
+            // this only limits the replay buffer used when SwiftUI recreates
+            // its platform view.
+            if output.utf8.count > 2_000_000 {
+                output = "\u{1B}[2J\u{1B}[H" + String(output.suffix(1_500_000))
+                streamID = UUID()
             }
         case .exited(let code):
             connectionState = .exited(code)
@@ -291,12 +237,10 @@ struct TerminalView: View {
 
     // MARK: - Input
 
-    private func sendInput() {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+    private func sendTerminalBytes(_ bytes: [UInt8]) {
+        guard connectionState == .connected, !bytes.isEmpty else { return }
         Task {
-            await wsClient?.sendInput(trimmed + "\n")
-            input = ""
+            await wsClient?.sendInput(String(decoding: bytes, as: UTF8.self))
         }
     }
 
@@ -304,45 +248,4 @@ struct TerminalView: View {
         await wsClient?.sendResize(cols: 80, rows: 24)
     }
 
-    // MARK: - ANSI stripping
-
-    /// Strips ANSI escape sequences from terminal output.
-    /// Handles CSI sequences (colors, cursor movement), OSC sequences
-    /// (window titles), and simple escape sequences.
-    private static func stripANSI(_ input: String) -> String {
-        // CSI: ESC [ ... letter  (colors, cursor movement, etc.)
-        // OSC: ESC ] ... BEL or ST  (window title, etc.)
-        // Other: ESC followed by one char
-        var result = ""
-        result.reserveCapacity(input.count)
-        var iter = input.makeIterator()
-        while let ch = iter.next() {
-            if ch == "\u{1B}" {  // ESC
-                guard let next = iter.next() else { break }
-                if next == "[" {
-                    // CSI — skip until we hit a letter (0x40–0x7E)
-                    while let c = iter.next() {
-                        if c.isLetter || c.asciiValue.map({ $0 >= 0x40 && $0 <= 0x7E }) == true {
-                            break
-                        }
-                    }
-                } else if next == "]" {
-                    // OSC — skip until BEL (\u{07}) or ST (ESC \\\)
-                    while let c = iter.next() {
-                        if c == "\u{07}" { break }
-                        if c == "\u{1B}" {
-                            _ = iter.next()  // consume backslash
-                            break
-                        }
-                    }
-                } else {
-                    // Other escape — skip the one char we already consumed
-                    continue
-                }
-            } else {
-                result.append(ch)
-            }
-        }
-        return result
-    }
 }
