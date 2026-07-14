@@ -69,7 +69,7 @@ If the workspace persists, the interface must show its Git state continuously, r
 
 The third piece is durable sessions: conversation, files, branches, and terminal state persist between visits, and the same workspace is reachable from any device. Waynode is mobile-first: the same workspace, session, and diff are available on a phone: follow a live task, review changed files, steer the agent, push a reviewed change. This only works because there is one canonical stateful workspace to point every client at; an ephemeral-per-task model has no equivalent object to reconnect to once the task ends.
 
-Around these three pieces, the remaining architecture is conventional: Waynode is MIT-licensed and self-hostable (`git clone` → `docker compose up -d`), connects to GitHub and GitLab via OAuth, runs the open-source pi agent engine (with pi-codex-goal for autonomous goal runs), and offers a sandboxed microVM execution path where KVM is available. A managed option ([Waynode Cloud](/learn)) runs the same stack with a 15-day free trial; self-hosters bring their own model keys.
+Around these three pieces, the remaining architecture is conventional: Waynode is MIT-licensed and self-hostable through a guided Docker Compose installer, connects to GitHub and GitLab via OAuth, and runs the open-source pi agent engine (with pi-codex-goal for autonomous goal runs). The default Compose deployment is for a trusted individual or small team; a separate KVM/microsandbox deployment is an advanced operator path. A managed option ([Waynode Cloud](/learn)) runs the same stack with a 15-day free trial; self-hosters bring their own model keys.
 
 ## How do persistent workspaces compare to the alternatives?
 
@@ -89,7 +89,7 @@ Each column is good at its own job. Ephemeral runners win on isolation and fan-o
 
 ## Does persistence weaken isolation?
 
-No. It changes where isolation is applied. Ephemeral runners get isolation for free by discarding the environment. A persistent workspace has to isolate execution while keeping data durable, running agent commands in a sandbox that can be torn down without touching the repository clone. Waynode's approach is a sandboxed microVM execution path (when KVM is available on the host), with the operator owning the session secret and encryption key on self-hosted deployments. On the hosted plans, workspaces are isolated and secrets are encrypted. The durable clone and the disposable execution environment are separate layers, which is the same separation Git itself encourages between the object store and the working tree.
+No. It changes where isolation is applied. Ephemeral runners get isolation for free by discarding the environment. A persistent workspace has to isolate execution while keeping data durable. Waynode has a separate KVM/microsandbox operator path for that separation; its default Compose deployment instead assumes a trusted individual or small team and does not provide hardware isolation between users. The operator owns the session secret and encryption key on self-hosted deployments. On hosted plans, workspaces are isolated and secrets are encrypted. The durable clone and disposable execution environment are separate layers, which is the same separation Git encourages between the object store and working tree.
 
 ## FAQ
 
@@ -111,4 +111,4 @@ Codespaces is a cloud development environment built around a human using an edit
 
 ### Can I self-host a persistent agent workspace?
 
-Yes. Waynode is MIT-licensed: clone the repository, copy `.env.example` to `.env`, and run `docker compose up -d`; the app serves on localhost:3000 with your repos, database, credentials, and LLM keys staying on your infrastructure. See the [repository](https://github.com/fornace/waynode) for setup details.
+Yes. Waynode is MIT-licensed: clone the repository and run `./scripts/self-host.sh setup`. The guided installer requires Docker Compose v2, an OAuth app, and a model-provider key; it generates the server secrets and starts on loopback by default, with your repos, database, credentials, and LLM keys staying on your infrastructure. See the [self-hosting guide](https://github.com/fornace/waynode/blob/main/docs/SELF-HOSTING.md) for setup and operations.

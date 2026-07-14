@@ -27,11 +27,13 @@ public final class SessionStore {
     public let sessionId: String
     public let spaceId: String
     private let api: APIClient
+    private let offlineFixture: Bool
     private var sse: SSEClient?
     private var listenerTask: Task<Void, Never>?
     private var stateTask: Task<Void, Never>?
     private var closeTimer: Task<Void, Never>?
     private var viewerCount: Int = 0
+    private var isRestartingStream: Bool = false
 
     // The reducer is the source of truth.
     public var reducer = ChatReducer()
@@ -45,10 +47,11 @@ public final class SessionStore {
     public var sessionMeta: Session?
     public var isPollingGoal: Bool = false
 
-    public init(sessionId: String, spaceId: String, api: APIClient) {
+    public init(sessionId: String, spaceId: String, api: APIClient, offlineFixture: Bool = false) {
         self.sessionId = sessionId
         self.spaceId = spaceId
         self.api = api
+        self.offlineFixture = offlineFixture
     }
 
     // MARK: - Lifecycle (acquire / release)
@@ -58,6 +61,10 @@ public final class SessionStore {
         closeTimer?.cancel()
         closeTimer = nil
 
+        if offlineFixture {
+            connectionState = .connected
+            return
+        }
         if sse == nil {
             await openStream()
         }
@@ -100,7 +107,32 @@ public final class SessionStore {
             startGoalPolling()
         }
 
-        // Open SSE.
+        await connectStream()
+    }
+
+    /// Reopen only the live stream. History and reducer state deliberately stay
+    /// intact, so retrying cannot erase the transcript or disturb a draft held
+    /// by the composing view.
+    public func reconnect() async {
+        guard viewerCount > 0, !isRestartingStream else { return }
+        isRestartingStream = true
+        defer { isRestartingStream = false }
+
+        listenerTask?.cancel()
+        listenerTask = nil
+        let previous = sse
+        sse = nil
+        await previous?.stop()
+
+        guard viewerCount > 0 else {
+            connectionState = .disconnected
+            return
+        }
+        await connectStream()
+    }
+
+    private func connectStream() async {
+        connectionState = .connecting
         let url = api.makeURL("/api/sessions/\(sessionId)/stream")
         let token = await api.currentToken()
         let client = SSEClient(url: url, token: token)

@@ -66,7 +66,7 @@ Waynode's unit is a **space**: a real cloned Git repository on disk, persistent 
 
 Because sessions persist, the desk-to-phone hand-off is simple: start a task at your desk, check the diff from your phone an hour later, resume in a terminal the next morning. Native macOS and iOS clients are planned (a native app exists in the repository).
 
-You can self-host it for free (`git clone` → `docker compose up -d`; MIT-licensed, your repos and LLM keys stay on your infrastructure; see the [self-hosting guide](/guides/self-host-coding-agent-docker)) or use [Waynode Cloud](https://waynode.fornace.net), the managed version of the same stack, from $39/month with a 15-day free trial. For the broader self-hosted-versus-hosted decision, see [self-hosted vs cloud coding agents](/guides/self-hosted-vs-cloud-coding-agents); for a direct comparison with a hosted agent product, see [Waynode vs Cursor background agents](/compare/waynode-vs-cursor-background-agents).
+You can self-host it for free (clone the repo and run the guided `./scripts/self-host.sh setup`; Docker Compose v2, an OAuth app, and a model-provider key are required; see the [self-hosting guide](/guides/self-host-coding-agent-docker)) or use [Waynode Cloud](https://waynode.fornace.net), the managed version of the same stack, from $39/month with a 15-day free trial. For the broader self-hosted-versus-hosted decision, see [self-hosted vs cloud coding agents](/guides/self-hosted-vs-cloud-coding-agents); for a direct comparison with a hosted agent product, see [Waynode vs Cursor background agents](/compare/waynode-vs-cursor-background-agents).
 
 ## What can't you realistically do from a phone?
 
@@ -95,8 +95,8 @@ Yes. GitHub Mobile lets you review the Copilot cloud agent's changes as a branch
 
 ### What makes Waynode different from Codex or Copilot on mobile?
 
-Persistence and ownership. Hosted agents run in ephemeral vendor environments and hand results off as PRs; Waynode's agent works in a persistent cloned repository on infrastructure you control (or on Waynode Cloud), and the same session, files, branches, and terminal state are reachable from any device. It is open source under MIT.
+Persistence and ownership. Hosted agents run in ephemeral vendor environments and hand results off as PRs; Waynode's agent works in a persistent cloned repository on infrastructure you control (or on Waynode Cloud), and the same session, files, and branches are reachable from any device. Self-hosted installations also expose the workspace terminal. It is open source under MIT.
 
 ### Do I need the Waynode Cloud plan to use it from a phone?
 
-No. The self-hosted version is free and MIT-licensed, and the mobile web experience is part of the open-source stack. Waynode Cloud ($39–$249/month, 15-day trial) adds managed hosting, updates, encrypted secrets, and backups on top of the same code.
+No. The self-hosted version is free and MIT-licensed, and the mobile web experience is part of the open-source stack. Waynode Cloud ($39–$249/month, 15-day trial) adds managed server operation, updates, encrypted secrets, and Stripe billing on top of the same code. Interactive terminal access is currently self-hosted only.

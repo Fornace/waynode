@@ -189,17 +189,23 @@
 .goal-badge.budget { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
 
 .login-page {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  background: radial-gradient(circle at center, var(--bg-surface) 0%, var(--bg) 100%);
+  min-height: 100dvh;
+  height: 100%;
+  overflow-y: auto;
+  padding: calc(24px + var(--safe-top)) 24px calc(24px + var(--safe-bottom));
+  background: var(--bg);
 }
+
+.login-home { position: absolute; top: 24px; left: 24px; min-height: 40px; display: inline-flex; align-items: center; color: var(--text-dim); font-size: 13px; }
 
 .login-card {
   background: var(--bg-surface);
   border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 48px 40px;
   width: 400px;
   text-align: center;
@@ -243,6 +249,18 @@
   background: rgba(255,255,255,0.08);
   transform: translateY(-1px);
 }
+
+.login-error { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 11px; border: 1px solid rgba(248,113,113,.42); border-radius: 8px; color: var(--red); font-size: 12px; text-align: left; }
+.login-error span { flex: 1; }
+.login-error button { min-height: 36px; color: var(--text); font-weight: 650; }
+.login-provider-empty { margin: 0; padding: 13px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); font-size: 13px; line-height: 1.55; }
+.login-dev { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: grid; gap: 8px; text-align: left; }
+.login-dev > button:first-child { width: 100%; color: var(--text-faint); font-size: 12px; text-align: center; }
+.login-dev label { color: var(--text-dim); font-size: 12px; }
+.login-server { margin-top: 22px; color: var(--text-faint); font-size: 12px; text-align: left; }
+.login-server summary { cursor: pointer; text-align: center; }
+.login-server p { margin: 10px 0 0; line-height: 1.55; }
+@media (max-width: 480px) { .login-card { width: 100%; padding: 38px 24px; } .login-home { top: 12px; left: 16px; } }
 
 .empty-state {
   display: flex;

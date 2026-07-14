@@ -85,8 +85,11 @@ public actor WSClient {
                         break
                     }
                 } catch {
-                    // Connection lost — yield exited so the UI updates.
-                    await self.outputContinuation.yield(.exited(-1))
+                    guard !Task.isCancelled else { break }
+                    // A transport failure is not a process exit. Keeping the
+                    // states distinct lets the UI offer Retry instead of
+                    // reporting a misleading negative exit code.
+                    await self.outputContinuation.yield(.error("Connection lost"))
                     break
                 }
             }

@@ -229,6 +229,21 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+.settings-inline-error { position: static; transform: none; width: 100%; max-width: none; margin-bottom: 18px; }
+.account-token-list { margin-top: 12px; }
+.account-token-error { margin-top: 12px; }
+.account-token-error button { margin-left: 8px; color: var(--text); text-decoration: underline; }
+.account-token-create { display: grid; gap: 7px; margin-top: 14px; }
+.account-token-create > label { color: var(--text-dim); font-size: 12px; font-weight: 650; }
+.account-token-create > label span { color: var(--text-faint); font-weight: 400; }
+.account-token-create > div { display: flex; gap: 8px; }
+.account-token-create .form-input { min-width: 0; flex: 1; }
+.account-token-create p { color: var(--amber); font-size: 12px; }
+.token-reveal-dialog { width: min(560px, calc(100vw - 32px)); }
+.token-reveal-dialog h2 { margin: 0; font-size: 18px; }
+.token-reveal-dialog p { margin: 9px 0 16px; color: var(--text-dim); line-height: 1.55; }
+.token-reveal-dialog textarea { width: 100%; min-height: 92px; padding: 12px; resize: none; border: 1px solid var(--border); border-radius: 8px; color: #dbeafe; background: var(--bg); font: 12px/1.5 var(--mono); overflow-wrap: anywhere; }
+@media (max-width: 560px) { .account-token-create > div { flex-direction: column; }.account-token-create button { min-height: 44px; }.token-reveal-dialog { width: 100%; }.token-reveal-dialog .confirm-dialog-actions { flex-direction: column-reverse; }.token-reveal-dialog .confirm-dialog-actions button { min-height: 44px; width: 100%; } }
 .agents-editor {
   width: 100%;
   min-height: 320px;

@@ -20,7 +20,7 @@ Coder is a self-hosted platform for provisioning cloud development environments 
 
 - **Coder**: AGPL-3.0 core plus enterprise license, workspaces defined in Terraform, runs on Kubernetes/EC2/Docker, ~13.8k GitHub stars as of July 2026. Built for platform teams managing fleets of dev environments; AI agents are a feature of that platform ([github.com/coder/coder](https://github.com/coder/coder)).
 - Coder's agent story is in transition: Coder Tasks is deprecated (removed from releases starting v2.37, September 1, 2026) in favor of Coder Agents, a control-plane-native agent currently in beta ([Coder Tasks docs](https://coder.com/docs/ai-coder/tasks)).
-- **Waynode**: MIT, `docker compose up -d` to self-host, agent-first design (pi engine, autonomous goal runs), persistent Git-native workspaces, mobile-first review-and-steer. No Terraform, no Kubernetes required.
+- **Waynode**: MIT, guided Docker Compose self-hosting, agent-first design (pi engine, autonomous goal runs), persistent Git-native workspaces, mobile-first review-and-steer. No Terraform or Kubernetes required, but you still configure OAuth, a model provider, HTTPS, and backups.
 - Pick Coder for enterprise scale, governance (audit logs, RBAC, quotas: Premium tier), and IDE-centric cloud dev environments. Pick Waynode for small-team simplicity where the agent is the primary worker and you review from anywhere.
 
 ## What is Coder?
@@ -50,7 +50,7 @@ Waynode is an open-source (MIT), self-hosted coding-agent workspace ([github.com
 - Sessions persist: conversation, files, branches, and terminal state survive between visits, and the same workspace works from a phone: follow a live task, review diffs, steer, push.
 - Repo providers: GitHub and GitLab via OAuth.
 
-Self-hosting is `git clone`, `cp .env.example .env`, `docker compose up -d`, open localhost:3000. See [/guides/self-host-coding-agent-docker](/guides/self-host-coding-agent-docker) for the full walkthrough. There is no Terraform, no template authoring, and no Kubernetes requirement. A sandboxed microVM execution path exists when KVM is available. See [/learn](/learn) for an overview.
+Self-hosting starts with `git clone` and `./scripts/self-host.sh setup`. The guided installer requires Docker Compose v2, a GitHub or GitLab OAuth app, and a supported model-provider key; it generates the server secrets, validates Compose, and starts Waynode on loopback. See [/guides/self-host-coding-agent-docker](/guides/self-host-coding-agent-docker) for the full walkthrough. There is no Terraform, template authoring, or Kubernetes requirement. The default Compose deployment is for a trusted individual or small team; the separate KVM/microsandbox deployment is an advanced operator path. See [/learn](/learn) for an overview.
 
 ## Waynode vs Coder: comparison table
 
@@ -58,7 +58,7 @@ Self-hosting is `git clone`, `cp .env.example .env`, `docker compose up -d`, ope
 |---|---|---|
 | Category | Self-hosted coding-agent workspace | Self-hosted cloud dev environment platform |
 | License | MIT | AGPL-3.0 + enterprise license ([repo](https://github.com/coder/coder)) |
-| Self-host install | `docker compose up -d` | Install script/binary for evaluation; Kubernetes or other hosted platforms for production multi-user installs ([install docs](https://coder.com/docs/install)) |
+| Self-host install | Guided Docker Compose script; OAuth and model key required | Install script/binary for evaluation; Kubernetes or other hosted platforms for production multi-user installs ([install docs](https://coder.com/docs/install)) |
 | Workspace definition | Cloned Git repo, persistent worktree | Terraform templates (K8s pods, EC2 VMs, Docker) |
 | Agent | pi engine built in; chat, autonomous goals, terminal | Coder Agents (beta, control-plane loop); Tasks deprecated Sept 2026 ([docs](https://coder.com/docs/ai-coder/agents)) |
 | Model configuration | Self-host: bring your own keys. Cloud: hosted tiers (Fornace models, GLM, Qwen) | Admin-configured: Anthropic, OpenAI, Google, Azure OpenAI, Bedrock, OpenAI-compatible |
@@ -109,4 +109,4 @@ Yes, when self-hosted. Coder runs workspaces on your Kubernetes clusters, VMs, o
 
 ### Which is easier to install?
 
-Waynode: `git clone`, copy the env file, `docker compose up -d`, open localhost:3000. Coder installs via a shell script or binary for evaluation, while production multi-user deployments run on Kubernetes or other hosted platforms and require authoring Terraform workspace templates ([install docs](https://coder.com/docs/install)).
+Waynode: clone the repo and run `./scripts/self-host.sh setup`; the installer walks through OAuth and model-provider credentials before starting Docker Compose. Coder installs via a shell script or binary for evaluation, while production multi-user deployments run on Kubernetes or other hosted platforms and require authoring Terraform workspace templates ([install docs](https://coder.com/docs/install)).

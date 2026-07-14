@@ -75,8 +75,11 @@ struct NativeTerminalSurface: UIViewRepresentable {
         func rangeChanged(source: SwiftTerm.TerminalView, startY: Int, endY: Int) {}
 
         func requestOpenLink(source: SwiftTerm.TerminalView, link: String, params: [String : String]) {
-            guard let url = URL(string: link), UIApplication.shared.canOpenURL(url) else { return }
-            UIApplication.shared.open(url)
+            guard let url = URL(string: link) else { return }
+            Task { @MainActor in
+                guard UIApplication.shared.canOpenURL(url) else { return }
+                UIApplication.shared.open(url)
+            }
         }
 
         func clipboardCopy(source: SwiftTerm.TerminalView, content: Data) {

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { Space } from "../types";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 export interface GitIssueAction {
   id: string;
@@ -40,12 +41,16 @@ export const STATUS_COLOR: Record<string, string> = {
 
 export function GitIssueCard({ issue }: { issue: GitIssue }) {
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const run = async (a: GitIssueAction) => {
     setBusyId(a.id);
-    try { await a.run(); } finally { setBusyId(null); }
+    setError("");
+    try { await a.run(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "The Git action could not be completed."); }
+    finally { setBusyId(null); }
   };
   return (
-    <div className="git-issue">
+    <div className="git-issue" role="alert">
       <div className="git-issue-title">🔀 {issue.title}</div>
       <div className="git-issue-detail">{issue.detail}</div>
       {issue.files && issue.files.length > 0 && (
@@ -53,6 +58,7 @@ export function GitIssueCard({ issue }: { issue: GitIssue }) {
           {issue.files.map((f) => <li key={f}>{f}</li>)}
         </ul>
       )}
+      {error && <div className="git-issue-detail">{error}</div>}
       <div className="git-issue-actions">
         {issue.actions.map((a) => (
           <button
@@ -81,16 +87,18 @@ export function MergeModal({
   onPick: (name: string) => void;
 }) {
   const [q, setQ] = useState("");
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEscapeToClose(onCancel, overlayRef);
   const list = branches.filter((b) => b.name.toLowerCase().includes(q.toLowerCase()));
   return (
-    <div className="git-modal-overlay" onClick={onCancel}>
-      <div className="git-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="git-modal-overlay" ref={overlayRef} onClick={onCancel}>
+      <div className="git-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="merge-branch-title">
         <div className="git-modal-head">
-          <h3>Merge into {current}</h3>
-          <button className="git-icon-btn" onClick={onCancel}><CloseIcon /></button>
+          <h3 id="merge-branch-title">Merge into {current}</h3>
+          <button className="git-icon-btn" onClick={onCancel} aria-label="Cancel branch merge"><CloseIcon /></button>
         </div>
         <div className="git-modal-body">
-          <input className="git-input" placeholder="Filter branches…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <input className="git-input" placeholder="Filter branches…" aria-label="Filter branches to merge" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <div className="git-merge-list">
             {list.length === 0 && <div className="git-empty">No branches.</div>}
             {list.map((b) => (
@@ -118,6 +126,7 @@ export function MergeModal({
 // ───────────────────────────── Diff view ─────────────────────────────
 
 export function FileEditor({ space, path, onClose, onSaved }: { space: Space; path: string; onClose: () => void; onSaved: () => void }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [content, setContent] = useState("");
   const [original, setOriginal] = useState("");
   const [revision, setRevision] = useState("");
@@ -169,18 +178,19 @@ export function FileEditor({ space, path, onClose, onSaved }: { space: Space; pa
   };
 
   const close = () => {
-    if (!dirty || window.confirm("Discard unsaved changes?")) onClose();
+    if (!dirty || window.confirm(`Discard unsaved changes to “${path}”?`)) onClose();
   };
+  useEscapeToClose(close, overlayRef);
 
   return (
-    <div className="file-editor-overlay" role="dialog" aria-modal="true" aria-label={`Edit ${path}`}>
+    <div ref={overlayRef} className="file-editor-overlay" role="dialog" aria-modal="true" aria-label={`Edit ${path}`} tabIndex={-1}>
       <section className="file-editor">
         <header className="file-editor-head">
           <div className="file-editor-title"><strong>{basename(path)}</strong><span>{dirname(path)}</span>{dirty && <i title="Unsaved changes" />}</div>
-          <button className="git-icon-btn" onClick={close} title="Close editor"><CloseIcon /></button>
+          <button className="git-icon-btn" onClick={close} title="Close editor" aria-label={`Close editor for ${path}`}><CloseIcon /></button>
         </header>
-        {loading ? <div className="git-empty">Opening file…</div> : error && !content ? <div className="file-editor-error">{error}</div> : <textarea className="file-editor-text" value={content} onChange={(e) => setContent(e.target.value)} spellCheck={false} autoFocus />}
-        {error && content && <div className="file-editor-error">{error}</div>}
+        {loading ? <div className="git-empty" role="status">Opening file…</div> : error && !content ? <div className="file-editor-error" role="alert">{error}</div> : <textarea className="file-editor-text" aria-label={`Contents of ${path}`} value={content} onChange={(e) => setContent(e.target.value)} spellCheck={false} autoFocus />}
+        {error && content && <div className="file-editor-error" role="alert">{error}</div>}
         <footer className="file-editor-foot">
           <span>{dirty ? "Unsaved changes" : "Saved"}</span>
           <button className="git-btn-ghost" disabled={!dirty || saving} onClick={() => setContent(original)}>Revert</button>

@@ -6,8 +6,8 @@ import Security
 // Thin wrapper over the iOS/macOS Keychain Services API for persisting the
 // Waynode API token and server URL. The token is the single credential the
 // app needs (Bearer `wn_...`). We store it in a generic password item
-// scoped to the app's access group (when present) so it survives reinstall
-// only when explicitly backed up.
+// in the app's default, code-signing-derived keychain namespace. Waynode does
+// not share credentials with another app or extension.
 
 public struct KeychainStore: Sendable {
     public let service: String
@@ -39,17 +39,13 @@ public struct KeychainStore: Sendable {
     // MARK: - Core operations
 
     private func read() -> String? {
-        var query: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
-        if let accessGroup = Self.accessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
-        }
-
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         #if DEBUG
@@ -67,17 +63,13 @@ public struct KeychainStore: Sendable {
         let data = Data(token.utf8)
         delete() // Always overwrite
 
-        var attributes: [String: Any] = [
+        let attributes: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
-        if let accessGroup = Self.accessGroup {
-            attributes[kSecAttrAccessGroup as String] = accessGroup
-        }
-
         let status = SecItemAdd(attributes as CFDictionary, nil)
         #if DEBUG
         print("Waynode diagnostics: keychain write status \(status)")
@@ -88,24 +80,13 @@ public struct KeychainStore: Sendable {
     }
 
     private func delete() {
-        var query: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-        if let accessGroup = Self.accessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
-        }
         SecItemDelete(query as CFDictionary)
     }
-
-    /// Access group is set via Info.plist key-chain-sharing when present.
-    /// On simulator without a group, this is nil.
-    private static let accessGroup: String? = {
-        // Apps without keychain sharing leave this nil; we read it from
-        // the bundle at runtime if available.
-        Bundle.main.object(forInfoDictionaryKey: "WaynodeKeychainAccessGroup") as? String
-    }()
 
     public enum KeychainError: Error, LocalizedError {
         case unhandledStatus(OSStatus)

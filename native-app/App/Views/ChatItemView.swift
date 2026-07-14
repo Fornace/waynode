@@ -75,6 +75,9 @@ struct UserMessageView: View {
                 }
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("You: \(message.content)")
+        .accessibilityHint(message.isGoal ? "Goal request" : "Your message")
     }
 }
 
@@ -110,33 +113,50 @@ struct AssistantMessageView: View {
     let message: ChatItem.AssistantItem
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            // Avatar / role indicator
-            Image(systemName: "sparkles")
-                .font(.caption)
-                .foregroundStyle(.tint)
-                .padding(.top, 6)
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(message.blocks.enumerated()), id: \.offset) { _, block in
-                    BlockView(block: block)
-                }
-                if !message.done {
-                    // Typing indicator while streaming
-                    HStack(spacing: 4) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            Circle()
-                                .fill(.secondary)
-                                .frame(width: 6, height: 6)
-                                .opacity(0.6)
-                        }
-                    }
-                    .padding(.top, 2)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(displayBlocks.enumerated()), id: \.offset) { _, block in
+                BlockView(block: block)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer(minLength: 0)
+            if !message.done {
+                HStack(spacing: 4) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Circle()
+                            .fill(.secondary)
+                            .frame(width: 6, height: 6)
+                            .opacity(0.6)
+                    }
+                }
+                .padding(.top, 2)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Waynode: \(message.blocks.accessibilitySummary)")
+        .accessibilityValue(message.done ? "Complete" : "Still responding")
+    }
+
+    private var displayBlocks: [Block] {
+        message.blocks.reduce(into: []) { result, block in
+            guard case .thinking(let next) = block,
+                  let last = result.last,
+                  case .thinking(let previous) = last else {
+                result.append(block)
+                return
+            }
+            result[result.count - 1] = .thinking(.init(text: previous.text + "\n\n" + next.text))
+        }
+    }
+}
+
+private extension Array where Element == Block {
+    var accessibilitySummary: String {
+        map { block in
+            switch block {
+            case .text(let data): return data.text
+            case .thinking(let data): return "Thinking: \(data.text)"
+            case .tool(let data): return "Tool result: \(String(describing: data))"
+            }
+        }.joined(separator: " ")
     }
 }
 
@@ -160,7 +180,7 @@ struct SystemMessageView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(.thinMaterial)
+            .background(Color.secondary.opacity(0.08))
             .clipShape(Capsule())
             Spacer()
         }
@@ -217,18 +237,19 @@ struct TextBlock: View {
 
 struct ThinkingBlock: View {
     let text: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
                 Haptics.light()
-                withAnimation(.smooth) { isExpanded.toggle() }
+                withAnimation(reduceMotion ? nil : .smooth) { isExpanded.toggle() }
             } label: {
                 HStack {
                     Image(systemName: "brain.head.profile")
                         .font(.caption)
-                    Text("Thinking")
+                    Text("Reasoning")
                         .font(.caption.bold())
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
@@ -249,8 +270,8 @@ struct ThinkingBlock: View {
                     .transition(.opacity)
             }
         }
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.secondary.opacity(0.07))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -258,13 +279,14 @@ struct ThinkingBlock: View {
 
 struct ToolBlockView: View {
     let data: Block.ToolBlock
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
                 Haptics.light()
-                withAnimation(.smooth) { isExpanded.toggle() }
+                withAnimation(reduceMotion ? nil : .smooth) { isExpanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
                     statusIcon

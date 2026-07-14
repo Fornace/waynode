@@ -4,6 +4,7 @@ import type { Space, GitSnapshot } from "../types";
 import { BranchesPanel } from "./GitBranchesPanel";
 import { ChangesPanel } from "./GitChangesPanel";
 import { BranchIcon, CloseIcon, GitIssueCard, RefreshIcon, type GitIssue } from "./GitSidebarShared";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import "./GitSidebarLayout.css";
 import "./GitSidebarActions.css";
 
@@ -26,6 +27,8 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
   const [tab, setTab] = useState<Tab>("changes");
   const [issue, setIssue] = useState<GitIssue | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  useEscapeToClose(onClose, panelRef, open);
 
   // ── Live data: only poll while open ──
   useEffect(() => {
@@ -61,12 +64,21 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
   return (
     <>
       {open && <div className="git-overlay" onClick={onClose} />}
-      <aside className={`git-panel ${open ? "open" : ""}`} aria-hidden={!open}>
+      <aside
+        ref={panelRef}
+        className={`git-panel ${open ? "open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="git-review-title"
+        aria-hidden={!open}
+        inert={!open}
+        tabIndex={-1}
+      >
         <header className="git-header">
           <div className="git-header-title">
             <span className="git-worktree-icon"><BranchIcon /></span>
             <span className="git-worktree-heading">
-              <b>Git worktree</b>
+              <b id="git-review-title">Git worktree</b>
               <small>{space.repo_name} · {snap?.currentBranch || "…"}</small>
             </span>
             {snap && !snap.detached && snap.upstream && (
@@ -77,36 +89,36 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
             )}
           </div>
           <div className="git-header-actions">
-            <button className="git-icon-btn" onClick={refresh} title="Refresh">
+            <button className="git-icon-btn" onClick={refresh} title="Refresh" aria-label="Refresh Git status">
               <RefreshIcon spinning={loading} />
             </button>
-            <button className="git-icon-btn git-close-btn" onClick={onClose} title="Close">
+            <button className="git-icon-btn git-close-btn" onClick={onClose} title="Close" aria-label="Close Git review">
               <CloseIcon />
             </button>
           </div>
         </header>
 
         {snap?.piBusy && (
-          <div className="git-pi-busy">
+          <div className="git-pi-busy" role="status">
             <span className="pulse">⚡</span> pi is working — changes may be in progress
           </div>
         )}
-        {error && <div className="git-error">{error}</div>}
+        {error && <div className="git-error" role="alert">{error}</div>}
 
         {issue && <GitIssueCard issue={issue} />}
 
-        <nav className="git-tabs">
-          <button className={`git-tab ${tab === "changes" ? "active" : ""}`} onClick={() => setTab("changes")}>
+        <nav className="git-tabs" role="tablist" aria-label="Git review sections">
+          <button id="git-changes-tab" role="tab" aria-selected={tab === "changes"} aria-controls="git-review-panel" className={`git-tab ${tab === "changes" ? "active" : ""}`} onClick={() => setTab("changes")}>
             Changes{snap ? ` (${snap.files.length})` : ""}
           </button>
-          <button className={`git-tab ${tab === "branches" ? "active" : ""}`} onClick={() => setTab("branches")}>
+          <button id="git-branches-tab" role="tab" aria-selected={tab === "branches"} aria-controls="git-review-panel" className={`git-tab ${tab === "branches" ? "active" : ""}`} onClick={() => setTab("branches")}>
             Branches
           </button>
         </nav>
 
-        <div className="git-body">
+        <div className="git-body" id="git-review-panel" role="tabpanel" aria-labelledby={tab === "changes" ? "git-changes-tab" : "git-branches-tab"}>
           {loading && !snap ? (
-            <div className="git-empty">Loading git…</div>
+            <div className="git-empty" role="status">Loading Git…</div>
           ) : !snap ? (
             <div className="git-empty">No data</div>
           ) : tab === "changes" ? (

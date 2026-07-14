@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- PWA / mobile web app -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -14,18 +14,16 @@
 
     <!-- Favicons -->
     <link rel="icon" href="/brand/waynode-mark.svg" type="image/svg+xml" />
-    <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
-    <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="mask-icon" href="/brand/waynode-mark.svg" color="#3b82f6" />
     <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Social / share -->
-    <title>Waynode: Open-source, self-hosted coding-agent workspace</title>
-    <meta name="description" content="Waynode gives coding agents a persistent Git workspace: real cloned repos, agent-native diffs and push, desktop to mobile. Self-host free (MIT) or use Waynode Cloud." />
+    <title>Waynode: The durable worktree for agent work</title>
+    <meta name="description" content="Connect a repository, direct the agent, leave safely, and return to the same branch, conversation, and changed files from any device." />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Waynode: Open-source, self-hosted coding-agent workspace" />
-    <meta property="og:description" content="A persistent Git workspace for coding agents: real cloned repos, agent-native diffs and push, desktop to mobile." />
+    <meta property="og:title" content="Waynode: The durable worktree for agent work" />
+    <meta property="og:description" content="Leave the laptop, not the worktree. Resume the same repository, agent session, and diff from any device." />
 
     <!-- Agent-readable twins of this site: /index.md, /llms.txt, /llms-full.txt -->
     <link rel="alternate" type="text/markdown" title="Markdown version for LLMs" href="/index.md" />
@@ -38,7 +36,7 @@
       "operatingSystem": "Web, macOS, iOS",
       "url": "https://waynode.fornace.net",
       "sameAs": ["https://github.com/fornace/waynode"],
-      "description": "Open-source, self-hosted coding-agent workspace. Each workspace is a real cloned Git repository with a persistent worktree, terminal, and agent session, reachable from desktop and mobile.",
+      "description": "Open-source durable worktrees for coding agents. Connect a repository, direct the agent, and return to the same branch, session, and changed files from any device.",
       "license": "https://opensource.org/licenses/MIT",
       "offers": [
         { "@type": "Offer", "name": "Self-hosted", "price": "0", "priceCurrency": "USD" },
@@ -48,10 +46,8 @@
       ]
     }
     </script>
-    <meta property="og:image" content="/og-image.png" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Waynode AI" />
-    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:title" content="Waynode" />
 
     <style>
       /* ── Boot screen: no white flash; branded loader until React mounts ── */

@@ -1,11 +1,6 @@
 import SwiftUI
 import WaynodeCore
 import AuthenticationServices
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
 
 // MARK: - AuthView
 //
@@ -13,7 +8,7 @@ import AppKit
 // "Continue with GitLab" (shown only if enabled on the server).
 //
 // Uses ASWebAuthenticationSession to perform the OAuth flow in Safari.
-// The server redirects to waynode://auth?token=wn_... which
+// The server redirects to waynode://auth?token=wn_...&nonce=... which
 // ASWebAuthenticationSession captures.
 //
 // Design: centered logo + buttons on a matte background. No glass here —
@@ -23,6 +18,7 @@ import AppKit
 struct AuthView: View {
     @Environment(AppModel.self) private var appModel
     @State private var session: ASWebAuthenticationSession?
+    @State private var presentationProvider: AuthPresentationProvider?
     @State private var error: String?
     @State private var customServerURL: String = ""
     @State private var showingServerSheet = false
@@ -30,8 +26,40 @@ struct AuthView: View {
     @State private var providersFetchFailed = false
 
     var body: some View {
+        GeometryReader { proxy in
+            ScrollView {
+                authContent
+                    .frame(maxWidth: 460)
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("auth.surface")
+        .sheet(isPresented: $showingServerSheet) {
+            ServerConfigSheet(
+                url: Binding(
+                    get: { customServerURL.isEmpty ? appModel.auth.serverConfig.baseURL.absoluteString : customServerURL },
+                    set: { customServerURL = $0 }
+                )
+            ) { newURL in
+                if let url = URL(string: newURL) {
+                    appModel.auth.setServerURL(url)
+                    appModel.reconfigureAPI()
+                    Task { await fetchProviders() }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .macSheetFrame(minWidth: 480, idealWidth: 540, maxWidth: 620, minHeight: 360, idealHeight: 420, maxHeight: 560)
+        }
+        .task { await fetchProviders() }
+    }
+
+    private var authContent: some View {
         VStack(spacing: 0) {
-            Spacer()
+            Spacer(minLength: 32)
+                .frame(maxHeight: 240)
 
             // Logo
             BrandLogo()
@@ -64,7 +92,8 @@ struct AuthView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassProminent)
-                    .controlSize(.large)
+                    .controlSize(.large).accessibilityIdentifier("auth.github")
+                    .disabled(session != nil)
                 }
 
                 if let providers = appModel.auth.providers, providers.gitlab == true {
@@ -75,7 +104,8 @@ struct AuthView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glass)
-                    .controlSize(.large)
+                    .controlSize(.large).accessibilityIdentifier("auth.gitlab")
+                    .disabled(session != nil)
                 }
 
                 // If we don't know providers yet, show loading or retry.
@@ -84,6 +114,7 @@ struct AuthView: View {
                         ProgressView()
                             .controlSize(.large)
                             .frame(maxWidth: .infinity, minHeight: 50)
+                            .accessibilityIdentifier("auth.providers.loading")
                     } else if providersFetchFailed {
                         VStack(spacing: 12) {
                             Text("Couldn't reach server")
@@ -96,7 +127,7 @@ struct AuthView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.glass)
-                            .controlSize(.large)
+                            .controlSize(.large).accessibilityIdentifier("auth.providers.retry")
                         }
                     } else {
                         // Fallback: generic login (should rarely show since
@@ -108,7 +139,8 @@ struct AuthView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glassProminent)
-                        .controlSize(.large)
+                        .controlSize(.large).accessibilityIdentifier("auth.login")
+                        .disabled(session != nil)
                     }
                 }
             }
@@ -116,12 +148,26 @@ struct AuthView: View {
             .padding(.bottom, 8)
 
             // Server URL config (for self-hosters)
-            Button("Server: \(serverHost)") {
+            Button {
+                customServerURL = appModel.auth.serverConfig.baseURL.absoluteString
                 showingServerSheet = true
+            } label: {
+                Label {
+                    Text(serverHost)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } icon: {
+                    Image(systemName: "server.rack")
+                }
             }
             .font(.caption)
-            .foregroundStyle(.tertiary)
-            .padding(.bottom, 24)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Change server. Current server: \(serverHost)")
+            .accessibilityHint("Opens server address settings")
+            .accessibilityIdentifier("auth.server.change")
+            .frame(minHeight: 44)
+            .padding(.vertical, 8)
+            .padding(.bottom, 16)
 
             if let error {
                 Text(error)
@@ -129,32 +175,23 @@ struct AuthView: View {
                     .foregroundStyle(.red)
                     .padding(.horizontal)
                     .padding(.bottom, 8)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.center)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Login error: \(error)")
+                    .accessibilitySortPriority(2)
             } else if let authError = appModel.auth.error {
                 Text(authError)
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .padding(.horizontal)
                     .padding(.bottom, 8)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.center)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Login error: \(authError)")
+                    .accessibilitySortPriority(2)
             }
-        }
-        .sheet(isPresented: $showingServerSheet) {
-            ServerConfigSheet(
-                url: Binding(
-                    get: { appModel.auth.serverConfig.baseURL.absoluteString },
-                    set: { customServerURL = $0 }
-                )
-            ) { newURL in
-                if let url = URL(string: newURL) {
-                    appModel.auth.setServerURL(url)
-                    appModel.reconfigureAPI()
-                    Task { await fetchProviders() }
-                }
-            }
-            .presentationDetents([.medium])
-        }
-        .task {
-            // Fetch providers list (no auth needed for /api/auth/me shape).
-            await fetchProviders()
         }
     }
 
@@ -191,26 +228,33 @@ struct AuthView: View {
         }
     }
     private func startAuth(provider: String) async {
+        guard session == nil else { return }
         error = nil
         appModel.auth.error = nil // Clear stale "session expired" msg
         let baseURL = appModel.auth.serverConfig.baseURL
         var authURL = URLComponents(url: baseURL.appendingPathComponent("/auth/\(provider)"), resolvingAgainstBaseURL: false)!
-        authURL.queryItems = [URLQueryItem(name: "native", value: "1")]
-        let url = authURL.url!
         let scheme = AuthStore.callbackScheme
+        guard let presentationProvider = AuthPresentationProvider.active() else {
+            error = "Waynode needs an active window before it can open sign in."
+            return
+        }
+        guard let nonce = appModel.auth.beginNativeAuth() else { return }
+        authURL.queryItems = [
+            URLQueryItem(name: "native", value: "1"),
+            URLQueryItem(name: "native_nonce", value: nonce),
+        ]
+        let url = authURL.url!
 
         let completion: @Sendable (URL?, Error?) -> Void = { callbackURL, err in
-            // ASWebAuthenticationSession invokes its completion from Safari's
-            // XPC queue on macOS. Creating a @MainActor Task directly there
-            // inherits an invalid executor and trips Swift 6's runtime
-            // isolation assertion (EXC_BREAKPOINT). Hop to the main dispatch
-            // queue first, then touch SwiftUI state or the AppModel.
+            // Safari completes on an XPC queue on Catalyst. Hop to main before
+            // touching SwiftUI state to satisfy Swift 6 actor isolation.
             DispatchQueue.main.async {
                 Task { @MainActor in
+                    self.session = nil
+                    self.presentationProvider = nil
                     guard let callbackURL else {
-                        // User canceled or session failed
+                        appModel.auth.cancelNativeAuth()
                         if let err = err as? ASWebAuthenticationSessionError, err.code == .canceledLogin {
-                            // Silent cancel — user dismissed the browser
                         } else if let err {
                             error = err.localizedDescription
                             Haptics.error()
@@ -221,27 +265,30 @@ struct AuthView: View {
                 }
             }
         }
-        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme, completionHandler: completion)
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callback: .customScheme(scheme),
+            completionHandler: completion
+        )
         session.prefersEphemeralWebBrowserSession = false
-        session.presentationContextProvider = AuthPresentationProvider.shared
+        session.presentationContextProvider = presentationProvider
+        self.presentationProvider = presentationProvider
         self.session = session
-        session.start()
+        guard session.start() else {
+            self.session = nil
+            self.presentationProvider = nil
+            appModel.auth.cancelNativeAuth()
+            error = "Waynode couldn't open the sign-in window. Please try again."
+            return
+        }
     }
 
     private func handleCallback(_ url: URL) async {
-        // Expected: waynode://auth?token=wn_...
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
-            error = "Invalid callback URL"
-            return
-        }
-        await appModel.auth.completeAuth(token: token)
-        if appModel.auth.isAuthenticated {
+        if await appModel.auth.completeNativeAuthCallback(url) {
             await appModel.bootstrap()
         }
     }
 }
-
 // MARK: - BrandLogo
 
 struct BrandLogo: View {
@@ -285,79 +332,4 @@ struct BrandLogo: View {
         }
         .aspectRatio(1, contentMode: .fit)
     }
-}
-
-// MARK: - Presentation provider for ASWebAuthenticationSession
-
-@MainActor
-final class AuthPresentationProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
-    static let shared = AuthPresentationProvider()
-
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        #if canImport(UIKit)
-        // UIKit: return a window associated with the active scene.
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else {
-            // Returning a fallback anchor lets the auth framework report a recoverable
-            // presentation failure if startup has not attached a scene yet.  Never
-            // terminate the app from its presentation-provider callback.
-            return ASPresentationAnchor()
-        }
-        return scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first ?? UIWindow(windowScene: scene)
-        #elseif canImport(AppKit)
-        // macOS: return the key window (or main window as fallback).
-        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow {
-            return window
-        }
-        return ASPresentationAnchor()
-        #else
-        return ASPresentationAnchor()
-        #endif
-    }
-}
-
-// MARK: - Server Config Sheet
-
-struct ServerConfigSheet: View {
-    @Binding var url: String
-    var onSave: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Server URL") {
-                    TextField("https://your-server.com", text: $url)
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                Section {
-                    Text("Point this at your self-hosted Waynode instance. The default is waynode.fornace.net.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .navigationTitle("Server")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onSave(url)
-                        dismiss()
-                    }
-                    .disabled(url.isEmpty)
-                }
-            }
-        }
-    }
-}
-
-#Preview {
-    AuthView()
-        .environment(AppModel(auth: AuthStore()))
 }

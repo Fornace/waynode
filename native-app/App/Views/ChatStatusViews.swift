@@ -6,20 +6,20 @@ struct EmptyChatState: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            VStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 40, weight: .light))
+            VStack(spacing: 10) {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .font(.system(size: 30, weight: .medium))
                     .foregroundStyle(.tint)
-                Text("How can I help?")
+                Text("What should we change?")
                     .font(.title3.bold())
-                Text("Describe a task, paste code, or ask a question.\nThe agent works directly in your repository.")
+                Text("Describe a task, paste code, or ask about this worktree.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             VStack(spacing: 8) {
                 SuggestionChip(icon: "doc.text.magnifyingglass", text: "Explain this codebase") { onTap("Explain this codebase") }
-                SuggestionChip(icon: "bug", text: "Find and fix bugs") { onTap("Find and fix bugs") }
+                SuggestionChip(icon: "ant.fill", text: "Find and fix bugs") { onTap("Find and fix bugs") }
                 SuggestionChip(icon: "wand.and.stars", text: "Add a feature") { onTap("Add a feature") }
             }
             .padding(.top, 4)
@@ -36,13 +36,17 @@ private struct SuggestionChip: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 8) {
-                Image(systemName: icon).font(.caption).foregroundStyle(.tint)
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(.tint)
+                    .frame(width: 20)
                 Text(text).font(.subheadline)
                 Spacer()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .frame(minHeight: 44)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -50,17 +54,48 @@ private struct SuggestionChip: View {
 
 struct ConnectionBanner: View {
     let state: SSEClient.ConnectionState
+    var onRecovery: (SSEClient.ConnectionFailure.Recovery) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             icon
-            Text(text).font(.caption.bold())
-            Spacer()
-            if case .reconnecting = state { ProgressView().controlSize(.small) }
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption.bold())
+                if let detail {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(statusLabel)
+            .accessibilityAddTraits(.updatesFrequently)
+            .accessibilityIdentifier("chat.connection.status")
+            Spacer(minLength: 8)
+            if case .reconnecting = state {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Waiting to reconnect")
+                Button("Retry Now") { onRecovery(.retry) }
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("chat.connection.retry")
+                    .accessibilityHint("Reconnects without clearing the transcript or message draft")
+            } else if case .failed(let failure) = state {
+                Button(failure.recoveryTitle) { onRecovery(failure.recovery) }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("chat.connection.recovery")
+                    .accessibilityHint(failure.message)
+            }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .background(bannerColor.opacity(0.15))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("chat.connection")
     }
 
     private var icon: some View {
@@ -71,12 +106,27 @@ struct ConnectionBanner: View {
         }
     }
 
-    private var text: String {
+    private var title: String {
         switch state {
-        case .reconnecting: "Reconnecting…"
-        case .failed: "Connection failed — will retry"
+        case .reconnecting: "Connection lost"
+        case .failed: "Action needed"
         default: ""
         }
+    }
+
+    private var detail: String? {
+        switch state {
+        case .reconnecting(let delay):
+            "Retrying in \(max(1, Int(delay))) seconds…"
+        case .failed(let failure):
+            failure.message
+        default:
+            nil
+        }
+    }
+
+    private var statusLabel: String {
+        [title, detail].compactMap { $0 }.joined(separator: ". ")
     }
 
     private var bannerColor: Color {
@@ -111,8 +161,11 @@ struct GoalBanner: View {
             Spacer()
             Button(action: onAbort) { Image(systemName: "stop.fill").font(.caption) }
                 .buttonStyle(.glass).controlSize(.small)
+                .accessibilityLabel("Abort goal")
+                .accessibilityIdentifier("chat.goal.stop")
         }
         .padding(.horizontal, 16).padding(.vertical, 8).background(.tint.opacity(0.08))
+        .accessibilityIdentifier("chat.goal")
     }
 }
 
@@ -161,7 +214,7 @@ struct ConnectionStateBadge: View {
         case .connecting: "Connecting…"
         case .reconnecting: "Reconnecting…"
         case .disconnected: "Disconnected"
-        case .failed: "Failed"
+        case .failed: "Action needed"
         }
     }
 }

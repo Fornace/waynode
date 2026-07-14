@@ -1,11 +1,11 @@
 interface BrandProps {
   size?: number;
-  spin?: boolean;        // subtle network-tension motion for loading/idle states
+  tension?: boolean;
   className?: string;
 }
 
 /** The Waynode mark: a connected W, shared with the app icon and favicon. */
-export function WaynodeMark({ size = 28, spin = false, className = "" }: BrandProps) {
+export function WaynodeMark({ size = 28, tension = false, className = "" }: BrandProps) {
   return (
     <svg
       width={size}
@@ -16,7 +16,7 @@ export function WaynodeMark({ size = 28, spin = false, className = "" }: BrandPr
       role="img"
       aria-label="Waynode"
     >
-      <g className={spin ? "wn-tension" : undefined}>
+      <g className={tension ? "wn-tension" : undefined}>
         <g className="wn-links" fill="none" stroke="var(--accent, #60a5fa)" strokeLinecap="round" strokeLinejoin="round">
           <path d="M11 23 24 50 32 15 45 50 55 11" strokeWidth="4" />
           <path d="m11 23 12 7 9-15 13 12 10-16" strokeWidth="3.2" opacity=".8" />

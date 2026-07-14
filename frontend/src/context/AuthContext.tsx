@@ -4,26 +4,49 @@ import { api } from "../api/client";
 
 interface AuthContextValue {
   user: User | null;
+  providers: { github: boolean; gitlab: boolean; dev?: boolean };
+  availableProviders: { github: boolean; gitlab: boolean };
   loading: boolean;
+  error: string;
+  retry: () => void;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
+  providers: { github: false, gitlab: false },
+  availableProviders: { github: false, gitlab: false },
   loading: true,
+  error: "",
+  retry: () => {},
   logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [providers, setProviders] = useState({ github: false, gitlab: false });
+  const [availableProviders, setAvailableProviders] = useState({ github: false, gitlab: false });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    setLoading(true);
+    setError("");
     api.auth.me()
-      .then(({ user }) => setUser(user))
-      .catch(() => setUser(null))
+      .then(({ user, providers, availableProviders }) => {
+        setUser(user);
+        setProviders(providers);
+        setAvailableProviders(availableProviders || providers);
+      })
+      .catch(() => {
+        setUser(null);
+        setProviders({ github: false, gitlab: false });
+        setAvailableProviders({ github: false, gitlab: false });
+        setError("Waynode could not reach this server. Check the address and try again.");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [attempt]);
 
   const logout = async () => {
     await api.auth.logout();
@@ -31,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, providers, availableProviders, loading, error, retry: () => setAttempt((value) => value + 1), logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import type { Space, GitSnapshot } from "../types";
 import { BranchIcon, CloseIcon, MergeModal, Pill, buildAskPrompt, type GitIssue } from "./GitSidebarShared";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 // ───────────────────────────── Branches ─────────────────────────────
 
@@ -151,13 +152,14 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
         <input
           className="git-input"
           placeholder="Filter branches…"
+          aria-label="Filter branches"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
         <button className="git-new-branch-btn" onClick={() => setShowCreate(true)}>New Branch</button>
       </div>
 
-      {err && <div className="git-error">{err}</div>}
+      {err && <div className="git-error" role="alert">{err}</div>}
 
       <div className="git-branch-list">
         {defaultBranches.length > 0 && (
@@ -260,12 +262,14 @@ function SwitchBranchDialog({
   target: string; current: string; mode: "stash" | "carry"; setMode: (m: "stash" | "carry") => void;
   busy: boolean; onCancel: () => void; onConfirm: () => void;
 }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEscapeToClose(onCancel, overlayRef);
   return (
-    <div className="git-modal-overlay" onClick={onCancel}>
-      <div className="git-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="git-modal-overlay" ref={overlayRef} onClick={onCancel}>
+      <div className="git-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="switch-branch-title">
         <div className="git-modal-head">
-          <h3>Switch Branch</h3>
-          <button className="git-icon-btn" onClick={onCancel}><CloseIcon /></button>
+          <h3 id="switch-branch-title">Switch branch</h3>
+          <button className="git-icon-btn" onClick={onCancel} aria-label="Cancel branch switch"><CloseIcon /></button>
         </div>
         <div className="git-modal-body">
           <p className="git-modal-lede">You have changes on this branch. What would you like to do with them?</p>
@@ -297,16 +301,19 @@ function SwitchBranchDialog({
 
 function CreateBranchModal({ base, onCancel, onCreate }: { base: string; onCancel: () => void; onCreate: (name: string) => void }) {
   const [name, setName] = useState("");
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEscapeToClose(onCancel, overlayRef);
   return (
-    <div className="git-modal-overlay" onClick={onCancel}>
-      <div className="git-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="git-modal-overlay" ref={overlayRef} onClick={onCancel}>
+      <div className="git-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="create-branch-title">
         <div className="git-modal-head">
-          <h3>Create a Branch</h3>
-          <button className="git-icon-btn" onClick={onCancel}><CloseIcon /></button>
+          <h3 id="create-branch-title">Create a branch</h3>
+          <button className="git-icon-btn" onClick={onCancel} aria-label="Cancel branch creation"><CloseIcon /></button>
         </div>
         <div className="git-modal-body">
-          <label className="git-field-label">Name</label>
+          <label className="git-field-label" htmlFor="new-branch-name">Name</label>
           <input
+            id="new-branch-name"
             className="git-input"
             autoFocus
             placeholder="my-feature"

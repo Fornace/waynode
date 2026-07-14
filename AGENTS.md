@@ -68,12 +68,13 @@ The canonical way to test waynode in prod as the authenticated user is
 
 ```bash
 cd e2e && npm install
-DEV=$(ssh root@49.12.9.255 'docker exec $(docker ps -q --filter name=waynode) printenv DEV_AUTH_TOKEN')
+DEV=$(ssh root@95.216.37.30 'docker exec $(docker ps -q --filter name=waynode) printenv DEV_AUTH_TOKEN')
 BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs   # ONLY=auth,chat for a subset
 ```
 
-Covers 7 flows: auth, open-session, chat-send, model-switch, terminal-open,
-terminal-survival (proves the server pty survives a browser close), mutex.
+Covers 6 hosted flows: auth, open-session, chat-send, model-switch,
+hosted-terminal-disabled, and chat-after-terminal-gate. Self-host terminal
+mechanics are covered by the focused sandbox terminal/security regressions.
 `BROWSER_TOKEN` = the browser.fornace.net api-key (`~/.agent_credentials/tokens/browser-mcp-tomasipromo.env`).
 `DEV_TOKEN` = waynode `DEV_AUTH_TOKEN` (injected into `localStorage` so REST +
 SSE + the terminal WS all run authed). The `call()` helper is rate-limit-aware

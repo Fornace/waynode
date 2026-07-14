@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { AccountTokens } from "./AccountTokens";
 
 interface AccountSettingsProps {
   onClose: () => void;
@@ -7,6 +9,8 @@ interface AccountSettingsProps {
 }
 
 export function AccountSettings({ onClose, onDeleted }: AccountSettingsProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEscapeToClose(onClose, overlayRef);
   const [blockers, setBlockers] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [confirmText, setConfirmText] = useState("");
@@ -39,18 +43,19 @@ export function AccountSettings({ onClose, onDeleted }: AccountSettingsProps) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal settings-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Account settings">
+    <div className="modal-overlay" ref={overlayRef} onClick={onClose}>
+      <div className="modal settings-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="account-settings-title">
         <div className="settings-modal-head">
-          <div className="modal-title" style={{ margin: 0 }}>Account</div>
+          <h1 className="modal-title" id="account-settings-title" style={{ margin: 0 }}>Account</h1>
           <button className="icon-btn-ghost" onClick={onClose} aria-label="Close account settings">✕</button>
         </div>
         <div className="settings-modal-body">
+          <AccountTokens />
           <div className="settings-section">
             <div className="settings-section-title">Account deletion</div>
             <p className="settings-hint">This permanently removes your profile, connected provider tokens, API tokens, personal settings, and personal workspaces. Shared organization work stays with another administrator.</p>
           </div>
-          {loading ? <div className="settings-hint">Checking your workspaces…</div> : blockers.length > 0 ? (
+          {loading ? <div className="settings-hint" role="status">Checking your workspaces…</div> : blockers.length > 0 ? (
             <div className="settings-section">
               <div className="form-error">Before deletion, appoint another admin for:</div>
               <ul className="settings-hint" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
@@ -64,7 +69,7 @@ export function AccountSettings({ onClose, onDeleted }: AccountSettingsProps) {
               <input id="delete-account-confirm" className="modal-input" value={confirmText} onChange={(event) => setConfirmText(event.target.value)} autoComplete="off" />
             </div>
           )}
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error" role="alert">{error}</div>}
         </div>
         <div className="settings-save-bar" style={{ position: "static", background: "var(--bg-surface)", borderTop: "1px solid var(--border)" }}>
           <button className="btn-secondary" onClick={onClose}>Cancel</button>

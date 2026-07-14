@@ -114,7 +114,8 @@ const PAGE_CSS = `
   body { background:var(--bg); color:var(--text); font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; }
   a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
   header.site { display:flex; align-items:center; justify-content:space-between; padding:18px 24px; border-bottom:1px solid var(--border); }
-  header.site .brand { color:var(--text); font-weight:700; font-size:17px; }
+  header.site .brand { display:inline-flex; align-items:center; gap:8px; color:var(--text); font-weight:700; font-size:17px; }
+  header.site .brand img { width:24px; height:24px; }
   header.site nav a { color:var(--dim); margin-left:18px; font-size:14px; }
   main { max-width:760px; margin:0 auto; padding:48px 24px 80px; }
   .crumbs { font-size:13px; color:var(--dim); margin-bottom:24px; }
@@ -166,16 +167,17 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script
 </head>
 <body>
 <header class="site">
-  <a class="brand" href="/">Waynode</a>
+  <a class="brand" href="/"><img src="/brand/waynode-mark.svg" alt="">Waynode</a>
   <nav>
     <a href="/learn">Guides &amp; comparisons</a>
     <a href="/llms.txt">llms.txt</a>
     <a href="https://github.com/fornace/waynode">GitHub</a>
+    <a href="/login">Sign in</a>
   </nav>
 </header>
 <main>${bodyHtml}</main>
 <footer class="site">
-  Waynode: open-source, self-hosted coding-agent workspaces.
+  Waynode: open-source durable worktrees for coding agents.
   <div><a href="/">Home</a><a href="/learn">Learn</a><a href="/index.md">Home (markdown)</a><a href="/llms-full.txt">llms-full.txt</a></div>
 </footer>
 </body>
@@ -308,7 +310,7 @@ router.get("/llms.txt", (req, res) => {
   const lines = [
     "# Waynode",
     "",
-    "> Waynode is an open-source, self-hosted coding-agent workspace. Each workspace is a real cloned Git repository with a persistent worktree, terminal, and agent session you can open from desktop or mobile. Use it self-hosted (MIT, free) or as Waynode Cloud (managed hosting).",
+    "> Waynode is an open-source durable worktree for coding agents. Each worktree is a real cloned Git repository with a persistent branch, agent session, terminal, and Git review surface. Use it self-hosted (MIT, free) or as Waynode Cloud.",
     "",
     "Every HTML page on this site has a markdown twin: append `.md` to the URL.",
     "",

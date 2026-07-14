@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { RepoGroup } from "../types";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { GitHubIcon, GitLabIcon, SearchIcon } from "./RepoProviderIcons";
 
 interface RepoPickerProps {
   onClose: () => void;
   onClone: (repoUrl: string, branch: string, authUser?: string, authToken?: string) => Promise<void>;
   githubConnected: boolean;
   gitlabConnected: boolean;
+  githubAvailable: boolean;
+  gitlabAvailable: boolean;
 }
 
 type Tab = "github" | "gitlab" | "url";
 
-export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected }: RepoPickerProps) {
-  const [tab, setTab] = useState<Tab>(githubConnected ? "github" : "url");
+export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected, githubAvailable, gitlabAvailable }: RepoPickerProps) {
+  const [tab, setTab] = useState<Tab>(githubAvailable && githubConnected ? "github" : gitlabAvailable && gitlabConnected ? "gitlab" : "url");
   const [search, setSearch] = useState("");
   const [githubGroups, setGithubGroups] = useState<RepoGroup[]>([]);
   const [gitlabGroups, setGitlabGroups] = useState<RepoGroup[]>([]);
@@ -48,6 +51,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
         credentials: "include",
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "GitHub repositories could not be loaded.");
       if (data.error) throw new Error(data.error);
       setGithubGroups(data.groups || []);
     } catch (e) {
@@ -66,6 +70,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
         credentials: "include",
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "GitLab repositories could not be loaded.");
       if (data.error) throw new Error(data.error);
       setGitlabGroups(data.groups || []);
     } catch (e) {
@@ -124,36 +129,45 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
     }
   };
 
+  const retryCurrent = () => {
+    if (tab === "github") loadGithub();
+    else if (tab === "gitlab") loadGitlab();
+    else handleUrlClone();
+  };
+
   return (
     <div className="modal-overlay" ref={overlayRef} onClick={onClose}>
-      <div className="repo-picker-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="repo-picker-header" style={{ background: "rgba(0,0,0,0.2)", padding: "16px 20px" }}>
-          <div className="repo-picker-title">Clone Repository</div>
-          <button className="repo-picker-close" onClick={onClose}>
+      <div className="repo-picker-modal" role="dialog" aria-modal="true" aria-labelledby="repo-picker-title" onClick={(e) => e.stopPropagation()}>
+        <div className="repo-picker-header">
+          <div className="repo-picker-title" id="repo-picker-title">New worktree</div>
+          <button type="button" className="repo-picker-close" onClick={onClose} aria-label="Close repository picker">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
 
-        <div className="repo-picker-tabs" style={{ display: "flex", justifyContent: "center", padding: "12px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          <div className="tabs">
-            <button
+        <div className="repo-picker-tabs">
+          <div className="tabs" role="tablist" aria-label="Repository source">
+            {githubAvailable && <button
+              type="button"
               className={`tab-btn ${tab === "github" ? "active" : ""}`}
               onClick={() => setTab("github")}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
+              role="tab" aria-selected={tab === "github"}
             >
               <GitHubIcon /> GitHub
-            </button>
-            <button
+            </button>}
+            {gitlabAvailable && <button
+              type="button"
               className={`tab-btn ${tab === "gitlab" ? "active" : ""}`}
               onClick={() => setTab("gitlab")}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
+              role="tab" aria-selected={tab === "gitlab"}
             >
               <GitLabIcon /> GitLab
-            </button>
+            </button>}
             <button
+              type="button"
               className={`tab-btn ${tab === "url" ? "active" : ""}`}
               onClick={() => setTab("url")}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
+              role="tab" aria-selected={tab === "url"}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> 
               URL
@@ -161,7 +175,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
           </div>
         </div>
 
-        {error && <div className="repo-picker-error">{error}</div>}
+        {error && <div className="repo-picker-error" role="alert"><span>{error}</span><button type="button" onClick={retryCurrent}>Try again</button></div>}
 
         {tab !== "url" && (
           <>
@@ -181,27 +195,30 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
             ) : (
               <>
                 <div className="repo-search-wrap">
-                  <span className="repo-search-icon">🔍</span>
+                  <span className="repo-search-icon"><SearchIcon /></span>
                   <input
                     ref={searchRef}
                     className="repo-search-input"
                     placeholder={`Search ${tab === "github" ? "GitHub" : "GitLab"} repos...`}
+                    aria-label={`Search ${tab === "github" ? "GitHub" : "GitLab"} repositories`}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
                   {search && (
-                    <button className="repo-search-clear" onClick={() => setSearch("")}>✕</button>
+                    <button type="button" className="repo-search-clear" onClick={() => setSearch("")} aria-label="Clear repository search">Clear</button>
                   )}
                 </div>
 
                 <div className="repo-list">
                   {loading ? (
-                    <div className="repo-loading">
-                      <Spinner /> Loading repositories...
+                    <div className="repo-loading" role="status">
+                      <Spinner /> Loading repositories…
                     </div>
                   ) : filteredGroups.length === 0 ? (
                     <div className="repo-empty">
-                      {search ? `No repos matching "${search}"` : "No repositories found"}
+                      <strong>{search ? "No matching repositories" : "No repositories found"}</strong>
+                      <span>{search ? `Nothing matched “${search}”.` : `No repositories are available from ${tab === "github" ? "GitHub" : "GitLab"}.`}</span>
+                      <button type="button" onClick={search ? () => setSearch("") : retryCurrent}>{search ? "Clear search" : "Refresh"}</button>
                     </div>
                   ) : (
                     filteredGroups.map((group) => (
@@ -212,10 +229,12 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
                           <span className="repo-group-count">{group.repos.length}</span>
                         </div>
                         {group.repos.map((repo) => (
-                          <div
+                          <button type="button"
                             key={repo.id}
                             className="repo-item"
                             onClick={() => !cloning && handleCloneRepo(repo.url, repo.default_branch || "main")}
+                            disabled={cloning}
+                            aria-label={`Clone ${repo.full_name || repo.name}`}
                           >
                             <div className="repo-item-main">
                               <span className="repo-item-name">{repo.name}</span>
@@ -233,7 +252,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
                                 <span>{timeAgo(repo.updated_at)}</span>
                               )}
                             </div>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     ))
@@ -245,45 +264,53 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
         )}
 
         {tab === "url" && (
-          <div className="repo-url-form">
+          <form className="repo-url-form" onSubmit={(event) => { event.preventDefault(); void handleUrlClone(); }}>
             <div className="form-field">
-              <label className="form-label">Repository URL</label>
+              <label className="form-label" htmlFor="repo-url">Repository URL</label>
               <input
                 className="form-input"
+                id="repo-url"
                 placeholder="https://github.com/user/repo.git"
+                autoComplete="url"
+                inputMode="url"
                 value={urlRepo}
                 onChange={(e) => setUrlRepo(e.target.value)}
                 autoFocus
               />
             </div>
             <div className="form-field">
-              <label className="form-label">Branch</label>
+              <label className="form-label" htmlFor="repo-branch">Branch</label>
               <input
                 className="form-input"
+                id="repo-branch"
                 placeholder="main"
                 value={urlBranch}
                 onChange={(e) => setUrlBranch(e.target.value)}
               />
             </div>
-            <div className="form-auth-toggle" onClick={() => setShowAuth(!showAuth)}>
-              {showAuth ? "▼" : "▶"} Private repo credentials (optional)
-            </div>
+            <button type="button" className="form-auth-toggle" onClick={() => setShowAuth(!showAuth)} aria-expanded={showAuth} aria-controls="repo-auth-fields">
+              <span aria-hidden="true">{showAuth ? "−" : "+"}</span> Private repository credentials <small>Optional</small>
+            </button>
             {showAuth && (
-              <div className="form-auth-fields">
+              <div className="form-auth-fields" id="repo-auth-fields">
                 <div className="form-field">
-                  <label className="form-label">Username / Token Name</label>
+                  <label className="form-label" htmlFor="repo-auth-user">Username or token name</label>
                   <input
                     className="form-input"
+                    id="repo-auth-user"
                     placeholder="username or token name"
+                    autoComplete="username"
                     value={authUser}
                     onChange={(e) => setAuthUser(e.target.value)}
                   />
                 </div>
                 <div className="form-field">
-                  <label className="form-label">Password / Access Token</label>
+                  <label className="form-label" htmlFor="repo-auth-token">Password or access token</label>
                   <input
                     className="form-input"
+                    id="repo-auth-token"
                     type="password"
+                    autoComplete="current-password"
                     placeholder="••••••••"
                     value={authToken}
                     onChange={(e) => setAuthToken(e.target.value)}
@@ -291,15 +318,15 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected 
                 </div>
               </div>
             )}
-            {cloning && <div className="repo-loading"><Spinner /> Cloning...</div>}
+            {cloning && <div className="repo-loading" role="status"><Spinner /> Cloning…</div>}
             <button
+              type="submit"
               className="repo-url-clone-btn"
-              onClick={handleUrlClone}
               disabled={!urlRepo.trim() || cloning}
             >
-              {cloning ? "Cloning..." : "Clone Repository"}
+              {cloning ? "Cloning…" : "Clone worktree"}
             </button>
-          </div>
+          </form>
         )}
       </div>
     </div>
@@ -321,22 +348,6 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 365)}y ago`;
 }
 
-function GitHubIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-    </svg>
-  );
-}
-
-function GitLabIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M23.955 13.587l-1.347-4.135-2.673-8.228a.456.456 0 00-.867 0l-2.672 8.228H7.604l-2.673-8.228a.456.456 0 00-.867 0L1.392 9.452.045 13.587a.924.924 0 00.331 1.022L12 23.054l11.624-8.445a.92.92 0 00.331-1.022"/>
-    </svg>
-  );
-}
-
 function Spinner() {
-  return <span className="spinner" />;
+  return <span className="spinner" aria-hidden="true" />;
 }

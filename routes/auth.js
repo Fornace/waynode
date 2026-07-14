@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { passport, resolveApiToken, requireAuth, prepareAccountDeletion, deletePreparedAccount } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
@@ -29,81 +29,94 @@ function resolveDevToken(req) {
 }
 
 const NATIVE_SCHEME = "waynode";
-// 10-minute validity window for the signed native state token.
-const NATIVE_STATE_TTL_MS = 10 * 60 * 1000;
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+const NATIVE_NONCE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
-// Sign a self-contained "native app" marker that survives the cross-domain
-// OAuth round-trip. GitHub/GitLab echo the `state` query param back on the
-// callback VERBATIM, so this does NOT depend on cookies or the session store
-// surviving a redirect through github.com/gitlab.com — which is exactly the
-// failure mode that broke native login inside ASWebAuthenticationSession on
-// iOS (SameSite=Lax + shared cookie store round-trips are unreliable).
-//
-// Format:  base64url(payload).base64url(hmac)
-function signNativeState() {
-  const payload = JSON.stringify({ native: true, exp: Date.now() + NATIVE_STATE_TTL_MS });
+function freshNonce() {
+  return randomBytes(32).toString("base64url");
+}
+
+// Format: base64url(payload).base64url(HMAC). Native state is cookie-free;
+// browser state is additionally bound to the initiating server session.
+function signOAuthState({ native, nonce, provider }) {
+  const iat = Date.now();
+  const payload = JSON.stringify({ native, nonce, provider, iat, exp: iat + OAUTH_STATE_TTL_MS });
   const b64 = Buffer.from(payload).toString("base64url");
   const sig = createHmac("sha256", config.sessionSecret).update(b64).digest("base64url");
   return `${b64}.${sig}`;
 }
 
-// Verify a state value returned by the OAuth provider. True iff the HMAC
-// signature matches (timing-safe), the token is unexpired, and it carries
-// native:true. Returns false for missing/tampered/expired state.
-function verifyNativeState(state) {
-  if (!state || typeof state !== "string") return false;
+function verifyOAuthState(state) {
+  if (!state || typeof state !== "string") return null;
   const dot = state.indexOf(".");
-  if (dot <= 0 || dot === state.length - 1) return false;
+  if (dot <= 0 || dot !== state.lastIndexOf(".") || dot === state.length - 1) return null;
   const b64 = state.slice(0, dot);
   const sig = state.slice(dot + 1);
   const expected = createHmac("sha256", config.sessionSecret).update(b64).digest("base64url");
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
-  if (a.length !== b.length || a.length === 0) return false;
-  if (!timingSafeEqual(a, b)) return false;
+  if (a.length !== b.length || a.length === 0 || !timingSafeEqual(a, b)) return null;
   try {
     const payload = JSON.parse(Buffer.from(b64, "base64url").toString("utf8"));
-    if (payload.native !== true) return false;
-    if (typeof payload.exp === "number" && Date.now() > payload.exp) return false;
-    return true;
+    const now = Date.now();
+    if (typeof payload.native !== "boolean") return null;
+    if (!NATIVE_NONCE_PATTERN.test(payload.nonce)) return null;
+    if (!["github", "gitlab"].includes(payload.provider)) return null;
+    if (!Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)) return null;
+    if (payload.exp - payload.iat !== OAUTH_STATE_TTL_MS) return null;
+    if (payload.iat > now + 5_000 || payload.exp <= now) return null;
+    return payload;
   } catch {
-    return false;
+    return null;
   }
 }
 
-// Build per-request passport options. When the native app initiated the
-// request (?native=1), embed the signed state so it round-trips through the
-// OAuth provider back to the callback. passport-oauth2 adds a string `state`
-// option to the authorize URL verbatim and (with NullStore) ignores it on the
-// way back — so we read it ourselves in authRedirect.
-function nativeAuthOptions(req) {
-  // Browser OAuth uses Passport's session-bound state store, which rejects
-  // login-CSRF callbacks. Native OAuth uses the separately signed, expiring
-  // marker because its system browser may not share the app's cookie jar.
-  return req.query.native !== undefined ? { state: signNativeState() } : { state: true };
+function safeEqualText(expected, provided) {
+  if (typeof expected !== "string" || typeof provided !== "string") return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(provided);
+  return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
 }
 
-// Legacy fallback: also flag the session. Unreliable across the cross-domain
-// OAuth redirect (the original bug), but kept as a belt-and-suspenders signal
-// in case the state channel is ever stripped.
-function markNative(req, res, next) {
-  if (req.query.native !== undefined) {
-    req.session.nativeAuth = true;
+function oauthOptions(req, provider) {
+  const native = req.query.native === "1";
+  const requestedNonce = typeof req.query.native_nonce === "string" ? req.query.native_nonce : "";
+  const nonce = native && NATIVE_NONCE_PATTERN.test(requestedNonce) ? requestedNonce : freshNonce();
+  const state = signOAuthState({ native, nonce, provider });
+  if (!native) {
+    req.session.oauthState = { nonce, provider, expiresAt: Date.now() + OAUTH_STATE_TTL_MS };
   }
-  next();
+  // passport-oauth2's configured NullStore passes through string state; this
+  // route verifies the HMAC and browser-session binding before Passport runs.
+  return { state };
+}
+
+function requireOAuthState(provider) {
+  return (req, res, next) => {
+    const state = verifyOAuthState(req.query?.state);
+    if (!state || state.provider !== provider) {
+      return res.redirect("/login?auth_error=invalid_oauth_state");
+    }
+    if (!state.native) {
+      const pending = req.session?.oauthState;
+      delete req.session.oauthState;
+      if (!pending || pending.provider !== provider || pending.expiresAt <= Date.now()
+          || !safeEqualText(pending.nonce, state.nonce)) {
+        return res.redirect("/login?auth_error=invalid_oauth_state");
+      }
+    }
+    req.oauthState = state;
+    next();
+  };
 }
 
 // After successful OAuth, either redirect to web `/` or, if the request
 // originated from the native app, create an API token and redirect to the
 // custom URL scheme `waynode://auth?token=wn_...`.
 function authRedirect(req, res) {
-  // Primary signal: the signed `state` param echoed back by the OAuth
-  // provider (cookie-independent — this is what makes native login robust).
-  // Fallback: the session flag set by markNative.
-  const isNative = verifyNativeState(req.query?.state) || !!req.session.nativeAuth;
-  delete req.session.nativeAuth;
+  const nativeState = req.oauthState?.native ? req.oauthState : null;
 
-  if (isNative && req.user) {
+  if (nativeState && req.user) {
     // Enforce the same MAX_TOKENS limit as /api/tokens, but evict the oldest
     // token first so native re-login never hits a wall (rolling replacement).
     if (countTokens(req.user.id) >= NATIVE_MAX_TOKENS) {
@@ -111,7 +124,7 @@ function authRedirect(req, res) {
       if (oldest) revokeToken(req.user.id, oldest.id);
     }
     const { token } = createToken(req.user.id, "iOS / Mac App");
-    const params = new URLSearchParams({ token });
+    const params = new URLSearchParams({ token, nonce: nativeState.nonce });
     return res.redirect(`${NATIVE_SCHEME}://auth?${params}`);
   }
   res.redirect("/");
@@ -121,33 +134,33 @@ function rotateAndLogin(req, res, user) {
   // Regenerate the pre-auth session before attaching an identity so a session
   // ID set before OAuth cannot survive into an authenticated browser session.
   req.session.regenerate((regenerateError) => {
-    if (regenerateError) return res.redirect("/?auth_error=session_failed");
+    if (regenerateError) return res.redirect("/login?auth_error=session_failed");
     req.login(user, (loginError) => {
-      if (loginError) return res.redirect("/?auth_error=login_failed");
+      if (loginError) return res.redirect("/login?auth_error=login_failed");
       authRedirect(req, res);
     });
   });
 }
 
-router.get("/auth/github", markNative, (req, res, next) => {
-  passport.authenticate("github", nativeAuthOptions(req))(req, res, next);
+router.get("/auth/github", (req, res, next) => {
+  passport.authenticate("github", oauthOptions(req, "github"))(req, res, next);
 });
 
-router.get("/auth/github/callback", (req, res, next) => {
+router.get("/auth/github/callback", requireOAuthState("github"), (req, res, next) => {
   passport.authenticate("github", { failureRedirect: "/" }, (err, user) => {
-    if (err || !user) return res.redirect("/?auth_error=github_failed");
+    if (err || !user) return res.redirect("/login?auth_error=github_failed");
     rotateAndLogin(req, res, user);
   })(req, res, next);
 });
 
-router.get("/auth/gitlab", markNative, (req, res, next) => {
-  passport.authenticate("gitlab", nativeAuthOptions(req))(req, res, next);
+router.get("/auth/gitlab", (req, res, next) => {
+  passport.authenticate("gitlab", oauthOptions(req, "gitlab"))(req, res, next);
 });
 
-router.get("/auth/gitlab/callback", (req, res, next) => {
+router.get("/auth/gitlab/callback", requireOAuthState("gitlab"), (req, res, next) => {
   passport.authenticate("gitlab", async (err, user, info, status) => {
-    if (err) return res.redirect("/?auth_error=" + encodeURIComponent(err.message));
-    if (!user) return res.redirect("/?auth_error=gitlab_failed");
+    if (err) return res.redirect("/login?auth_error=" + encodeURIComponent(err.message));
+    if (!user) return res.redirect("/login?auth_error=gitlab_failed");
 
     // Provider linking must be an explicit, state-bound flow. Do not silently
     // merge an OAuth identity into whichever browser account happens to have a
@@ -165,7 +178,7 @@ router.get("/api/auth/me", (req, res) => {
     ? resolveApiToken(authHeader.slice(7).trim())
     : null;
   if (bearerUser) {
-    return res.json({ user: bearerUser, providers: { github: !!bearerUser.github_id, gitlab: !!bearerUser.gitlab_id, dev: false } });
+    return res.json({ user: bearerUser, providers: { github: !!bearerUser.github_id, gitlab: !!bearerUser.gitlab_id, dev: false }, availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId } });
   }
   // If a Bearer header was sent but no user resolved, the token is
   // invalid/revoked. Return 401 so the native client can detect this
@@ -175,7 +188,7 @@ router.get("/api/auth/me", (req, res) => {
   }
   const devUser = resolveDevToken(req);
   if (devUser) {
-    return res.json({ user: devUser, providers: { github: false, gitlab: false, dev: true } });
+    return res.json({ user: devUser, providers: { github: false, gitlab: false, dev: true }, availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId } });
   }
   if (!req.isAuthenticated()) {
     // Return which OAuth providers are configured on the server so the
@@ -183,11 +196,13 @@ router.get("/api/auth/me", (req, res) => {
     return res.json({
       user: null,
       providers: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId },
+      availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId },
     });
   }
   res.json({
     user: req.user,
     providers: getLinkedProviders(req.user.id),
+    availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId },
   });
 });
 

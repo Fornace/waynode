@@ -1,7 +1,7 @@
 {
-  "name": "Waynode AI",
+  "name": "Waynode",
   "short_name": "Waynode",
-  "description": "Open-source, self-hosted coding-agent workspace. Each space is a real cloned repo. pi is the engine.",
+  "description": "Durable worktrees for coding agents, reachable from web and native clients.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,11 +10,8 @@
   "theme_color": "#0a0a0a",
   "categories": ["developer", "productivity", "utilities"],
   "icons": [
-    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
-    { "src": "/favicon-32x32.png", "type": "image/png", "sizes": "32x32", "purpose": "any" },
+    { "src": "/brand/waynode-mark.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
     { "src": "/icon-192x192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
-    { "src": "/icon-512x512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
-    { "src": "/icon-maskable-192.png", "type": "image/png", "sizes": "192x192", "purpose": "maskable" },
-    { "src": "/icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+    { "src": "/icon-512x512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" }
   ]
 }

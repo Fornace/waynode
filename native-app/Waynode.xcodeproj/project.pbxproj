@@ -11,14 +11,21 @@
 		06270A9C81EED2D2259C895A /* ChatStatusViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 973570FC4313CD06E6FCF0E4 /* ChatStatusViews.swift */; };
 		06F12231474E4FDD4BBA6286 /* CodeHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6ACEC5FF8A17F8035E717B6 /* CodeHighlighter.swift */; };
 		07686D0CE347E928BD9CD197 /* WaynodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9668F08A2E898BABC66081 /* WaynodeApp.swift */; };
+		2186F018EC348FC3FA0A2FD6 /* SessionSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CF5AEFDBBFC6C0D9E40A8F /* SessionSettingsSheet.swift */; };
 		27FA3D28EDF17A292B5BB7AC /* MarkdownParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EDECA98CC2D4733656BBE1 /* MarkdownParser.swift */; };
 		2880115F18769261C6BE0BBE /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 26B83464C0A62DBEC630A979 /* SwiftTerm */; };
+		2AD75EE640D4C061F3B57605 /* GitUITestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AEBE3414F5C093745FB03A /* GitUITestFixtures.swift */; };
+		30BF80813276787371BFA285 /* SignedKeychainSmokeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A35A5B18C018530CBCC7E154 /* SignedKeychainSmokeView.swift */; };
 		370881664556AF549C6AB785 /* SessionsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B759E8CE22B0B375BB475282 /* SessionsList.swift */; };
+		557B7CFDBF2BBF7E351B8C72 /* SignedKeychainUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D7AE1B68CED2FAB3490786 /* SignedKeychainUITests.swift */; };
+		582D3A4D189B40EE1855774A /* AuthPresentationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ADED7FBF7E899002F98DF79 /* AuthPresentationProvider.swift */; };
 		619282D7EC37F0CF5004F59C /* NewTokenSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69176506DF3F62FCAF2C3AC9 /* NewTokenSheet.swift */; };
 		6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A89D5250119F107505CA318 /* GitInspector.swift */; };
 		7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */; };
+		855A8EA61057C7E04B8D24C3 /* GitInspectorActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F44015822997D1676D53F725 /* GitInspectorActions.swift */; };
 		89ED4A1123BF82E715F6576F /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */; };
 		8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF14352DE276CEE0FD2DEEC /* RootView.swift */; };
+		9F64BCDAD6E51AD695460D9F /* WaynodeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB96574A2B818018ABF92D7 /* WaynodeUITests.swift */; };
 		A8F8603A7DFFD882AA7D9018 /* CloneSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3597634E9CD330E43026BD8B /* CloneSheet.swift */; };
 		AAB014B3667DE5BAB8D7B39F /* GitInspectorSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F978E1E246E01CDE8C35D4E3 /* GitInspectorSupportingViews.swift */; };
 		AD06B8C7096720EA43E77579 /* WaynodeCore in Frameworks */ = {isa = PBXBuildFile; productRef = 94F593349EDED17C7E44778A /* WaynodeCore */; };
@@ -26,17 +33,31 @@
 		C0C99F3EE7F086A282859DA3 /* AccountScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4429524F93F2D7BAD0B11C7F /* AccountScene.swift */; };
 		C30EDF89EAFFF22AE8FBA5EA /* PlatformUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */; };
 		C443CB0479232AB4B92DFA16 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B76EABB353F48ADBB9E9A5A /* ChatView.swift */; };
+		C4A9BA01DB4356780199C591 /* ServerConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52CD7C4669DEE047A23455C5 /* ServerConfigSheet.swift */; };
 		C54BD14AA6CFE0287ED26646 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */; };
 		CC08168B051773A3058011EA /* ChatItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */; };
 		D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156A741D0EA8E9804E056580 /* SessionDetail.swift */; };
 		D445BFA0F669F13B6334FC75 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7365BF994B13B6120DA3165B /* Assets.xcassets */; };
 		D9DC71A2E65BCC8A13B48A9C /* SpacesSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B382C33134DF897FD4C618 /* SpacesSidebar.swift */; };
 		E6F247329523B034DB67E46A /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD24C4235EFD2CABF8A6565 /* MainView.swift */; };
+		F1A3D2C4B5E60718293A4B5C /* WorkbenchDeletionAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A3D2C4B5E60718293A4B5D /* WorkbenchDeletionAlerts.swift */; };
 		EF7DDCEFE3EBB7368D1EF045 /* NativeTerminalSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		D9DD6E7B399F3B653CDDDA28 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F58CAD3B1EB1646E95A4C3E0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 52C15B13C72933960BEF0FA9;
+			remoteInfo = Waynode;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		02D7AE1B68CED2FAB3490786 /* SignedKeychainUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignedKeychainUITests.swift; sourceTree = "<group>"; };
 		05DEA2882D8C1DF151489327 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0ADED7FBF7E899002F98DF79 /* AuthPresentationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthPresentationProvider.swift; sourceTree = "<group>"; };
 		0B954C00B60D3DB33B2A804F /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WaynodeCore; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
 		156A741D0EA8E9804E056580 /* SessionDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetail.swift; sourceTree = "<group>"; };
@@ -48,20 +69,27 @@
 		46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Waynode.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B76EABB353F48ADBB9E9A5A /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatItemView.swift; sourceTree = "<group>"; };
+		52CD7C4669DEE047A23455C5 /* ServerConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigSheet.swift; sourceTree = "<group>"; };
 		54B382C33134DF897FD4C618 /* SpacesSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesSidebar.swift; sourceTree = "<group>"; };
-		5F295D7965A3D17F1012AB64 /* Waynode.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Waynode.entitlements; sourceTree = "<group>"; };
 		69176506DF3F62FCAF2C3AC9 /* NewTokenSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTokenSheet.swift; sourceTree = "<group>"; };
 		7365BF994B13B6120DA3165B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7A89D5250119F107505CA318 /* GitInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitInspector.swift; sourceTree = "<group>"; };
 		7CD24C4235EFD2CABF8A6565 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		7EDBB5991A1EE64E7425BCC1 /* AccountScene+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountScene+Actions.swift"; sourceTree = "<group>"; };
+		88CF5AEFDBBFC6C0D9E40A8F /* SessionSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSettingsSheet.swift; sourceTree = "<group>"; };
 		8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
 		973570FC4313CD06E6FCF0E4 /* ChatStatusViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStatusViews.swift; sourceTree = "<group>"; };
+		9CB96574A2B818018ABF92D7 /* WaynodeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaynodeUITests.swift; sourceTree = "<group>"; };
+		A1AEBE3414F5C093745FB03A /* GitUITestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitUITestFixtures.swift; sourceTree = "<group>"; };
+		A35A5B18C018530CBCC7E154 /* SignedKeychainSmokeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignedKeychainSmokeView.swift; sourceTree = "<group>"; };
 		B759E8CE22B0B375BB475282 /* SessionsList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsList.swift; sourceTree = "<group>"; };
 		BAF14352DE276CEE0FD2DEEC /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		D2EDECA98CC2D4733656BBE1 /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
 		E6ACEC5FF8A17F8035E717B6 /* CodeHighlighter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeHighlighter.swift; sourceTree = "<group>"; };
 		E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
+		F2E0D13732D4DEF87745317D /* WaynodeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WaynodeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F44015822997D1676D53F725 /* GitInspectorActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitInspectorActions.swift; sourceTree = "<group>"; };
+		F1A3D2C4B5E60718293A4B5D /* WorkbenchDeletionAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchDeletionAlerts.swift; sourceTree = "<group>"; };
 		F978E1E246E01CDE8C35D4E3 /* GitInspectorSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitInspectorSupportingViews.swift; sourceTree = "<group>"; };
 		FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -84,6 +112,7 @@
 			children = (
 				97D6AC4023C59C96D02BBC31 /* App */,
 				CB52F70C25F62C2823662A08 /* Packages */,
+				A5C3BB5C9A3CBCAB5B2AC650 /* WaynodeUITests */,
 				3C32FF7665F0F8CF77D345F4 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -92,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */,
+				F2E0D13732D4DEF87745317D /* WaynodeUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -109,17 +139,23 @@
 				E6ACEC5FF8A17F8035E717B6 /* CodeHighlighter.swift */,
 				FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */,
 				7A89D5250119F107505CA318 /* GitInspector.swift */,
+				F44015822997D1676D53F725 /* GitInspectorActions.swift */,
 				F978E1E246E01CDE8C35D4E3 /* GitInspectorSupportingViews.swift */,
+				A1AEBE3414F5C093745FB03A /* GitUITestFixtures.swift */,
 				7CD24C4235EFD2CABF8A6565 /* MainView.swift */,
 				D2EDECA98CC2D4733656BBE1 /* MarkdownParser.swift */,
 				E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */,
 				15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */,
 				69176506DF3F62FCAF2C3AC9 /* NewTokenSheet.swift */,
 				BAF14352DE276CEE0FD2DEEC /* RootView.swift */,
+				52CD7C4669DEE047A23455C5 /* ServerConfigSheet.swift */,
 				156A741D0EA8E9804E056580 /* SessionDetail.swift */,
+				88CF5AEFDBBFC6C0D9E40A8F /* SessionSettingsSheet.swift */,
 				B759E8CE22B0B375BB475282 /* SessionsList.swift */,
+				A35A5B18C018530CBCC7E154 /* SignedKeychainSmokeView.swift */,
 				54B382C33134DF897FD4C618 /* SpacesSidebar.swift */,
 				8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */,
+				F1A3D2C4B5E60718293A4B5D /* WorkbenchDeletionAlerts.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -129,12 +165,21 @@
 			children = (
 				49B904D137DD5BC1DE218583 /* Views */,
 				7365BF994B13B6120DA3165B /* Assets.xcassets */,
+				0ADED7FBF7E899002F98DF79 /* AuthPresentationProvider.swift */,
 				05DEA2882D8C1DF151489327 /* Info.plist */,
 				3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */,
-				5F295D7965A3D17F1012AB64 /* Waynode.entitlements */,
 				3C9668F08A2E898BABC66081 /* WaynodeApp.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		A5C3BB5C9A3CBCAB5B2AC650 /* WaynodeUITests */ = {
+			isa = PBXGroup;
+			children = (
+				02D7AE1B68CED2FAB3490786 /* SignedKeychainUITests.swift */,
+				9CB96574A2B818018ABF92D7 /* WaynodeUITests.swift */,
+			);
+			path = WaynodeUITests;
 			sourceTree = "<group>";
 		};
 		CB52F70C25F62C2823662A08 /* Packages */ = {
@@ -169,6 +214,24 @@
 			productReference = 46BAA0B9F3AC6BE7B5AC1BED /* Waynode.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F730BC4C0525B6A2B0CDAF17 /* WaynodeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26093D5CA3B7EB650FB0D18E /* Build configuration list for PBXNativeTarget "WaynodeUITests" */;
+			buildPhases = (
+				B00D60260ECDFBB99523EE41 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3D20FDDBE54B0DD307024CE8 /* PBXTargetDependency */,
+			);
+			name = WaynodeUITests;
+			packageProductDependencies = (
+			);
+			productName = WaynodeUITests;
+			productReference = F2E0D13732D4DEF87745317D /* WaynodeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -181,6 +244,11 @@
 					52C15B13C72933960BEF0FA9 = {
 						DevelopmentTeam = 2V6YSU4HFB;
 						ProvisioningStyle = Automatic;
+					};
+					F730BC4C0525B6A2B0CDAF17 = {
+						DevelopmentTeam = 2V6YSU4HFB;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 52C15B13C72933960BEF0FA9;
 					};
 				};
 			};
@@ -203,6 +271,7 @@
 			projectRoot = "";
 			targets = (
 				52C15B13C72933960BEF0FA9 /* Waynode */,
+				F730BC4C0525B6A2B0CDAF17 /* WaynodeUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -225,6 +294,7 @@
 			files = (
 				BA9AD611325C2A6E03674477 /* AccountScene+Actions.swift in Sources */,
 				C0C99F3EE7F086A282859DA3 /* AccountScene.swift in Sources */,
+				582D3A4D189B40EE1855774A /* AuthPresentationProvider.swift in Sources */,
 				000186C4EC52022640BC6843 /* AuthView.swift in Sources */,
 				CC08168B051773A3058011EA /* ChatItemView.swift in Sources */,
 				06270A9C81EED2D2259C895A /* ChatStatusViews.swift in Sources */,
@@ -233,7 +303,9 @@
 				06F12231474E4FDD4BBA6286 /* CodeHighlighter.swift in Sources */,
 				7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */,
 				6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */,
+				855A8EA61057C7E04B8D24C3 /* GitInspectorActions.swift in Sources */,
 				AAB014B3667DE5BAB8D7B39F /* GitInspectorSupportingViews.swift in Sources */,
+				2AD75EE640D4C061F3B57605 /* GitUITestFixtures.swift in Sources */,
 				E6F247329523B034DB67E46A /* MainView.swift in Sources */,
 				27FA3D28EDF17A292B5BB7AC /* MarkdownParser.swift in Sources */,
 				C54BD14AA6CFE0287ED26646 /* MarkdownView.swift in Sources */,
@@ -241,15 +313,36 @@
 				619282D7EC37F0CF5004F59C /* NewTokenSheet.swift in Sources */,
 				C30EDF89EAFFF22AE8FBA5EA /* PlatformUtilities.swift in Sources */,
 				8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */,
+				C4A9BA01DB4356780199C591 /* ServerConfigSheet.swift in Sources */,
 				D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */,
+				2186F018EC348FC3FA0A2FD6 /* SessionSettingsSheet.swift in Sources */,
 				370881664556AF549C6AB785 /* SessionsList.swift in Sources */,
+				30BF80813276787371BFA285 /* SignedKeychainSmokeView.swift in Sources */,
 				D9DC71A2E65BCC8A13B48A9C /* SpacesSidebar.swift in Sources */,
 				89ED4A1123BF82E715F6576F /* TerminalView.swift in Sources */,
+				F1A3D2C4B5E60718293A4B5C /* WorkbenchDeletionAlerts.swift in Sources */,
 				07686D0CE347E928BD9CD197 /* WaynodeApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B00D60260ECDFBB99523EE41 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				557B7CFDBF2BBF7E351B8C72 /* SignedKeychainUITests.swift in Sources */,
+				9F64BCDAD6E51AD695460D9F /* WaynodeUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3D20FDDBE54B0DD307024CE8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 52C15B13C72933960BEF0FA9 /* Waynode */;
+			targetProxy = D9DD6E7B399F3B653CDDDA28 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		082AFE25C0AE3F7B1B175E01 /* Debug */ = {
@@ -318,6 +411,44 @@
 			};
 			name = Debug;
 		};
+		25DD785FF729AF0CBA9B6E3A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.waynode.app.uitests;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Waynode;
+			};
+			name = Debug;
+		};
+		38A995D6955CA0E212F50F03 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.waynode.app.uitests;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Waynode;
+			};
+			name = Release;
+		};
 		62FC0726316165E3FB17E6F1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -381,7 +512,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = App/Waynode.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -404,7 +534,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = App/Waynode.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -426,6 +555,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		26093D5CA3B7EB650FB0D18E /* Build configuration list for PBXNativeTarget "WaynodeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25DD785FF729AF0CBA9B6E3A /* Debug */,
+				38A995D6955CA0E212F50F03 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		B1F63346B85193FDE52C019A /* Build configuration list for PBXNativeTarget "Waynode" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

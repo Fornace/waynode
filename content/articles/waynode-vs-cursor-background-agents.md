@@ -19,7 +19,7 @@ Cursor's background agents (now called Cloud Agents) run coding tasks in isolate
 **TL;DR**
 
 - Cursor Cloud Agents run in "isolated VMs in the cloud with full development environments" on Cursor's infrastructure by default; execution can be delegated to your machines, but orchestration and model inference stay on Cursor's servers ([Cursor docs](https://cursor.com/docs/cloud-agent), [self-hosted docs](https://cursor.com/docs/cloud-agent/self-hosted)).
-- Waynode is fully self-hostable: repos, database, credentials, and LLM keys stay with you (`docker compose up -d`), or use Waynode Cloud managed hosting from $39/mo.
+- Waynode is fully self-hostable: repos, database, credentials, and LLM keys stay with you (guided Docker Compose setup), or use Waynode Cloud managed hosting from $39/mo.
 - Cursor's agent workspaces are per-task; Waynode spaces are persistent Git worktrees where conversation, files, branches, and terminal state survive between visits.
 - Both offer mobile access. Cursor exposes agents via Cursor Web and an iOS app; Waynode is mobile-first around the same workspace, session, and diff, with an agent-native Git review surface.
 - Cursor plans: Hobby free, Individual $20/mo, Teams $40/user/mo, Enterprise custom; Cloud Agents billed at API pricing on top ([cursor.com/pricing](https://cursor.com/pricing)).
@@ -38,7 +38,7 @@ Waynode is an open-source (MIT) coding-agent workspace you host yourself. Each w
 
 The Git surface is agent-native: changed files, hunks, diffs, commits, branches, and push live beside the conversation, so "done" means ready for review rather than merely finished running. Sessions persist: conversation, files, branches, and terminal state survive between visits, so you can start at your desk and resume from a phone. Repo providers are GitHub and GitLab via OAuth. Source: [github.com/fornace/waynode](https://github.com/fornace/waynode).
 
-There are two ways to run it. Self-hosting is free: `git clone`, `cp .env.example .env`, `docker compose up -d`, open localhost:3000; your repos, database, credentials, LLM keys, and billing stay with you. Waynode Cloud is managed hosting of the same open-source stack: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations.
+There are two ways to run it. Self-hosting is free: clone the repo and run `./scripts/self-host.sh setup`; the guided installer collects the required OAuth and model-provider credentials, generates the server secrets, validates Compose, and starts on loopback. Your repos, database, credentials, LLM keys, and billing stay with you. Waynode Cloud is managed hosting of the same open-source stack: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations.
 
 ## Where does the code actually run?
 
@@ -46,7 +46,7 @@ This is the sharpest difference between the two.
 
 With Cursor Cloud Agents, the default is Cursor-managed VMs. Cursor does offer self-hosted execution modes ("My Machines" for individuals and "Self-Hosted Pool" for Enterprise teams), but these delegate only tool execution (terminal commands, file edits, browser actions) to your infrastructure. Agent orchestration and model inference remain on Cursor's servers, and "file chunks the model reads during inference" are still sent to Cursor. As the docs put it, self-hosted pools "do not move the agent loop out of Cursor's cloud." Self-Hosted Pool additionally requires an Enterprise plan, with capacity limits of 10 workers per user and 50 per team ([Cursor self-hosted docs](https://cursor.com/docs/cloud-agent/self-hosted)).
 
-With self-hosted Waynode, the entire stack runs on your infrastructure: the web app, the workspaces, the Git credentials, and the database. You bring your own model keys, so inference goes to whichever provider you choose under your own account. No Stripe or hosted-billing code is active on self-host. A sandboxed microVM execution path exists when KVM is available. If you want someone else to run it, Waynode Cloud hosts the same stack with isolated workspaces, encrypted secrets, and backups.
+With self-hosted Waynode, the entire stack runs on your infrastructure: the web app, the workspaces, the Git credentials, and the database. You bring your own model keys, so inference goes to the configured provider under your own account. Hosted billing is disabled on self-host. The default Compose deployment assumes trusted users; KVM/microsandbox deployment is a separate advanced operator path. If you want someone else to run it, Waynode Cloud operates the server, updates, encrypted secrets, and Stripe billing. Interactive terminal access is currently self-hosted only.
 
 In short: Cursor's "self-hosted" is hybrid: your machines execute, Cursor's cloud orchestrates and does inference. Waynode's self-hosted is the whole product.
 

@@ -1,0 +1,67 @@
+.state-surface {
+  width: min(100%, 520px);
+  min-height: 100%;
+  margin: auto;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  text-align: center;
+}
+.state-surface.is-compact { min-height: 180px; padding: 28px 20px; }
+.state-surface h1 { margin: 0; color: var(--text); font-size: 18px; font-weight: 680; letter-spacing: -.02em; }
+.state-surface p { max-width: 440px; margin: 8px 0 0; color: var(--text-dim); font-size: 13px; line-height: 1.55; }
+.state-surface.is-error h1 { color: #fecaca; }
+.state-progress { position: relative; width: 86px; height: 2px; margin-bottom: 18px; overflow: hidden; border-radius: 999px; background: var(--bg-elevated); }
+.state-progress::after { content: ""; position: absolute; inset: 0; width: 42%; background: var(--accent); animation: state-progress 1.5s ease-in-out infinite; }
+.state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.state-actions button { min-height: 38px; padding: 8px 13px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 650; }
+.state-primary { color: white; border-color: transparent !important; background: var(--accent); }
+.state-primary:hover { background: var(--accent-hover); }
+.state-secondary { color: var(--text); background: var(--bg-elevated); }
+.state-secondary:hover { background: var(--bg-hover); }
+.state-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sidebar-empty { padding: 18px 10px; color: var(--text-faint); font-size: 12px; line-height: 1.5; text-align: center; }
+.sidebar-session-state { padding: 7px 10px; color: var(--text-faint); font-size: 11px; }
+.sidebar { background: var(--bg-surface); box-shadow: none; }
+.new-space-btn { background: var(--accent); border-color: transparent; box-shadow: none; }
+.new-space-btn:hover { background: var(--accent-hover); border-color: transparent; }
+.sidebar-settings-btn { color: var(--text-dim); background: transparent; border-color: var(--border); }
+button.space-item { width: 100%; text-align: left; }
+.space-item.active { background: rgba(59,130,246,.13); box-shadow: none; }
+.session-item-open:focus-visible,.space-item:focus-visible,.new-session-btn:focus-visible,.archived-toggle:focus-visible,.session-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sidebar-issue { margin: 8px; padding: 10px; border: 1px solid rgba(239,68,68,.34); border-radius: 8px; color: #fecaca; background: rgba(90,24,24,.28); font-size: 12px; line-height: 1.45; }
+.sidebar-issue p { margin: 0; }
+.sidebar-issue-actions { display: flex; gap: 8px; margin-top: 8px; }
+.sidebar-issue button { min-height: 32px; padding: 5px 8px; border-radius: 6px; color: var(--text); background: rgba(255,255,255,.07); font-size: 12px; font-weight: 650; }
+.sidebar-issue button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.repo-picker-error { display: flex; align-items: center; gap: 12px; }
+.repo-picker-modal { background: #151517; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+.repo-picker-error span { flex: 1; }
+.repo-picker-error button { min-height: 32px; padding: 5px 9px; border: 1px solid rgba(239,68,68,.35); border-radius: 6px; color: #fecaca; font-weight: 650; }
+.repo-picker-tabs { justify-content: center; padding: 12px; }
+.repo-picker-tabs .tab-btn { display: flex; align-items: center; gap: 6px; }
+button.repo-item { width: 100%; color: inherit; background: transparent; text-align: left; }
+button.repo-item:disabled { cursor: wait; opacity: .55; }
+button.repo-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.repo-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; line-height: 1.45; }
+.repo-empty strong { color: var(--text-dim); font-size: 13px; }
+.repo-empty button { min-height: 34px; margin-top: 5px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--bg-elevated); }
+.repo-search-icon { display: inline-flex; }
+.form-auth-toggle { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; }
+.form-auth-toggle small { margin-left: auto; color: var(--text-faint); font-size: 11px; }
+.repo-picker-close:focus-visible,.repo-search-clear:focus-visible,.form-auth-toggle:focus-visible,.repo-url-clone-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@keyframes state-progress {
+  0% { transform: translateX(-110%); }
+  50%, 100% { transform: translateX(240%); }
+}
+@media (prefers-reduced-motion: reduce) { .state-progress::after { animation: none; width: 100%; opacity: .65; } }
+@media (pointer: coarse) {
+  .icon-btn,.icon-btn-ghost,.git-icon-btn,.repo-picker-close,.session-menu-btn,.new-session-btn,.archived-toggle,.git-mini-btn,.git-chev,.git-msg-dismiss { min-width: 44px; min-height: 44px; }
+  .send-dropdown-item,.git-tab,.workspace-tabs button,.form-auth-toggle { min-height: 44px; }
+}

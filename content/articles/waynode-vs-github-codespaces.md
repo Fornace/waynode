@@ -21,7 +21,7 @@ GitHub Codespaces is a managed cloud development environment: it spins up a cont
 - **Codespaces** = ephemeral, metered compute for a human editing in VS Code. Stops after 30 minutes of inactivity by default; stopped codespaces are deleted after 30 days by default.
 - **Waynode** = a durable "space" that is a persistent Git worktree on disk. The agent session, files, branches, and terminal state survive between visits.
 - In Codespaces, you drive; in Waynode, an agent does (the open-source pi engine, with pi-codex-goal for autonomous goal runs): you chat, assign goals, or drop into a terminal.
-- Codespaces is GitHub-hosted only. Waynode is `docker compose up -d` on your own hardware (free), or Waynode Cloud from $39/mo.
+- Codespaces is GitHub-hosted only. Waynode has a guided Docker Compose installer for your own hardware (free), or Waynode Cloud from $39/mo.
 - Codespaces bills usage: $0.18/hr for a 2-core machine, $0.07/GB-month storage. Waynode self-host is free (bring your own model keys); Waynode Cloud is a flat monthly plan with token quotas.
 - They are complementary more than competitive: many teams will keep Codespaces for hands-on-keyboard work and use Waynode for delegated agent work.
 
@@ -35,7 +35,7 @@ Lifecycle is deliberately ephemeral: a codespace stops after 30 minutes of inact
 
 [Waynode](https://github.com/fornace/waynode) is an open-source (MIT), self-hosted coding-agent workspace. Each workspace, called a "space," is a real cloned Git repository on disk: a persistent worktree, not a disposable task container. The agent engine is pi, with pi-codex-goal for autonomous goal-driven runs; you can chat with the agent, hand it a goal, or open a full terminal in the workspace yourself.
 
-The Git surface is agent-native: changed files, hunks, diffs, commits, branches, and push live beside the conversation, so "done" means ready for review rather than merely finished running. Sessions persist: conversation, files, branches, and terminal state survive between visits, so you can start at your desk and resume from a phone. Repos connect via GitHub or GitLab OAuth. It runs two ways: self-hosted (free: `git clone`, `cp .env.example .env`, `docker compose up -d`, open localhost:3000, with your repos, database, credentials, and LLM keys staying with you) or Waynode Cloud, managed hosting of the same stack with a 15-day free trial. For background, see [/learn](/learn).
+The Git surface is agent-native: changed files, hunks, diffs, commits, branches, and push live beside the conversation, so "done" means ready for review rather than merely finished running. Sessions persist: conversation, files, branches, and terminal state survive between visits, so you can start at your desk and resume from a phone. Repos connect via GitHub or GitLab OAuth. It runs two ways: self-hosted (free: clone the repo and run `./scripts/self-host.sh setup`, providing an OAuth app and model-provider key during setup; your repos, database, credentials, and LLM keys stay with you) or Waynode Cloud, managed hosting of the same stack with a 15-day free trial. For background, see [/learn](/learn).
 
 ## How do they compare?
 
@@ -54,7 +54,7 @@ The Git surface is agent-native: changed files, hunks, diffs, commits, branches,
 
 ## Is Waynode a self-hosted Codespaces alternative?
 
-Partially, and only for a specific use. If what you want from Codespaces is *a full IDE in the browser for a human* (devcontainer builds, extensions, port forwarding into a live editor), Waynode does not replace that; self-hosted cloud IDE platforms like Coder or Gitpod/Ona are the closer substitutes. What Waynode self-host does give you is the piece Codespaces doesn't offer at all: a durable, self-owned workspace where an agent works in your actual repository, with an operator-owned encryption key and session secret, per-deployment OAuth apps, your own LLM keys, and a sandboxed microVM execution path when KVM is available. Nothing about your code or credentials leaves your infrastructure, and there is no per-hour meter; the cost is your hardware plus your model usage.
+Partially, and only for a specific use. If what you want from Codespaces is *a full IDE in the browser for a human* (devcontainer builds, extensions, port forwarding into a live editor), Waynode does not replace that; self-hosted cloud IDE platforms like Coder or Gitpod/Ona are the closer substitutes. What Waynode self-host does give you is the piece Codespaces doesn't offer at all: a durable, self-owned workspace where an agent works in your actual repository, with an operator-owned encryption key and session secret, per-deployment OAuth apps, and your own LLM keys. The default Compose deployment is for a trusted individual or small team and does not provide hardware isolation between its users; a separate KVM/microsandbox deployment is an advanced operator path. There is no per-hour Waynode meter; the cost is your hardware plus your model usage.
 
 ## When is Codespaces the better choice?
 
@@ -81,7 +81,7 @@ Codespaces is built for interactive human use; GitHub's own Copilot coding agent
 
 ### Is Waynode free?
 
-Self-hosted Waynode is free and MIT-licensed: clone the repo, copy the env file, and run `docker compose up -d`. You bring your own LLM API keys. Waynode Cloud, the managed option, starts at $39/month (Starter: 3 seats, 3M agent tokens, 10 GB) with a 15-day free trial.
+Self-hosted Waynode is free and MIT-licensed: clone the repo and run the guided `./scripts/self-host.sh setup` installer. You need Docker Compose v2, an OAuth app, and your own LLM API key. Waynode Cloud, the managed option, starts at $39/month (Starter: 3 seats, 3M agent tokens, 10 GB) with a 15-day free trial.
 
 ### Does Codespaces charge while a codespace is stopped?
 

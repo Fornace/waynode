@@ -45,6 +45,9 @@ struct TerminalView: View {
                 Text(statusText)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(statusText)
                 Spacer()
 
                 if connectionState == .connected {
@@ -57,6 +60,8 @@ struct TerminalView: View {
                     .buttonStyle(.plain)
                     .help("Fit terminal to 80×24")
                     .accessibilityLabel("Resize terminal")
+                    .accessibilityIdentifier("terminal.resize")
+                    .frame(minWidth: 44, minHeight: 44)
                 }
 
                 Button {
@@ -68,6 +73,9 @@ struct TerminalView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(output.isEmpty)
+                .accessibilityLabel("Copy terminal output")
+                .accessibilityIdentifier("terminal.copy")
+                .frame(minWidth: 44, minHeight: 44)
 
                 Button {
                     Task { await reconnect() }
@@ -76,7 +84,14 @@ struct TerminalView: View {
                         .font(.caption2)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Reconnect terminal")
+                .accessibilityIdentifier("terminal.reconnect")
+                .frame(minWidth: 44, minHeight: 44)
+                .disabled(connectionState == .connecting)
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("terminal.status")
+            .accessibilityLabel("Terminal status: \(statusText)")
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
 
@@ -91,6 +106,9 @@ struct TerminalView: View {
                 }
             )
             .background(Color.black)
+            .accessibilityIdentifier("terminal.surface")
+            .accessibilityLabel("Terminal output")
+            .accessibilityHint("Use the keyboard to interact with the running agent")
 
             // SwiftTerm supplies its own keyboard input. This footer only
             // appears after the server-side PTY has reached a terminal state.
@@ -108,10 +126,14 @@ struct TerminalView: View {
                         Task { await reconnect() }
                     }
                     .buttonStyle(.glass)
+                    .accessibilityIdentifier("terminal.failure.retry")
+                    .accessibilityHint("Starts a new terminal connection")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(.thinMaterial)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("terminal.failure")
             } else {
                 HStack {
                     Image(systemName: "checkmark.circle")
@@ -121,13 +143,29 @@ struct TerminalView: View {
                         Task { await reconnect() }
                     }
                     .buttonStyle(.glass)
+                    .accessibilityIdentifier("terminal.exited.restart")
+                    .accessibilityHint("Starts a new terminal process")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(.thinMaterial)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("terminal.exited")
             }
         }
         .task {
+            #if DEBUG
+            if CommandLine.arguments.contains("-ui-test-terminal-error") {
+                connectionState = .failed("Terminal service unavailable")
+                hasExited = true
+                return
+            }
+            if CommandLine.arguments.contains("-ui-test-terminal-exited") {
+                connectionState = .exited(0)
+                hasExited = true
+                return
+            }
+            #endif
             await connect()
         }
         .onDisappear {
@@ -164,7 +202,11 @@ struct TerminalView: View {
     // MARK: - Connection
 
     private func connect() async {
-        guard let api = appModel.currentAPI() else { return }
+        guard let api = appModel.currentAPI() else {
+            connectionState = .failed("Server configuration is unavailable")
+            hasExited = true
+            return
+        }
         connectionState = .connecting
         output = "\u{1B}[2J\u{1B}[H"
         streamID = UUID()
@@ -185,6 +227,7 @@ struct TerminalView: View {
         wsClient = client
         await client.connect()
 
+        let connectionID = streamID
         listenTask = Task {
             let stream = client.output()
             for await msg in stream {
@@ -193,7 +236,7 @@ struct TerminalView: View {
             // Stream ended. If the terminal didn't exit cleanly, the
             // socket dropped unexpectedly — surface as a failure so the
             // user knows they need to reconnect.
-            if !hasExited {
+            if streamID == connectionID && !hasExited {
                 await MainActor.run {
                     if case .exited = connectionState {
                         // already handled
@@ -208,7 +251,8 @@ struct TerminalView: View {
 
     private func reconnect() async {
         listenTask?.cancel()
-        Task { await wsClient?.disconnect() }
+        await wsClient?.disconnect()
+        wsClient = nil
         await connect()
     }
 

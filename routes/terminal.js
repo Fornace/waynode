@@ -7,7 +7,7 @@ import db from "../lib/db.mjs";
 import { randomUUID } from "crypto";
 import { resolveApiToken } from "../lib/auth.mjs";
 import { getSpace } from "../lib/spaces.mjs";
-import { billingEnabled } from "../lib/billing.mjs";
+import { billingEnabled, checkQuota } from "../lib/billing.mjs";
 
 const router = Router();
 
@@ -15,6 +15,20 @@ let allowedOrigin = null;
 try {
   if (config.appUrl) allowedOrigin = new URL(config.appUrl).origin;
 } catch {}
+
+export function terminalBillingRejection(session) {
+  if (!billingEnabled) return null;
+  const space = getSpace(session.space_id);
+  if (!space?.org_id) return null;
+  const quota = checkQuota(space.org_id);
+  if (!["active", "trialing"].includes(quota.status)) {
+    return "This Waynode Cloud trial or subscription is not active. Ask an organization admin to update billing.";
+  }
+  if (quota.tokens.exceeded) {
+    return "This organization has reached its monthly included agent usage. Ask an organization admin to update billing.";
+  }
+  return null;
+}
 
 export function attachTerminalWebSocket(server, sessionMiddleware) {
   const wss = new WebSocketServer({ noServer: true });
@@ -113,25 +127,24 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
         // pty — spawning one only if none exists yet.
         let handle;
         try {
-          // The interactive PTY can execute arbitrary commands and pi turns,
-          // but it currently has no provider-side token reservation or durable
-          // usage meter. Do not let a hosted org bypass its trial/subscription
-          // limits through this side channel. Self-hosted terminals are
-          // unaffected; re-enable hosted terminals only with a reservation and
-          // execution accounting model that is at least as strict as chat.
-          const space = getSpace(session.space_id);
-          if (billingEnabled && space?.org_id) {
-            const err = new Error("Terminal is temporarily unavailable on Waynode Cloud while usage safeguards are being completed. Use Chat for metered agent work.");
-            err.terminalDisabled = true;
-            throw err;
+          const billingRejection = terminalBillingRejection(session);
+          if (billingRejection) {
+            const error = new Error(billingRejection);
+            error.billingBlocked = true;
+            throw error;
           }
+          // getTerminal rejects hosted deployments before reclaiming chat or
+          // starting a process. Interactive terminal stays self-hosted until
+          // a broker can issue narrowly scoped, revocable guest credentials.
           handle = await getTerminal(session);
         } catch (err) {
           // Mirror the existing terminalDisabled (sandboxed-mode) pattern:
           // tag the payload so the frontend can distinguish "agent busy, try
           // again shortly" from "sandboxed mode, terminal permanently
           // unavailable" instead of treating both as the same hard error.
-          if (err.agentBusy) {
+          if (err.billingBlocked) {
+            ws.send(JSON.stringify({ type: "error", billingBlocked: true, message: err.message }), () => ws.close());
+          } else if (err.agentBusy) {
             ws.send(JSON.stringify({ type: "error", agentBusy: true, message: err.message }), () => ws.close());
           } else if (err.terminalDisabled) {
             ws.send(JSON.stringify({ type: "error", terminalDisabled: true, message: err.message }), () => ws.close());

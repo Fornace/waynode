@@ -1,4 +1,5 @@
 import Foundation
+import Security
 #if canImport(Observation)
 import Observation
 #endif
@@ -66,6 +67,49 @@ public final class AuthStore {
 
     /// Auth callback URL scheme for ASWebAuthenticationSession.
     public static let callbackScheme = "waynode"
+
+    /// Starts a one-shot native OAuth attempt. The nonce is persisted briefly
+    /// so a signed callback can still finish after scene reconstruction.
+    public func beginNativeAuth() -> String? {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            error = "Couldn't create a secure sign-in request. Please try again."
+            return nil
+        }
+        let nonce = Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let attempt = NativeAuthAttempt(nonce: nonce, expiresAt: Date().addingTimeInterval(10 * 60))
+        if let data = try? JSONEncoder().encode(attempt) {
+            UserDefaults.standard.set(data, forKey: Self.nativeAuthAttemptKey)
+            return nonce
+        }
+        error = "Couldn't prepare sign in. Please try again."
+        return nil
+    }
+
+    public func cancelNativeAuth() {
+        UserDefaults.standard.removeObject(forKey: Self.nativeAuthAttemptKey)
+    }
+
+    /// Validates and consumes the signed server callback before storing a token.
+    @discardableResult
+    public func completeNativeAuthCallback(_ url: URL) async -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme == Self.callbackScheme,
+              components.host == "auth",
+              let token = components.queryItems?.first(where: { $0.name == "token" })?.value,
+              token.hasPrefix("wn_"),
+              let nonce = components.queryItems?.first(where: { $0.name == "nonce" })?.value,
+              consumeNativeAuthNonce(nonce) else {
+            cancelNativeAuth()
+            error = "This sign-in callback is invalid or expired. Please start again."
+            return false
+        }
+        await completeAuth(token: token)
+        return isAuthenticated
+    }
 
     // MARK: - Verify token (called on launch)
 
@@ -145,6 +189,18 @@ public final class AuthStore {
         self.hasCompletedLaunchCheck = true
     }
 
+    #if DEBUG
+    /// Installs an in-memory identity for deterministic native UI tests.
+    public func installUITestUser() {
+        token = "ui-test-token"
+        user = User(id: "ui-user", name: "Waynode Tester", email: "tester@example.test", role: "owner")
+        providers = .init(github: true, gitlab: true, dev: true)
+        error = nil
+        isLoading = false
+        hasCompletedLaunchCheck = true
+    }
+    #endif
+
     // MARK: - Change server
 
     public func setServerURL(_ url: URL) {
@@ -155,6 +211,31 @@ public final class AuthStore {
     // MARK: - Persistence (UserDefaults for config, Keychain for token)
 
     private static let serverConfigKey = "waynode.serverConfig"
+    private static let nativeAuthAttemptKey = "waynode.nativeAuthAttempt"
+
+    private struct NativeAuthAttempt: Codable {
+        let nonce: String
+        let expiresAt: Date
+    }
+
+    private func consumeNativeAuthNonce(_ candidate: String) -> Bool {
+        defer { cancelNativeAuth() }
+        guard let data = UserDefaults.standard.data(forKey: Self.nativeAuthAttemptKey),
+              let attempt = try? JSONDecoder().decode(NativeAuthAttempt.self, from: data),
+              attempt.expiresAt > Date() else { return false }
+        let expected = Data(attempt.nonce.utf8)
+        let provided = Data(candidate.utf8)
+        guard expected.count == provided.count, !expected.isEmpty else { return false }
+        return expected.withUnsafeBytes { expectedBytes in
+            provided.withUnsafeBytes { providedBytes in
+                var difference: UInt8 = 0
+                for index in 0..<expected.count {
+                    difference |= expectedBytes[index] ^ providedBytes[index]
+                }
+                return difference == 0
+            }
+        }
+    }
 
     private static func loadServerConfig() -> ServerConfig? {
         guard let data = UserDefaults.standard.data(forKey: serverConfigKey) else { return nil }

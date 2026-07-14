@@ -3,12 +3,8 @@ import WaynodeCore
 
 // MARK: - MainView
 //
-// The authenticated app shell. A TabView with bottom tabs (iPhone) that
-// adapts to a sidebar on iPad/Mac via `.sidebarAdaptable`.
-//
-// Two tabs:
-//   • Spaces — the main work area (NavigationStack drill-down: Spaces → Sessions → Chat)
-//   • Account — tokens, server config, logout
+// The authenticated app shell. Compact devices use one focused drill-down;
+// regular-width devices use a three-column workbench.
 //
 // Uses NavigationStack (NOT NavigationSplitView) for the Spaces tab so that
 // taps always work and the drill-down is natural on mobile: tap a repo → see
@@ -21,30 +17,11 @@ import WaynodeCore
 struct MainView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var selection: TopLevelTab? = .spaces
     @State private var spacesPath = NavigationPath()
-
-    enum TopLevelTab: String, Hashable, CaseIterable {
-        case spaces, account
-
-        var label: String {
-            switch self {
-            case .spaces: return "Spaces"
-            case .account: return "Account"
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .spaces: return "folder"
-            case .account: return "person.crop.circle"
-            }
-        }
-    }
 
     var body: some View {
         Group {
-            if horizontalSizeClass == .regular {
+            if usesWorkbench {
                 WorkbenchView()
             } else {
                 compactShell
@@ -59,33 +36,25 @@ struct MainView: View {
         }
     }
 
-    private var compactShell: some View {
-        TabView(selection: $selection) {
-            // Spaces tab: drill-down navigation (Spaces → Sessions → Chat)
-            NavigationStack(path: $spacesPath) {
-                SpacesScene()
-                    .navigationDestination(for: DeepLink.self) { destination in
-                        switch destination {
-                        case .sessionsList(let spaceId):
-                            SessionsList(spaceId: spaceId)
-                        case .sessionDetail(let spaceId, let sessionId):
-                            SessionDetail(sessionId: sessionId, spaceId: spaceId)
-                        }
-                    }
-            }
-            .tabItem {
-                Label(TopLevelTab.spaces.label, systemImage: TopLevelTab.spaces.systemImage)
-            }
-            .tag(TopLevelTab.spaces)
+    private var usesWorkbench: Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        horizontalSizeClass == .regular
+        #endif
+    }
 
-            // Account tab
-            NavigationStack {
-                AccountScene()
-            }
-            .tabItem {
-                Label(TopLevelTab.account.label, systemImage: TopLevelTab.account.systemImage)
-            }
-            .tag(TopLevelTab.account)
+    private var compactShell: some View {
+        NavigationStack(path: $spacesPath) {
+            SpacesScene()
+                .navigationDestination(for: DeepLink.self) { destination in
+                    switch destination {
+                    case .sessionsList(let spaceId):
+                        SessionsList(spaceId: spaceId)
+                    case .sessionDetail(let spaceId, let sessionId):
+                        SessionDetail(sessionId: sessionId, spaceId: spaceId)
+                    }
+                }
         }
     }
 
@@ -93,7 +62,6 @@ struct MainView: View {
 
     private func handleDeepLink() {
         guard let link = appModel.pendingDeepLink else { return }
-        selection = .spaces
         switch link {
         case .sessionsList(let spaceId):
             appModel.selectedSpaceId = spaceId
@@ -114,42 +82,58 @@ struct MainView: View {
 
 private struct WorkbenchView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingAccount = false
     @State private var showingCloneSheet = false
     @State private var showingNewSession = false
     @State private var newSessionTitle = ""
     @State private var sessionError: String?
+    @State private var spaceToDelete: Space?
+    @State private var sessionToDelete: Session?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @FocusState private var focusedColumn: FocusColumn?
+    private enum FocusColumn: Hashable { case worktrees, sessions }
 
     var body: some View {
         @Bindable var model = appModel
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $model.selectedSpaceId) {
                 if model.spaces.isEmpty {
                     if model.isLoadingSpaces {
                         HStack { Spacer(); ProgressView(); Spacer() }
                     } else {
                         ContentUnavailableView {
-                            Label("No Workspaces", systemImage: "folder.badge.plus")
+                            Label("No Worktrees", systemImage: "folder.badge.plus")
                         } description: {
-                            Text("Clone a repository to create your first persistent workspace.")
+                            Text("Clone a repository to create your first worktree.")
                         } actions: {
                             Button("Clone Repository") { showingCloneSheet = true }
                                 .buttonStyle(.glassProminent)
+                                .accessibilityIdentifier("worktree.clone")
                         }
                         .listRowBackground(Color.clear)
                     }
                 } else {
                     ForEach(model.spaces) { space in
-                        SpaceRow(space: space)
+                        SpaceRow(space: space, isSelected: model.selectedSpaceId == space.id)
                             .tag(space.id)
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                            .contextMenu {
+                                Button("Delete Worktree", role: .destructive) { spaceToDelete = space }
+                                    .accessibilityIdentifier("worktree.\(space.id).delete")
+                            }
+                            .accessibilityAction(named: "Delete Worktree") { spaceToDelete = space }
                     }
                 }
             }
             .listStyle(.sidebar)
-            .navigationTitle("Workspaces")
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("worktrees.list")
+            .focused($focusedColumn, equals: .worktrees)
+            .navigationTitle("Worktrees")
+            .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 360)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
@@ -157,12 +141,17 @@ private struct WorkbenchView: View {
                     } label: {
                         Label("Clone Repository", systemImage: "plus")
                     }
+                    .help("Clone a repository into a new worktree")
+                    .accessibilityIdentifier("worktree.clone")
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
                     Button {
                         showingAccount = true
                     } label: {
                         Label("Account", systemImage: "person.crop.circle")
                     }
                     .accessibilityHint("Open server, billing, and account settings")
+                    .accessibilityIdentifier("account.open")
+                    .help("Account, billing, and server settings")
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -196,28 +185,38 @@ private struct WorkbenchView: View {
                             ContentUnavailableView {
                                 Label("No Sessions", systemImage: "plus.bubble")
                             } description: {
-                                Text("Start a focused conversation inside this workspace.")
+                                Text("Start a focused conversation inside this worktree.")
                             } actions: {
                                 Button("New Session", action: openNewSession)
                                     .buttonStyle(.glassProminent)
+                                    .accessibilityIdentifier("session.new")
                             }
                             .listRowBackground(Color.clear)
                         }
                     } else {
                         ForEach(sessions) { session in
-                            SessionRow(session: session)
+                            SessionRow(session: session, isSelected: model.selectedSessionId == session.id)
                                 .tag(session.id)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                                .contextMenu {
+                                    Button("Delete Session", role: .destructive) { sessionToDelete = session }
+                                        .accessibilityIdentifier("session.\(session.id).delete")
+                                }
+                                .accessibilityAction(named: "Delete Session") { sessionToDelete = session }
                         }
                     }
                 } else {
-                    ContentUnavailableView("Choose a workspace", systemImage: "folder")
+                    ContentUnavailableView("Choose a worktree", systemImage: "folder")
                         .listRowBackground(Color.clear)
                 }
             }
-            .navigationTitle("Sessions")
+            .navigationTitle(selectedSpaceTitle)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("sessions.list")
+            .focused($focusedColumn, equals: .sessions)
+            .navigationSplitViewColumnWidth(min: 250, ideal: 310, max: 380)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -226,10 +225,15 @@ private struct WorkbenchView: View {
                         Label("New Session", systemImage: "plus.bubble")
                     }
                     .disabled(model.selectedSpaceId == nil)
+                    .help("Start a session in the selected worktree")
+                    .accessibilityIdentifier("session.new")
+                    .keyboardShortcut("n", modifiers: .command)
                 }
             }
             .task(id: model.selectedSpaceId) {
-                if let id = model.selectedSpaceId { await model.refreshSessions(spaceId: id) }
+                guard let id = model.selectedSpaceId else { return }
+                await model.refreshSessions(spaceId: id)
+                selectFirstSessionIfNeeded(in: id)
             }
         } detail: {
             if let spaceId = model.selectedSpaceId, let sessionId = model.selectedSessionId {
@@ -239,8 +243,30 @@ private struct WorkbenchView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .toolbar {
+            #if targetEnvironment(macCatalyst)
+            ToolbarItemGroup(placement: .navigation) {
+                Button(action: toggleNavigation) {
+                    Label("Toggle Navigation", systemImage: "sidebar.left")
+                }
+                .help(columnVisibility == .detailOnly ? "Show worktrees and sessions" : "Hide navigation columns")
+                .accessibilityIdentifier("navigation.toggle")
+                .keyboardShortcut("s", modifiers: [.command, .control])
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await refreshSelection() }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .help("Refresh worktrees and the selected session list")
+                .accessibilityIdentifier("workbench.refresh")
+                .keyboardShortcut("r", modifiers: .command)
+            }
+            #endif
+        }
         .sheet(isPresented: $showingAccount) {
-            NavigationStack { AccountScene() }
+            AccountSheetContainer()
         }
         .sheet(isPresented: $showingCloneSheet) {
             CloneSheet()
@@ -252,7 +278,24 @@ private struct WorkbenchView: View {
                 onCreate: createSession,
                 onCancel: { showingNewSession = false }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .workbenchDeletionAlerts(space: $spaceToDelete, session: $sessionToDelete)
+        .task {
+            if model.spaces.isEmpty { await model.refreshSpaces() }
+            selectFirstSpaceIfNeeded()
+            focusedColumn = .worktrees
+        }
+        .onChange(of: model.spaces.map(\.id)) {
+            selectFirstSpaceIfNeeded()
+        }
+        .onChange(of: model.selectedSpaceId) { oldValue, newValue in
+            guard oldValue != newValue else { return }
+            let validIds = Set(newValue.map { model.sessions(forSpace: $0).map(\.id) } ?? [])
+            if let sessionId = model.selectedSessionId, !validIds.contains(sessionId) {
+                model.selectedSessionId = nil
+            }
         }
     }
 
@@ -262,22 +305,61 @@ private struct WorkbenchView: View {
         showingNewSession = true
     }
 
-    private func createSession() {
+    private func createSession() async throws {
         guard let spaceId = appModel.selectedSpaceId else { return }
-        Task {
-            do {
-                let session = try await appModel.createSession(
-                    spaceId: spaceId,
-                    title: newSessionTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newSessionTitle
-                )
-                appModel.selectedSessionId = session.id
-                showingNewSession = false
-                Haptics.success()
-            } catch {
-                sessionError = error.localizedDescription
-                Haptics.error()
-            }
+        let trimmedTitle = newSessionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let session = try await appModel.createSession(
+            spaceId: spaceId,
+            title: trimmedTitle.isEmpty ? nil : trimmedTitle
+        )
+        try Task.checkCancellation()
+        appModel.selectedSessionId = session.id
+        showingNewSession = false
+        Haptics.success()
+    }
+
+    private var selectedSpaceTitle: String {
+        guard let id = appModel.selectedSpaceId,
+              let space = appModel.spaces.first(where: { $0.id == id }) else { return "Sessions" }
+        return space.repoName.isEmpty ? "Sessions" : space.repoName
+    }
+
+    private func selectFirstSpaceIfNeeded() {
+        guard appModel.selectedSpaceId == nil else { return }
+        appModel.selectedSpaceId = appModel.spaces.first?.id
+    }
+
+    private func selectFirstSessionIfNeeded(in spaceId: String) {
+        let sessions = appModel.sessions(forSpace: spaceId)
+        if let selected = appModel.selectedSessionId, sessions.contains(where: { $0.id == selected }) { return }
+        appModel.selectedSessionId = sessions.first?.id
+    }
+
+    private func refreshSelection() async {
+        await appModel.refreshSpaces()
+        if let spaceId = appModel.selectedSpaceId {
+            await appModel.refreshSessions(spaceId: spaceId)
+            selectFirstSessionIfNeeded(in: spaceId)
+        } else {
+            selectFirstSpaceIfNeeded()
         }
+    }
+
+    private func toggleNavigation() {
+        withAnimation(reduceMotion ? nil : .snappy) {
+            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        }
+    }
+}
+
+struct AccountSheetContainer: View {
+    var body: some View {
+        NavigationStack {
+            AccountScene()
+        }
+        #if targetEnvironment(macCatalyst)
+        .frame(minWidth: 560, minHeight: 620)
+        #endif
     }
 }
 

@@ -40,9 +40,12 @@ extension EnvironmentValues {
 struct ChatView: View {
     @Bindable var store: SessionStore
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dismiss) private var dismiss
     @State private var composerText: String = ""
     @FocusState private var composerFocused: Bool
     @State private var autoScroll: Bool = true
+    @State private var showingAccount: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // Auto-scroll anchor: track the last item id for scroll-to-bottom.
     private let bottomID = "chat-bottom"
@@ -55,7 +58,10 @@ struct ChatView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     if showConnectionBanner {
-                        ConnectionBanner(state: store.connectionState)
+                        ConnectionBanner(
+                            state: store.connectionState,
+                            onRecovery: handleConnectionRecovery
+                        )
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     if store.goalStatus.status == .active || store.goalStatus.status == .paused {
@@ -65,8 +71,8 @@ struct ChatView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
-                .animation(.smooth, value: store.connectionState)
-                .animation(.smooth, value: store.goalStatus.status)
+                .animation(reduceMotion ? nil : .smooth, value: store.connectionState)
+                .animation(reduceMotion ? nil : .smooth, value: store.goalStatus.status)
             }
             // Provide an edit handler so user messages can pre-fill the
             // composer via their context menu (#9).
@@ -84,8 +90,14 @@ struct ChatView: View {
                     onSend: { prompt, isGoal in
                         Task {
                             await store.sendMessage(prompt, isGoal: isGoal)
-                            composerText = ""
-                            autoScroll = true
+                            // Keep the user's draft when delivery fails so
+                            // reconnecting never destroys work they typed.
+                            if store.sendError == nil {
+                                composerText = ""
+                                autoScroll = true
+                            } else {
+                                composerFocused = true
+                            }
                         }
                     },
                     onAbort: {
@@ -103,6 +115,9 @@ struct ChatView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingAccount) {
+            NavigationStack { AccountScene() }
+        }
     }
 
     // MARK: - Message list
@@ -117,7 +132,7 @@ struct ChatView: View {
                             composerFocused = true
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 80)
+                        .padding(.top, 28)
                     }
 
                     if store.isLoadingHistory {
@@ -127,9 +142,12 @@ struct ChatView: View {
                             Spacer()
                         }
                         .padding(.top, 40)
+                        .accessibilityLabel("Loading conversation history")
+                        .accessibilityAddTraits(.updatesFrequently)
+                        .accessibilityIdentifier("chat.history.loading")
                     }
 
-                    ForEach(store.reducer.items) { item in
+                    ForEach(transcriptItems) { item in
                         ChatItemView(item: item)
                             .id(item.id)
                     }
@@ -145,13 +163,15 @@ struct ChatView: View {
                 // screen width on iPhone (was 16 → 10). Bubbles and markdown
                 // blocks already carry their own internal padding.
                 .padding(.horizontal, 10)
-                .padding(.top, 8)
+                .padding(.top, 16)
                 .padding(.bottom, 16)
             }
             // Per-session identity: forces a fresh ScrollView instance when
             // switching sessions so the scroll offset from a previous session
             // is NOT carried over (#8 — scroll position remembered bug).
             .id(ObjectIdentifier(store))
+            .accessibilityIdentifier("chat.transcript")
+            .accessibilityLabel("Conversation transcript")
             // Interactively dismiss the keyboard as the user scrolls down.
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
@@ -170,7 +190,7 @@ struct ChatView: View {
             }
             .onChange(of: store.reducer.items.last?.id) {
                 if autoScroll {
-                    withAnimation(.smooth) {
+                    withAnimation(reduceMotion ? nil : .smooth) {
                         proxy.scrollTo(bottomID, anchor: .bottom)
                     }
                 }
@@ -194,7 +214,7 @@ struct ChatView: View {
             }
             .onChange(of: store.reducer.items.count) {
                 if autoScroll {
-                    withAnimation(.smooth) {
+                    withAnimation(reduceMotion ? nil : .smooth) {
                         proxy.scrollTo(bottomID, anchor: .bottom)
                     }
                 }
@@ -215,6 +235,41 @@ struct ChatView: View {
             return true
         default:
             return false
+        }
+    }
+
+    private func handleConnectionRecovery(_ recovery: SSEClient.ConnectionFailure.Recovery) {
+        switch recovery {
+        case .retry:
+            Task { await store.reconnect() }
+        case .signIn:
+            appModel.handleUnauthorized()
+        case .openAccount:
+            showingAccount = true
+        case .returnToWorktrees:
+            appModel.selectedSessionId = nil
+            appModel.selectedSpaceId = nil
+            dismiss()
+        case .returnToSessions:
+            appModel.selectedSessionId = nil
+            dismiss()
+        }
+    }
+
+    /// Server history may split one agent turn into several adjacent
+    /// assistant records around tool calls. Present them as one turn so
+    /// consecutive reasoning fragments can collapse into a single section.
+    private var transcriptItems: [ChatItem] {
+        store.reducer.items.reduce(into: []) { result, item in
+            guard case .assistant(let next) = item,
+                  let last = result.last,
+                  case .assistant(var previous) = last else {
+                result.append(item)
+                return
+            }
+            previous.blocks.append(contentsOf: next.blocks)
+            previous.done = next.done
+            result[result.count - 1] = .assistant(previous)
         }
     }
 }

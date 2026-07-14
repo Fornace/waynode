@@ -31,7 +31,7 @@ only as an offline fallback.
 - **`BROWSER_TOKEN`** = the `browser.fornace.net` api-key (`fnc_…`), from
   `~/.agent_credentials/tokens/browser-mcp-tomasipromo.env` (`BROWSER_MCP_TOKEN`).
 - **`DEV_TOKEN`** = waynode's `DEV_AUTH_TOKEN` (read from the prod container:
-  `ssh root@49.12.9.255 'docker exec $(docker ps -q --filter name=waynode)
+  `ssh root@95.216.37.30 'docker exec $(docker ps -q --filter name=waynode)
   printenv DEV_AUTH_TOKEN'`). The harness injects it into the page's
   `localStorage` as `waynode-dev-token`, so REST, SSE, **and the terminal
   WebSocket** all run authenticated as the dev user — no OAuth login step.
@@ -44,7 +44,7 @@ makes fully-automated E2E possible here, but it should be rotated/gated.
 ```bash
 cd e2e
 npm install                       # one-time (installs nothing browser-side)
-DEV=$(ssh root@49.12.9.255 'docker exec $(docker ps -q --filter name=waynode) printenv DEV_AUTH_TOKEN')
+DEV=$(ssh root@95.216.37.30 'docker exec $(docker ps -q --filter name=waynode) printenv DEV_AUTH_TOKEN')
 BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs
 
 # flags:
@@ -60,9 +60,8 @@ BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs
 | `open-session` | expanding a space + new session renders the chat/tabs |
 | `chat-send` | "Reply with exactly: E2E-OK" → assistant replies with it |
 | `model-switch` | dropdown → Fornace Reasoning, no error |
-| `terminal-open` | Terminal tab mounts xterm, pi TUI paints |
-| `terminal-survival` | **the marquee:** `browser_clear_session` + re-navigate → re-attaches to the *same* server pty (proves the terminal survives a browser close) |
-| `mutex` | switching back to Chat reclaims the terminal |
+| `hosted-terminal-disabled` | authenticated hosted production rejects interactive terminal, shows the capability explanation, and removes the Terminal control |
+| `chat-after-terminal-gate` | returning to Chat keeps the composer usable and the unsupported Terminal control hidden |
 
 Screenshots land in `shots/`; `last-result.json` records the pass/fail summary.
 
@@ -89,15 +88,27 @@ node e2e/test-native-auth.mjs
 No external services required — sets `DATA_DIR` to a temp dir, configures
 `GITHUB_CLIENT_ID`, and spawns `node server.js`.
 
+## Self-host terminal coverage
+
+Hosted production deliberately does not execute an interactive shell. The
+self-host terminal contract is covered without weakening that boundary:
+
+- `test-sandbox-terminal.mjs` exercises bidirectional microVM TTY output,
+  input, exit, and cleanup through the installed microsandbox API.
+- `test-sandbox-security.mjs` asserts hosted denial and self-host allowance.
+- `test-terminal-billing.mjs` covers the typed availability error and detached
+  terminal metering.
+- `run.mjs` remains the local/offline browser fallback for a trusted self-host.
+
 ## Reliability
 
 The harness is **rate-limit-aware**: `browser.fornace.net` throttles sustained
 call volume (no advertised headers — just `{error:"Rate limit exceeded"}`),
 so `call()` detects that and backs off with exponential retry. Polling loops
-use ≥2.5s intervals to stay under the limit. With this, the full 7-flow suite
+use ≥2.5s intervals to stay under the limit. With this, the full 6-flow suite
 runs green consistently (verified across consecutive runs).
 
-Earlier "terminal-open is flaky" notes are obsolete — the root cause was always
-the rate limiter eating the late flows, not the terminal or the mutex. The
-server-side pty/terminal is separately verified by the in-container real-pty
-E2E (`getTerminal` path).
+The hosted suite does not accept a painted TUI as success: that would be a
+security regression. It waits for the typed capability denial and verifies the
+navigation control stays hidden. Polling uses ≥2.5s intervals so the hosted
+browser action API does not throttle late flows.

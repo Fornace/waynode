@@ -22,7 +22,7 @@ Waynode is an open-source (MIT), self-hosted **coding-agent workspace**: a place
 - The agent engine is **pi** (open source), with **pi-codex-goal** for autonomous goal-driven runs. You can chat with the agent, send it an autonomous goal, or open a full terminal.
 - An **agent-native Git surface** (changed files, hunks, diffs, commits, branches, push) lives beside the conversation. "Done" means ready for review, not merely finished running.
 - Sessions persist and work on mobile: start at your desk, resume from a phone; the same workspace, session, and diff everywhere.
-- **Self-host free** (MIT, `docker compose up -d`) or **Waynode Cloud** from $39/mo with a 15-day free trial.
+- **Self-host free** (MIT, guided Docker Compose setup) or **Waynode Cloud** from $39/mo with a 15-day free trial.
 - Source: [github.com/fornace/waynode](https://github.com/fornace/waynode).
 
 ## What problem does Waynode solve?
@@ -58,7 +58,7 @@ The same space, session, and diff render on a phone. In practice this means you 
 ## Who is Waynode for?
 
 - Developers who want agent work to be durable. If you dislike that a cloud-agent task's environment evaporates when the task ends, spaces-as-real-repos is the fix.
-- Teams with self-hosting requirements. Repos, database, credentials, and LLM keys stay on your infrastructure. No Stripe or hosted-billing code is active on self-host.
+- Teams with self-hosting requirements. Repos, database, credentials, and LLM keys stay on your infrastructure. Hosted billing and Waynode usage limits are disabled on self-host.
 - People who review agent output on the go. The mobile session model is aimed at the "agent finished while I was away from my desk" moment.
 
 It is a weaker fit if you mainly want many short, parallel, fire-and-forget tasks with zero infrastructure; a managed cloud agent is simpler for that (see the comparison pages under [/learn](/learn) for specific matchups).
@@ -68,14 +68,14 @@ It is a weaker fit if you mainly want many short, parallel, fire-and-forget task
 | | Self-host | Waynode Cloud |
 |---|---|---|
 | Price | Free (MIT license) | Starter $39/mo · Pro $99/mo · Team $249/mo |
-| Setup | `git clone` → `cp .env.example .env` → `docker compose up -d` → localhost:3000 | Sign up; 15-day free trial (5M trial tokens, 2 GB storage, 1 seat) |
-| Data | Repos, database, credentials, LLM keys, billing all stay with you | Managed: updates, isolated workspaces, encrypted secrets, backups, support |
+| Setup | Clone → guided `./scripts/self-host.sh setup`; OAuth app and model key required | Sign up; 15-day free trial (5M trial tokens, 2 GB storage, 1 seat) |
+| Data | Repos, database, credentials, LLM keys, billing all stay with you | Managed server operation, updates, encrypted secrets, and Stripe billing; interactive terminal currently remains self-hosted |
 | Models | Bring your own model keys | Hosted fast/reasoning/max tiers (Fornace models, GLM, Qwen) |
 | Code | Same open-source stack | Same open-source stack |
 
 Hosted plan limits: Starter includes 3 seats, 3M agent tokens/mo, and 10 GB storage; Pro includes 10 seats, 8M tokens, 50 GB; Team includes 25 seats, 20M tokens, 200 GB. Billing is via Stripe web checkout.
 
-On the security side, the session secret and encryption key are operator-owned, OAuth apps are configured per deployment, and a sandboxed microVM execution path exists when KVM is available.
+On the security side, the session secret and encryption key are operator-owned, and OAuth apps are configured per deployment. The default Compose deployment assumes a trusted individual or small team; KVM/microsandbox deployment is a separate advanced operator path.
 
 ## How does Waynode compare to other tools?
 
@@ -99,11 +99,16 @@ Self-host:
 ```bash
 git clone https://github.com/fornace/waynode
 cd waynode
-cp .env.example .env   # add your model keys and secrets
-docker compose up -d   # open localhost:3000
+./scripts/self-host.sh setup
 ```
 
-Then connect GitHub or GitLab via OAuth and create your first space. For the managed route, Waynode Cloud offers a 15-day free trial for new organizations. See [/learn](/learn) for guides.
+The installer requires Docker Compose v2, a GitHub or GitLab OAuth app, and a
+supported model-provider key. It generates the server secrets, validates the
+configuration, and starts on loopback by default. The
+[self-hosting guide](https://github.com/fornace/waynode/blob/main/docs/SELF-HOSTING.md)
+covers HTTPS, upgrades, backup, and restore.
+
+Then sign in through the OAuth app you configured and create your first space. For the managed route, Waynode Cloud offers a 15-day free trial for new organizations. See [/learn](/learn) for guides.
 
 ## FAQ
 

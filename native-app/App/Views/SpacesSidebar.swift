@@ -12,6 +12,7 @@ import WaynodeCore
 struct SpacesScene: View {
     @Environment(AppModel.self) private var appModel
     @State private var showingCloneSheet = false
+    @State private var showingAccount = false
     @State private var spaceToDelete: Space?
     @State private var searchText = ""
 
@@ -29,17 +30,21 @@ struct SpacesScene: View {
         List {
             if filteredSpaces.isEmpty {
                 if appModel.isLoadingSpaces {
-                    HStack { Spacer(); ProgressView(); Spacer() }
+                    ContentUnavailableView {
+                        ProgressView()
+                    } description: {
+                        Text("Loading worktrees…")
+                    }
+                    .listRowBackground(Color.clear)
                 } else if let err = appModel.spacesError {
                     ContentUnavailableView {
-                        Label("Couldn't load spaces", systemImage: "wifi.exclamationmark")
+                        Label("Couldn’t Load Worktrees", systemImage: "wifi.exclamationmark")
                     } description: {
                         Text(err)
                     } actions: {
                         Button("Retry") {
                             Task { await appModel.refreshAll() }
                         }
-                        .buttonStyle(.glass)
                     }
                     .listRowBackground(Color.clear)
                 } else if !searchText.isEmpty {
@@ -47,9 +52,9 @@ struct SpacesScene: View {
                         .listRowBackground(Color.clear)
                 } else {
                     ContentUnavailableView(
-                        "No Spaces",
+                        "No Worktrees",
                         systemImage: "folder.badge.plus",
-                        description: Text("Clone a repository to get started.")
+                        description: Text("Clone a repository to create your first worktree.")
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -67,35 +72,47 @@ struct SpacesScene: View {
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
+                        .accessibilityIdentifier("worktree.\(space.id).delete")
                     }
                 }
             }
         }
-        .navigationTitle("Workspaces")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("worktrees.list")
+        .navigationTitle("Worktrees")
+        .navigationBarTitleDisplayMode(.inline)
         // Force search into a drawer below the title so it doesn't collide
         // with the Clone button in the navigation bar on iOS 26+.
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search spaces")
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search worktrees")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     Haptics.light()
                     showingCloneSheet = true
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
+                    Label("Clone Repository", systemImage: "plus")
                 }
+                .accessibilityIdentifier("worktree.clone")
+                Button {
+                    showingAccount = true
+                } label: {
+                    Label("Account", systemImage: "person.crop.circle")
+                }
+                .accessibilityIdentifier("account.open")
             }
         }
         .sheet(isPresented: $showingCloneSheet) {
             CloneSheet()
         }
-        .confirmationDialog(
-            "Delete Space?",
+        .sheet(isPresented: $showingAccount) {
+            AccountSheetContainer()
+        }
+        .alert(
+            "Delete Worktree?",
             isPresented: Binding(
                 get: { spaceToDelete != nil },
                 set: { if !$0 { spaceToDelete = nil } }
-            ),
-            titleVisibility: .visible
+            )
         ) {
             Button("Delete", role: .destructive) {
                 if let space = spaceToDelete {
@@ -104,7 +121,9 @@ struct SpacesScene: View {
                 }
                 spaceToDelete = nil
             }
+            .accessibilityIdentifier("worktree.delete.confirm")
             Button("Cancel", role: .cancel) { spaceToDelete = nil }
+                .accessibilityIdentifier("worktree.delete.cancel")
         } message: {
             if let space = spaceToDelete {
                 Text("This will remove \"\(space.repoName)\" and all its sessions. This cannot be undone.")
@@ -127,19 +146,14 @@ struct SpacesScene: View {
 
 struct SpaceRow: View {
     let space: Space
+    var isSelected = false
 
-    /// Derive a human-readable repo path from repoFullName or repoUrl.
-    /// Server stores repo_full_name as the full URL in some cases; we
-    /// extract the `owner/repo` portion for display.
     private var displayPath: String? {
-        // Prefer repoFullName if it looks like an org/repo path (not a URL)
         if let fn = space.repoFullName, !fn.isEmpty, !fn.contains("://") {
             return fn
         }
-        // Extract from URL: https://github.com/Fornace/waynode.git → Fornace/waynode
         let url = space.repoUrl.isEmpty ? (space.repoFullName ?? "") : space.repoUrl
         guard !url.isEmpty else { return nil }
-        // Strip .git suffix and protocol, take last two path components
         var cleaned = url
         if cleaned.hasSuffix(".git") { cleaned.removeLast(4) }
         if let schemeRange = cleaned.range(of: "://") {
@@ -152,93 +166,66 @@ struct SpaceRow: View {
         return nil
     }
 
-    /// Short date+time label so clones of the same repo are distinguishable.
-    /// Uses absolute time ("Jun 24, 5:43 PM") rather than relative because
-    /// 15 clones created the same day all collapse to "1 wk ago".
-    private var dateLabel: String? {
-        guard !space.createdAt.isEmpty else { return nil }
-        let date = parseDate(space.createdAt)
-        guard let date else { return nil }
-        let df = DateFormatter()
-        // If older than a week, show month + day + time; otherwise full date.
-        df.locale = Locale.autoupdatingCurrent
-        df.setLocalizedDateFormatFromTemplate("MMMd HHmm")
-        return df.string(from: date)
-    }
-
-    private func parseDate(_ s: String) -> Date? {
-        // Server format: "2026-06-24 17:43:07" (SQLite datetime)
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        if let d = df.date(from: s) { return d }
-        // Fallback: ISO 8601
-        let iso = ISO8601DateFormatter()
-        return iso.date(from: s)
+    private var subtitle: String? {
+        if let title = space.latestSessionTitle, !title.isEmpty { return title }
+        return displayPath == space.repoName ? nil : displayPath
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(spacing: 12) {
             Image(systemName: "arrow.triangle.branch")
-                .font(.body.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.tint)
-                .frame(width: 40, height: 40)
-                .background(.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 12))
+                .frame(width: 32, height: 32)
+                .background(.tint.opacity(0.11), in: RoundedRectangle(cornerRadius: 9))
 
-            VStack(alignment: .leading, spacing: 5) {
-                // Title row: repo name + session count badge
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(space.repoName.isEmpty ? "Untitled" : space.repoName)
                     .font(.headline)
                     .lineLimit(1)
-                Spacer(minLength: 0)
-                if let count = space.sessionCount, count > 0 {
-                    Text("\(count)")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.15), in: Capsule())
-                }
-                }
-                // Latest session preview — the most useful distinguishing info.
-                if let title = space.latestSessionTitle, !title.isEmpty {
-                    Label(title, systemImage: "bubble.left.fill")
+                    .truncationMode(.middle)
+                if let subtitle {
+                    Text(subtitle)
                         .font(.subheadline)
-                        .foregroundStyle(.primary.opacity(0.84))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+            }
 
-                // Metadata row: owner/repo (if different) + timestamp + branch
-                HStack(spacing: 6) {
-                    if let path = displayPath, path != space.repoName {
-                        Text(path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    if let date = dateLabel {
-                        Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        Text(date)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    if !space.branch.isEmpty {
-                        Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        Label(space.branch, systemImage: "arrow.triangle.branch")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 4) {
+                if !space.branch.isEmpty {
+                    Text(space.branch)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if let count = space.sessionCount, count > 0 {
+                    Text("\(count) session\(count == 1 ? "" : "s")")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(.primary.opacity(0.07)))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .background(isSelected ? Color.accentColor.opacity(0.13) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("worktree.row.\(space.id)")
+        .accessibilityLabel(space.repoName.isEmpty ? "Untitled worktree" : space.repoName)
+        .accessibilityValue(space.branch.isEmpty ? "No branch" : "Branch \(space.branch)")
+        .accessibilityHint("Open sessions for this worktree")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .help(rowHelp)
+    }
+
+    private var rowHelp: String {
+        let name = space.repoName.isEmpty ? "Untitled worktree" : space.repoName
+        return [name, displayPath, space.branch.isEmpty ? nil : "Branch: \(space.branch)"]
+            .compactMap { $0 }
+            .joined(separator: "\n")
     }
 }

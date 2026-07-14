@@ -31,17 +31,21 @@ struct SessionsList: View {
         List {
             if sessions.isEmpty {
                 if appModel.isLoadingSessions {
-                    HStack { Spacer(); ProgressView(); Spacer() }
+                    ContentUnavailableView {
+                        ProgressView()
+                    } description: {
+                        Text("Loading sessions…")
+                    }
+                    .listRowBackground(Color.clear)
                 } else if let err = appModel.sessionsError {
                     ContentUnavailableView {
-                        Label("Couldn't load sessions", systemImage: "wifi.exclamationmark")
+                        Label("Couldn’t Load Sessions", systemImage: "wifi.exclamationmark")
                     } description: {
                         Text(err)
                     } actions: {
                         Button("Retry") {
                             Task { await appModel.refreshSessions(spaceId: spaceId) }
                         }
-                        .buttonStyle(.glass)
                     }
                     .listRowBackground(Color.clear)
                 } else if !searchText.isEmpty {
@@ -51,13 +55,13 @@ struct SessionsList: View {
                     ContentUnavailableView {
                         Label("No Sessions", systemImage: "plus.bubble")
                     } description: {
-                        Text("Create a session to start a conversation.")
+                        Text("Start a focused conversation in this worktree.")
                     } actions: {
                         Button("New Session") {
                             Haptics.light()
                             showingNewSession = true
                         }
-                        .buttonStyle(.glassProminent)
+                        .accessibilityIdentifier("session.new")
                     }
                     .listRowBackground(Color.clear)
                 }
@@ -75,10 +79,13 @@ struct SessionsList: View {
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
+                        .accessibilityIdentifier("session.\(session.id).delete")
                     }
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("sessions.list")
         .navigationTitle(spaceName)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search sessions")
@@ -90,7 +97,7 @@ struct SessionsList: View {
                 } label: {
                     Label("New Session", systemImage: "plus.bubble")
                 }
-                .buttonStyle(.glass)
+                .accessibilityIdentifier("session.new")
             }
         }
         .sheet(isPresented: $showingNewSession) {
@@ -98,37 +105,32 @@ struct SessionsList: View {
                 title: $newSessionTitle,
                 error: $sessionError,
                 onCreate: {
-                    Task {
-                        do {
-                            let session = try await appModel.createSession(
-                                spaceId: spaceId,
-                                title: newSessionTitle.isEmpty ? nil : newSessionTitle
-                            )
-                            newSessionTitle = ""
-                            showingNewSession = false
-                            Haptics.success()
-                            // Auto-navigate into the new session via deep link
-                            appModel.pendingDeepLink = .sessionDetail(spaceId: spaceId, sessionId: session.id)
-                        } catch {
-                            sessionError = error.localizedDescription
-                            Haptics.error()
-                        }
-                    }
+                    let trimmedTitle = newSessionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let session = try await appModel.createSession(
+                        spaceId: spaceId,
+                        title: trimmedTitle.isEmpty ? nil : trimmedTitle
+                    )
+                    try Task.checkCancellation()
+                    newSessionTitle = ""
+                    showingNewSession = false
+                    Haptics.success()
+                    appModel.pendingDeepLink = .sessionDetail(spaceId: spaceId, sessionId: session.id)
                 },
                 onCancel: {
                     newSessionTitle = ""
+                    sessionError = nil
                     showingNewSession = false
                 }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
-        .confirmationDialog(
+        .alert(
             "Delete Session?",
             isPresented: Binding(
                 get: { sessionToDelete != nil },
                 set: { if !$0 { sessionToDelete = nil } }
-            ),
-            titleVisibility: .visible
+            )
         ) {
             Button("Delete", role: .destructive) {
                 if let session = sessionToDelete {
@@ -137,9 +139,15 @@ struct SessionsList: View {
                 }
                 sessionToDelete = nil
             }
+            .accessibilityIdentifier("session.delete.confirm")
             Button("Cancel", role: .cancel) { sessionToDelete = nil }
+                .accessibilityIdentifier("session.delete.cancel")
         } message: {
-            Text("This action cannot be undone.")
+            if let session = sessionToDelete {
+                Text("This permanently deletes \"\(session.title.isEmpty ? "Untitled" : session.title)\" and all its messages. This cannot be undone.")
+            } else {
+                Text("This action cannot be undone.")
+            }
         }
         .refreshable {
             await appModel.refreshSessions(spaceId: spaceId)
@@ -161,19 +169,30 @@ struct SessionsList: View {
 struct NewSessionSheet: View {
     @Binding var title: String
     @Binding var error: String?
-    var onCreate: () -> Void
+    var onCreate: () async throws -> Void
     var onCancel: () -> Void
+    @FocusState private var titleFocused: Bool
+    @State private var isCreating = false
+    @State private var creationTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
             Form {
                 TextField("Session title (optional)", text: $title)
                     .submitLabel(.done)
+                    .focused($titleFocused)
+                    .onSubmit(submit)
+                    .disabled(isCreating)
+                    .accessibilityIdentifier("session.new.title")
 
                 if let error {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                            .accessibilityLabel("Could not create session: \(error)")
+                            .accessibilityIdentifier("session.new.error")
                     }
                 }
             }
@@ -181,60 +200,182 @@ struct NewSessionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button("Cancel", action: cancel)
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityIdentifier("session.new.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create", action: onCreate)
-                        .buttonStyle(.glassProminent)
+                    Button(action: submit) {
+                        if isCreating {
+                            ProgressView()
+                                .controlSize(.small)
+                                .accessibilityHidden(true)
+                        }
+                        Text(isCreating ? "Creating…" : "Create")
+                    }
+                        .disabled(isCreating)
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("session.new.create")
+                        .accessibilityHint(isCreating ? "Creating the session" : "Creates and opens the session")
                 }
+            }
+            .onAppear { titleFocused = true }
+            .interactiveDismissDisabled(isCreating)
+            .onDisappear { creationTask?.cancel() }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("session.new.surface")
+        #if targetEnvironment(macCatalyst)
+        .frame(minWidth: 440, minHeight: 220)
+        #endif
+    }
+
+    private func submit() {
+        guard !isCreating else { return }
+        isCreating = true
+        error = nil
+        creationTask = Task {
+            do {
+                try await onCreate()
+            } catch is CancellationError {
+                // Cancellation is an intentional escape path, not an error.
+            } catch {
+                self.error = error.localizedDescription
+                Haptics.error()
+            }
+            isCreating = false
+        }
+    }
+
+    private func cancel() {
+        creationTask?.cancel()
+        creationTask = nil
+        isCreating = false
+        onCancel()
+    }
+}
+
+#if DEBUG
+/// Deterministic host for exercising session creation independently of
+/// navigation state. It uses the production sheet and AppModel mutations.
+struct SessionUITestFixtureView: View {
+    @Environment(AppModel.self) private var appModel
+    let settings: Bool
+    @State private var title = ""
+    @State private var error: String?
+    @State private var createdTitle: String?
+    @State private var store: SessionStore?
+    @State private var showingNewSession = true
+    @State private var showingSettings = false
+
+    var body: some View {
+        Group {
+            if settings {
+                Color.clear
+                    .sheet(isPresented: $showingSettings) {
+                        if let store { SessionSettingsSheet(store: store) }
+                    }
+            } else {
+                Color.clear
+                    .sheet(isPresented: $showingNewSession) {
+                        NewSessionSheet(title: $title, error: $error, onCreate: create,
+                                        onCancel: { showingNewSession = false })
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                    }
+            }
+        }
+        .task {
+            guard settings else { return }
+            store = appModel.store(for: "ui-session", spaceId: "ui-space")
+            showingSettings = true
+        }
+        .accessibilityIdentifier(settings ? "session.settings.fixture" : "session.new.fixture")
+        .overlay(alignment: .bottom) {
+            if let createdTitle {
+                Text("Created " + createdTitle)
+                    .accessibilityIdentifier("session.new.created")
+                    .padding(10)
+                    .background(.thinMaterial, in: Capsule())
+                    .padding()
+            }
+            if settings && !showingSettings && store != nil {
+                Text(appModel.sessions(forSpace: "ui-space").contains { $0.id == "ui-session" }
+                     ? "Settings closed" : "Session deleted")
+                    .accessibilityIdentifier("session.settings.result")
+                    .padding(10)
+                    .background(.thinMaterial, in: Capsule())
+                    .padding()
             }
         }
     }
+
+    private func create() async throws {
+        let session = try await appModel.createSession(
+            spaceId: "ui-space", title: title.isEmpty ? nil : title)
+        try Task.checkCancellation()
+        createdTitle = session.title
+        title = ""
+        showingNewSession = false
+    }
 }
+#endif
 
 // MARK: - SessionRow
 
 struct SessionRow: View {
     let session: Session
+    var isSelected = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(spacing: 12) {
             Image(systemName: "bubble.left.and.bubble.right.fill")
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.tint)
-                .frame(width: 38, height: 38)
-                .background(.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 11))
+                .frame(width: 32, height: 32)
+                .background(.tint.opacity(0.11), in: RoundedRectangle(cornerRadius: 9))
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                Text(session.title.isEmpty ? "Untitled" : session.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                if session.archived {
-                    Image(systemName: "archivebox.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                }
-                HStack(spacing: 6) {
-                    if let model = session.model, !model.isEmpty {
-                        Text(model)
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.tint)
-                            .lineLimit(1)
-                    }
-                    let rel = Format.compactRelative(fromISO: session.createdAt)
-                    if !rel.isEmpty {
-                        if session.model != nil { Text("·").foregroundStyle(.tertiary) }
-                        Text(rel)
+                    Text(session.title.isEmpty ? "Untitled" : session.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if session.archived {
+                        Image(systemName: "archivebox.fill")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
+                let rel = Format.compactRelative(fromISO: session.createdAt)
+                if !rel.isEmpty {
+                    Text(rel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if let model = session.model, !model.isEmpty {
+                Text(model)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 96, alignment: .trailing)
             }
         }
-        .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 15))
-        .overlay(RoundedRectangle(cornerRadius: 15).stroke(.primary.opacity(0.07)))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .background(isSelected ? Color.accentColor.opacity(0.13) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("session.row.\(session.id)")
+        .accessibilityLabel(session.title.isEmpty ? "Untitled session" : session.title)
+        .accessibilityValue(session.archived ? "Archived" : (session.model ?? "Active"))
+        .accessibilityHint("Open this session")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .help(session.title.isEmpty ? "Untitled session" : session.title)
     }
 }

@@ -229,6 +229,7 @@ struct TableView: View {
 struct CodeBlockView: View {
     let language: String
     let code: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded: Bool = true
     @State private var showCopied: Bool = false
 
@@ -242,7 +243,7 @@ struct CodeBlockView: View {
                 Button {
                     copyToClipboard(code)
                     Haptics.success()
-                    withAnimation { showCopied = true }
+                    withAnimation(reduceMotion ? nil : .default) { showCopied = true }
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         await MainActor.run { showCopied = false }
@@ -255,7 +256,7 @@ struct CodeBlockView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(showCopied ? "Copied" : "Copy code")
                 Button {
-                    withAnimation(.smooth) { isExpanded.toggle() }
+                    withAnimation(reduceMotion ? nil : .smooth) { isExpanded.toggle() }
                 } label: {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption2)

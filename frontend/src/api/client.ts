@@ -25,10 +25,20 @@ async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
 
 export const api = {
   auth: {
-    me: () => fetchJSON<{ user: User | null }>("/api/auth/me"),
+    me: () => fetchJSON<{
+      user: User | null;
+      providers: { github: boolean; gitlab: boolean; dev?: boolean };
+      availableProviders: { github: boolean; gitlab: boolean };
+    }>("/api/auth/me"),
     logout: () => fetchJSON("/auth/logout", { method: "POST" }),
     deletionCheck: () => fetchJSON<{ can_delete: boolean; blockers: Array<{ id: string; name: string; slug: string }> }>("/api/auth/account/deletion-check"),
     deleteAccount: () => fetchJSON("/api/auth/account", { method: "DELETE", body: JSON.stringify({ confirmation: "DELETE" }) }),
+  },
+
+  tokens: {
+    list: () => fetchJSON<{ tokens: Array<{ id: string; label: string; created_at: string; last_used_at: string | null }> }>("/api/tokens"),
+    create: (label: string) => fetchJSON<{ id: string; token: string; label: string }>("/api/tokens", { method: "POST", body: JSON.stringify({ label }) }),
+    revoke: (id: string) => fetchJSON<{ ok: boolean }>(`/api/tokens/${id}`, { method: "DELETE" }),
   },
 
   orgs: {
@@ -72,10 +82,10 @@ export const api = {
         body: JSON.stringify(updates),
       }),
     /** Switch model on the live agent (RPC set_model) + persist for next spawn. */
-    setModel: (id: string, model: string) =>
-      fetchJSON<{ ok: boolean; model: string; live: boolean }>(`/api/sessions/${id}/model`, {
+    setModel: (id: string, model: string, provider?: string) =>
+      fetchJSON<{ ok: boolean; model: string; provider: string; live: boolean }>(`/api/sessions/${id}/model`, {
         method: "POST",
-        body: JSON.stringify({ model }),
+        body: JSON.stringify({ model, provider }),
       }),
     getGoal: (id: string) => fetchJSON<{ goal: GoalStatus | null }>(`/api/sessions/${id}/goal`),
     getMessages: (id: string) => fetchJSON<ChatMessage[]>(`/api/sessions/${id}/messages`),

@@ -8,31 +8,126 @@ import WaynodeCore
 
 struct RootView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
-            if appModel.auth.isAuthenticated && appModel.auth.user != nil {
-                MainView()
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
-            } else if appModel.auth.token != nil
-                        && !appModel.auth.hasCompletedLaunchCheck {
-                // Returning user whose token is still being validated at
-                // launch. Show the brand splash rather than flashing the
-                // login screen for ~1s.
-                LaunchView()
-                    .transition(.opacity)
-            } else {
-                AuthView()
-                    .transition(.opacity.combined(with: .move(edge: .leading)))
-            }
+            routedContent
         }
         // Respect the system appearance. A workbench must remain legible with
         // the user's contrast, transparency, and light/dark preferences.
-        .animation(.smooth(duration: 0.4), value: appModel.auth.isAuthenticated)
-        .animation(.smooth(duration: 0.3), value: appModel.auth.hasCompletedLaunchCheck)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: appModel.auth.isAuthenticated)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: appModel.auth.hasCompletedLaunchCheck)
         .onOpenURL { url in
             handleDeepLink(url)
         }
+    }
+
+    @ViewBuilder private var routedContent: some View {
+        #if DEBUG
+        if showKeychainFixture {
+            SignedKeychainSmokeView().transition(.opacity)
+        } else {
+            standardContent
+        }
+        #else
+        standardContent
+        #endif
+    }
+
+    @ViewBuilder private var standardContent: some View {
+        #if DEBUG
+        if showAccountFixture {
+            AccountSheetContainer().transition(.opacity)
+        } else if showGitFixture {
+            GitInspector(spaceId: "ui-space", fixtureSnapshot: GitUITestFixtures.snapshot).transition(.opacity)
+        } else if showSettingsFixture {
+            SessionUITestFixtureView(settings: true).transition(.opacity)
+        } else if showNewSessionFixture {
+            SessionUITestFixtureView(settings: false).transition(.opacity)
+        } else if showTerminalFixture {
+            TerminalView(sessionId: "ui-session", spaceId: "ui-space").transition(.opacity)
+        } else {
+            authenticatedContent
+        }
+        #else
+        authenticatedContent
+        #endif
+    }
+
+    @ViewBuilder private var authenticatedContent: some View {
+        if showMainView {
+            MainView().transition(.opacity.combined(with: .move(edge: .trailing)))
+        } else if appModel.auth.token != nil && !appModel.auth.hasCompletedLaunchCheck {
+            LaunchView().transition(.opacity)
+        } else {
+            AuthView().transition(.opacity.combined(with: .move(edge: .leading)))
+        }
+    }
+
+    private var showMainView: Bool {
+        #if DEBUG
+        return (appModel.isUITestFixture && appModel.auth.isAuthenticated)
+            || (appModel.auth.isAuthenticated && appModel.auth.user != nil)
+        #else
+        return appModel.auth.isAuthenticated && appModel.auth.user != nil
+        #endif
+    }
+
+    private var showKeychainFixture: Bool {
+        #if DEBUG
+        return CommandLine.arguments.contains("-ui-test-keychain")
+        #else
+        return false
+        #endif
+    }
+
+    private var showTerminalFixture: Bool {
+        #if DEBUG
+        return fixtureIsAuthenticated && CommandLine.arguments.contains("-ui-test-terminal")
+        #else
+        return false
+        #endif
+    }
+
+    private var showGitFixture: Bool {
+        #if DEBUG
+        return fixtureIsAuthenticated && CommandLine.arguments.contains("-ui-test-git")
+        #else
+        return false
+        #endif
+    }
+
+    private var showAccountFixture: Bool {
+        #if DEBUG
+        return fixtureIsAuthenticated && CommandLine.arguments.contains("-ui-test-account")
+        #else
+        return false
+        #endif
+    }
+
+    private var showSettingsFixture: Bool {
+        #if DEBUG
+        return fixtureIsAuthenticated && CommandLine.arguments.contains("-ui-test-settings")
+        #else
+        return false
+        #endif
+    }
+
+    private var showNewSessionFixture: Bool {
+        #if DEBUG
+        return fixtureIsAuthenticated && CommandLine.arguments.contains("-ui-test-new-session")
+        #else
+        return false
+        #endif
+    }
+
+    private var fixtureIsAuthenticated: Bool {
+        #if DEBUG
+        return appModel.isUITestFixture && appModel.auth.isAuthenticated
+        #else
+        return false
+        #endif
     }
 
     // MARK: - Deep Link Handling
@@ -43,8 +138,14 @@ struct RootView: View {
     //   waynode://space/<id>/session/<id> — open a specific chat session
 
     private func handleDeepLink(_ url: URL) {
-        // OAuth callbacks are handled by AuthView's ASWebAuthenticationSession
-        if url.host == "auth" { return }
+        if url.scheme == "waynode", url.host == "auth" {
+            Task {
+                if await appModel.auth.completeNativeAuthCallback(url) {
+                    await appModel.bootstrap()
+                }
+            }
+            return
+        }
 
         guard url.host == "space" else { return }
         let segments = url.pathComponents.filter { !$0.isEmpty }

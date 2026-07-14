@@ -61,7 +61,7 @@ See [/learn](/learn) for the full product overview.
 | Git surface | Files, hunks, diffs, commits, branches, push beside the chat | GitHub, GitLab, Bitbucket integrations in Cloud ([docs](https://docs.openhands.dev/)) |
 | Terminal | Full terminal in the workspace | CLI (terminal interface) |
 | Mobile | Mobile-first web; native macOS/iOS clients planned | Cloud reachable from a browser; no mobile-specific product listed ([pricing](https://www.openhands.dev/pricing)) |
-| Self-host | `docker compose up -d`, free | `agent-canvas` via npm or Docker, free (MIT core) |
+| Self-host | Guided Docker Compose installer, free | `agent-canvas` via npm or Docker, free (MIT core) |
 | Repo providers | GitHub, GitLab (OAuth) | GitHub, GitLab, Bitbucket; plus Slack, Jira, Linear ([docs](https://docs.openhands.dev/)) |
 | Hosted pricing | Starter $39/mo · Pro $99/mo · Team $249/mo; 15-day trial | Individual free (1 user, 10 daily conversations, LLM at cost or BYOK); Enterprise custom ([pricing](https://www.openhands.dev/pricing)) |
 | Models | Hosted tiers (Fornace models, GLM, Qwen); self-host BYOK | Model-agnostic; BYOK or at-cost provider with no markup ([pricing](https://www.openhands.dev/pricing)) |
@@ -76,7 +76,7 @@ Waynode does not ask you to build agents. It runs pi (open source) as the engine
 
 Both self-host for free with Docker.
 
-- Waynode: `git clone` → `cp .env.example .env` → `docker compose up -d` → localhost:3000. Your repos, database, credentials, LLM keys, and billing stay with you; no hosted-billing code is active on self-host. A sandboxed microVM execution path exists when KVM is available.
+- Waynode: clone the repo and run `./scripts/self-host.sh setup`. The guided installer requires Docker Compose v2, an OAuth app, and a supported model-provider key; it generates the server secrets and starts on loopback by default. Your repos, database, credentials, LLM keys, and billing stay with you; hosted billing is disabled on self-host. The default Compose deployment does not isolate trusted users from one another; KVM/microsandbox deployment is a separate advanced operator path.
 - OpenHands: `npm install -g @openhands/agent-canvas` or a single `docker run` of the agent-canvas image, serving a web UI on localhost:8000 ([github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)). Sandboxed execution runs in Docker, the default and recommended isolation model ([docs.openhands.dev/openhands/usage/sandboxes/docker](https://docs.openhands.dev/openhands/usage/sandboxes/docker)).
 
 One licensing nuance: OpenHands' work is MIT-licensed except for the repository's `enterprise/` directory, which carries a separate license requiring purchase for use beyond one month ([docs.openhands.dev](https://docs.openhands.dev/)). Waynode's entire repository is MIT.
@@ -113,7 +113,7 @@ Yes. The project started as OpenDevin, an open-source homage to Cognition's Devi
 
 ### Are both Waynode and OpenHands free to self-host?
 
-Yes. Waynode is MIT-licensed end to end and runs with `docker compose up -d`. OpenHands' core (including the `openhands` and `agent-server` Docker images) is MIT and runs via npm or Docker, though its `enterprise/` directory is separately licensed ([docs.openhands.dev](https://docs.openhands.dev/)).
+Yes. Waynode is MIT-licensed end to end and includes a guided Docker Compose installer. OpenHands' core (including the `openhands` and `agent-server` Docker images) is MIT and runs via npm or Docker, though its `enterprise/` directory is separately licensed ([docs.openhands.dev](https://docs.openhands.dev/)).
 
 ### Can I use OpenHands or Waynode from my phone?
 

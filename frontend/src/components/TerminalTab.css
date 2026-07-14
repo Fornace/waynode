@@ -1,102 +1,54 @@
-/* ── Terminal — mount container ── */
-
 .terminal-container {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-sizing: border-box;
-  position: relative;
+  background: #0f0f11;
 }
+.terminal-surface { position: absolute; inset: 4px; min-width: 0; min-height: 0; }
+.terminal-surface .xterm { height: 100%; padding: 8px; background: #0f0f11; }
+.terminal-surface .xterm-viewport { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.2) transparent; }
+.terminal-surface .xterm-viewport::-webkit-scrollbar { width: 12px; height: 12px; }
+.terminal-surface .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+.terminal-surface .xterm-viewport::-webkit-scrollbar-thumb { border: 3px solid #0f0f11; border-radius: 6px; background: rgba(255,255,255,.2); }
+.terminal-surface .xterm-viewport::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.35); }
 
-/* xterm's own scrollbar lives on .xterm-viewport (a real DOM element with a
-   native scrollbar, not canvas-drawn) — scope the override to the terminal
-   container so it doesn't bleed into the app's other scroll areas. Reuses
-   the app's existing scrollbar theme (index.css) at a thicker, easier-to-grab
-   size since this one sits over dark terminal content. */
-.terminal-container .xterm-viewport {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  border: 3px solid var(--bg);
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-/* ── Mobile key-helper bar ── */
-
-.term-keybar {
+.terminal-state {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  z-index: 5;
+  inset: 0;
+  z-index: 4;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.term-keybar-handle {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: clamp(24px, 7vh, 56px) 24px;
   color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  box-shadow: var(--shadow-md);
+  background: rgba(10,10,11,.94);
+  text-align: center;
 }
+.terminal-state h2 { margin: 0; color: var(--text); font-size: 16px; font-weight: 680; }
+.terminal-state p { max-width: 470px; margin: 8px 0 0; color: var(--text-dim); font-size: 13px; line-height: 1.55; }
+.terminal-state.is-failed h2 { color: #fecaca; }
+.terminal-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.terminal-state-actions button { min-height: 38px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--bg-elevated); font-size: 12px; font-weight: 650; }
+.terminal-state-actions button:hover { background: var(--bg-hover); }
+.terminal-state-actions .terminal-state-primary { border-color: transparent; color: white; background: var(--accent); }
+.terminal-state-actions .terminal-state-primary:hover { background: var(--accent-hover); }
+.terminal-state-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.term-keybar-handle:active {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.term-keybar-row {
-  display: flex;
-  gap: 4px;
-  padding: 6px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-md);
-}
-
-.term-keybar-btn {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--mono);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+.term-keybar { position: absolute; right: 10px; bottom: 10px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.term-keybar-handle { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 1px solid var(--border); border-radius: 50%; color: var(--text-dim); background: var(--bg-elevated); box-shadow: var(--shadow-md); }
+.term-keybar-handle:hover { color: var(--text); background: var(--bg-hover); }
+.term-keybar-row { display: flex; gap: 4px; max-width: calc(100vw - 32px); overflow-x: auto; padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elevated); box-shadow: var(--shadow-md); }
+.term-keybar-btn { display: flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: rgba(255,255,255,.05); font: 500 12px var(--mono); }
 .term-keybar-btn:hover { background: var(--bg-hover); }
-.term-keybar-btn.armed {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: var(--accent);
-  color: var(--accent);
-}
+.term-keybar-btn.armed { border-color: var(--accent); color: #93b7ff; background: rgba(59,130,246,.2); }
+.term-keybar-btn:focus-visible,.term-keybar-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-height: 440px) { .terminal-state { justify-content: flex-start; } }
+@media (prefers-reduced-motion: reduce) { .terminal-container * { scroll-behavior: auto !important; } }

@@ -4,9 +4,11 @@ import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import { RepoPicker } from "./RepoPicker";
 import { OrgSwitcher, SessionMenu, UserMenu } from "./SidebarMenus";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface SidebarProps {
   spaces: Space[];
+  spacesLoading: boolean;
   sessions: Session[];
   activeSessionId: string | null;
   activeSpaceId: string | null;
@@ -17,9 +19,11 @@ interface SidebarProps {
   onSessionCreated: (session: Session) => void;
   onSessionArchived: (session: Session) => void;
   onSessionDeleted: (sessionId: string) => void;
-  onSpaceExpand: (spaceId: string) => void;
+  onSpaceExpand: (spaceId: string) => Promise<void>;
   githubConnected: boolean;
   gitlabConnected: boolean;
+  githubAvailable: boolean;
+  gitlabAvailable: boolean;
   isAdmin: boolean;
   onOpenAdmin: () => void;
   onOpenOrgSettings: () => void;
@@ -33,14 +37,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  spaces, sessions, activeSessionId, activeSpaceId,
+  spaces, spacesLoading, sessions, activeSessionId, activeSpaceId,
   onToggleSidebar, onSelectSession, onSpaceCreated, onSessionCreated, onSessionArchived, onSessionDeleted, onSpaceExpand,
-  githubConnected, gitlabConnected, isAdmin, onOpenAdmin, onOpenOrgSettings, onOpenAccountSettings,
+  githubConnected, gitlabConnected, githubAvailable, gitlabAvailable, isAdmin, onOpenAdmin, onOpenOrgSettings, onOpenAccountSettings,
   orgs, activeOrgId, onSelectOrg, onOrgCreated, user, onLogout,
 }: SidebarProps) {
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set());
   const [showPicker, setShowPicker] = useState(false);
-  const [error, setError] = useState("");
+  const [issue, setIssue] = useState<{ message: string; retry?: () => void } | null>(null);
 
   // Lazily-fetched, per-space git status — only populated when a space is
   // expanded (or refreshed after a git action), never polled globally.
@@ -50,32 +54,39 @@ export function Sidebar({
   const [showArchivedFor, setShowArchivedFor] = useState<Set<string>>(new Set());
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
   const [busySessionId, setBusySessionId] = useState<string | null>(null);
+  const [loadingSessionSpaces, setLoadingSessionSpaces] = useState<Set<string>>(new Set());
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
 
-  const refreshGitStatus = (spaceId: string) => {
+  const refreshGitStatus = (spaceId: string): void => {
     api.git.status(spaceId).then((snap) => {
       setGitStatus((prev) => ({ ...prev, [spaceId]: snap }));
-    }).catch(() => {});
+    }).catch(() => setIssue({ message: "Waynode couldn’t check this worktree’s Git status. Existing changes are unchanged.", retry: () => refreshGitStatus(spaceId) }));
+  };
+
+  const loadSpaceSessions = (spaceId: string): void => {
+    setLoadingSessionSpaces((previous) => new Set(previous).add(spaceId));
+    onSpaceExpand(spaceId)
+      .catch(() => setIssue({ message: "Sessions for this worktree couldn’t be loaded.", retry: () => loadSpaceSessions(spaceId) }))
+      .finally(() => setLoadingSessionSpaces((previous) => { const next = new Set(previous); next.delete(spaceId); return next; }));
   };
 
   const toggleSpace = (spaceId: string) => {
-    setExpandedSpaces((prev) => {
-      const next = new Set(prev);
-      if (next.has(spaceId)) {
-        next.delete(spaceId);
-      } else {
-        next.add(spaceId);
-        onSpaceExpand(spaceId);
-        refreshGitStatus(spaceId);
-      }
+    const expanding = !expandedSpaces.has(spaceId);
+    setExpandedSpaces((previous) => {
+      const next = new Set(previous);
+      if (expanding) next.add(spaceId); else next.delete(spaceId);
       return next;
     });
+    if (!expanding) return;
+    loadSpaceSessions(spaceId);
+    refreshGitStatus(spaceId);
   };
 
-  const loadArchived = (spaceId: string) => {
+  const loadArchived = (spaceId: string): void => {
     api.sessions.list(spaceId, { includeArchived: true }).then((all) => {
       const archived = all.filter((s) => !!s.archived);
       setArchivedBySpace((prev) => ({ ...prev, [spaceId]: archived }));
-    }).catch(() => {});
+    }).catch(() => setIssue({ message: "Archived sessions couldn’t be loaded.", retry: () => loadArchived(spaceId) }));
   };
 
   const toggleShowArchived = (spaceId: string) => {
@@ -107,7 +118,7 @@ export function Sidebar({
       onSessionArchived(updated);
       loadArchived(session.space_id);
     } catch (err) {
-      setError((err as Error).message);
+      setIssue({ message: (err as Error).message, retry: () => handleArchive(session, archived) });
     } finally {
       setBusySessionId(null);
     }
@@ -125,7 +136,7 @@ export function Sidebar({
         [session.space_id]: (prev[session.space_id] || []).filter((s) => s.id !== session.id),
       }));
     } catch (err) {
-      setError((err as Error).message);
+      setIssue({ message: (err as Error).message, retry: () => handleDelete(session) });
     } finally {
       setBusySessionId(null);
     }
@@ -138,7 +149,7 @@ export function Sidebar({
       await ensureCommitted(session.space_id, session);
       refreshGitStatus(session.space_id);
     } catch (err) {
-      setError(`Auto-commit failed, ${action} cancelled: ${(err as Error).message}`);
+      setIssue({ message: `The safety commit failed, so the session was not ${action === "archive" ? "archived" : "deleted"}: ${(err as Error).message}`, retry: () => handleMergeAnd(session, action) });
       setBusySessionId(null);
       return;
     }
@@ -147,13 +158,7 @@ export function Sidebar({
   };
 
   const handleClone = async (repoUrl: string, branch: string, authUser?: string, authToken?: string) => {
-    let space;
-    try {
-      space = await api.spaces.create(repoUrl, branch, authUser, authToken, activeOrgId || undefined);
-    } catch (err) {
-      setError((err as Error).message);
-      throw err;
-    }
+    const space = await api.spaces.create(repoUrl, branch, authUser, authToken, activeOrgId || undefined);
     onSpaceCreated(space);
 
     // Land the user in a fresh session immediately and stream the clone progress
@@ -165,39 +170,43 @@ export function Sidebar({
       onSelectSession(session, space);
 
       const PROG = "clone-progress";
-      store.injectProgress(session.id, PROG, `📦 Cloning \`${repoUrl}\` (branch \`${branch || "main"}\`)…`);
+      store.injectProgress(session.id, PROG, `Cloning \`${repoUrl}\` from branch \`${branch || "main"}\`…`);
       const es = api.spaces.cloneStream(space.id);
-      let lastLine = "";
       es.onmessage = (ev) => {
         try {
           const m = JSON.parse(ev.data);
           if (m.type === "progress") {
             // git clone progress lines can be noisy; show the latest meaningful one.
-            lastLine = m.line;
-            store.injectProgress(session.id, PROG, `📦 Cloning… ${m.line}`);
+            store.injectProgress(session.id, PROG, `Cloning… ${m.line}`);
           } else if (m.type === "done") {
-            store.injectProgress(session.id, PROG, `✅ Cloned \`${space.repo_name}\` — ready to go.`);
+            store.injectProgress(session.id, PROG, `Cloned \`${space.repo_name}\`. The worktree is ready.`);
             es.close();
           } else if (m.type === "error") {
             store.injectProgress(session.id, PROG, `✗ Clone failed: ${m.error || "unknown error"}`);
             es.close();
           }
-        } catch {}
+        } catch {
+          store.injectProgress(session.id, PROG, "Clone progress could not be read. The clone may still be running.");
+          es.close();
+        }
       };
-      es.onerror = () => store.injectProgress(session.id, PROG, `✗ Lost clone progress stream.`);
+      es.onerror = () => {
+        store.injectProgress(session.id, PROG, "Clone progress disconnected. The clone may still be running; refresh the worktree before retrying.");
+        es.close();
+      };
     } catch (err) {
       // Session/nav failed but the space cloned fine — surface the error.
-      setError((err as Error).message);
+      setIssue({ message: `The worktree was created, but its first session could not be opened: ${(err as Error).message}` });
     }
   };
 
-  const handleNewSession = async (spaceId: string) => {
+  const handleNewSession = async (spaceId: string): Promise<void> => {
     try {
       const session = await api.sessions.create(spaceId);
       onSessionCreated(session);
       onSelectSession(session);
     } catch (err) {
-      setError((err as Error).message);
+      setIssue({ message: (err as Error).message, retry: () => handleNewSession(spaceId) });
     }
   };
 
@@ -207,7 +216,7 @@ export function Sidebar({
       onOrgCreated(org);
       onSelectOrg(org.id);
     } catch (err) {
-      setError((err as Error).message);
+      setIssue({ message: (err as Error).message });
       throw err;
     }
   };
@@ -220,22 +229,20 @@ export function Sidebar({
         <div className="sidebar-content">
           <button type="button" className="new-space-btn" onClick={() => setShowPicker(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Clone Repository
+            New worktree
           </button>
 
           {orgs.length > 0 && (
             <button type="button" className="new-space-btn sidebar-settings-btn" onClick={onOpenOrgSettings}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-              Org Settings
+              Organization settings
             </button>
           )}
 
           <div style={{ height: 12 }} />
 
-          {spaces.length === 0 && (
-            <div style={{ padding: "20px 8px", textAlign: "center", color: "var(--text-faint)", fontSize: 12 }}>
-              No spaces yet. Clone a repo to get started.
-            </div>
+          {spacesLoading ? <div className="sidebar-empty" role="status">Loading worktrees…</div> : spaces.length === 0 && (
+            <div className="sidebar-empty">No worktrees yet. Use New worktree to clone a repository.</div>
           )}
 
           {spaces.map((space) => {
@@ -246,9 +253,10 @@ export function Sidebar({
             const showingArchived = showArchivedFor.has(space.id);
             return (
               <div key={space.id} className="space-group">
-                <div
+                <button type="button"
                   className={`space-item ${activeSpaceId === space.id ? "active" : ""}`}
                   onClick={() => toggleSpace(space.id)}
+                  aria-expanded={expanded}
                 >
                   <span className={`space-chevron ${expanded ? "expanded" : ""}`}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
@@ -264,21 +272,30 @@ export function Sidebar({
                   {space.session_count ? (
                     <span style={{ fontSize: 10, color: "var(--text-faint)", background: "var(--bg-elevated)", padding: "1px 6px", borderRadius: "10px" }}>{space.session_count}</span>
                   ) : null}
-                </div>
+                </button>
                 {expanded && (
                   <div className="space-sessions">
+                    {loadingSessionSpaces.has(space.id) && <div className="sidebar-session-state" role="status">Loading sessions…</div>}
                     {spaceSessions.map((session) => (
                       <div
                         key={session.id}
                         className={`session-item ${activeSessionId === session.id ? "active" : ""}`}
-                        onClick={() => onSelectSession(session)}
                       >
-                        <span className="session-item-title">{session.title}</span>
+                        <button
+                          type="button"
+                          className="session-item-open"
+                          onClick={() => onSelectSession(session)}
+                          aria-current={activeSessionId === session.id ? "page" : undefined}
+                          title={session.title}
+                        >
+                          <span className="session-item-title">{session.title}</span>
+                        </button>
                         <button
                           className="session-menu-btn"
                           onClick={(e) => { e.stopPropagation(); setOpenMenuFor(openMenuFor === session.id ? null : session.id); }}
                           disabled={busySessionId === session.id}
                           title="Session actions"
+                          aria-label={`Actions for ${session.title}`}
                         >
                           {busySessionId === session.id ? "…" : "⋯"}
                         </button>
@@ -295,14 +312,14 @@ export function Sidebar({
                         )}
                       </div>
                     ))}
-                    <div className="new-session-btn" onClick={() => handleNewSession(space.id)}>
+                    <button type="button" className="new-session-btn" onClick={() => handleNewSession(space.id)}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                       New Session
-                    </div>
+                    </button>
                     {archivedSessions.length > 0 && (
-                      <div className="archived-toggle" onClick={() => toggleShowArchived(space.id)}>
+                      <button type="button" className="archived-toggle" onClick={() => toggleShowArchived(space.id)} aria-expanded={showingArchived}>
                         {showingArchived ? "Hide archived" : `Show archived (${archivedSessions.length})`}
-                      </div>
+                      </button>
                     )}
                     {showingArchived && archivedSessions.map((session) => (
                       <div key={session.id} className="session-item archived">
@@ -311,6 +328,7 @@ export function Sidebar({
                           className="session-unarchive-btn"
                           onClick={() => handleArchive(session, false)}
                           disabled={busySessionId === session.id}
+                          aria-label={`Unarchive ${session.title}`}
                         >
                           {busySessionId === session.id ? "…" : "Unarchive"}
                         </button>
@@ -323,7 +341,15 @@ export function Sidebar({
           })}
         </div>
 
-        {user && <UserMenu user={user} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} onOpenAccountSettings={onOpenAccountSettings} onLogout={onLogout} />}
+        {issue && !showPicker && <div className="sidebar-issue" role="alert">
+          <p>{issue.message}</p>
+          <div className="sidebar-issue-actions">
+            {issue.retry && <button type="button" onClick={() => { const retry = issue.retry; setIssue(null); retry?.(); }}>Try again</button>}
+            <button type="button" onClick={() => setIssue(null)}>Dismiss</button>
+          </div>
+        </div>}
+
+        {user && <UserMenu user={user} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} onOpenAccountSettings={onOpenAccountSettings} onLogout={() => setConfirmingLogout(true)} />}
       </div>
 
       {showPicker && (
@@ -332,15 +358,19 @@ export function Sidebar({
           onClone={handleClone}
           githubConnected={githubConnected}
           gitlabConnected={gitlabConnected}
+          githubAvailable={githubAvailable}
+          gitlabAvailable={gitlabAvailable}
         />
       )}
 
-      {error && !showPicker && (
-        <div style={{ position: "fixed", bottom: 16, right: 16, background: "var(--red)", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 12, zIndex: 1000 }}>
-          {error}
-          <button onClick={() => setError("")} style={{ marginLeft: 8, opacity: 0.7 }}>✕</button>
-        </div>
-      )}
+      {confirmingLogout && <ConfirmDialog
+        title="Log out of Waynode?"
+        description="Your worktrees and running agent sessions stay on this server. You can sign in again to resume them."
+        confirmLabel="Log out"
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={() => { setConfirmingLogout(false); onLogout(); }}
+      />}
+
     </>
   );
 }

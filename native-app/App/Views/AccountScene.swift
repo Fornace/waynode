@@ -1,21 +1,18 @@
 import SwiftUI
 import WaynodeCore
 
-// MARK: - AccountScene
-//
-// The account management tab. Shows:
-//   • User profile (avatar, name, email)
-//   • Connected providers (GitHub, GitLab)
-//   • API tokens (create, list, revoke)
-//   • Server configuration
-//   • About / version
-//   • Logout
+struct NewTokenPresentation: Identifiable {
+    let id = UUID()
+    let value: String
+}
 
 struct AccountScene: View {
     @Environment(AppModel.self) var appModel
     @Environment(\.openURL) var openURL
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State var tokens: [APIClient.TokenInfo] = []
-    @State var newToken: String?
+    @State var newToken: NewTokenPresentation?
     @State var isLoadingTokens = false
     @State var isCreatingToken = false
     @State var error: String?
@@ -23,12 +20,12 @@ struct AccountScene: View {
     @State var serverURL = ""
     @State var tokenToRevoke: APIClient.TokenInfo?
     @State var showingLogoutConfirm = false
-    @State var showingNewTokenSheet = false
     @State var hostedBillingEnabled = false
     @State var billing: APIClient.BillingInfo?
     @State var isLoadingBilling = false
     @State var billingBusy = false
     @State var billingError: String?
+    @State var areTokensExpanded = false
 
     var body: some View {
         List {
@@ -40,31 +37,52 @@ struct AccountScene: View {
             aboutSection
             logoutSection
         }
-        .navigationTitle("Account")
-        .task {
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("account.surface")
+        .refreshable {
             await loadTokens()
             await loadBilling()
         }
-        .confirmationDialog(
+        .navigationTitle("Account")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("account.done")
+                    .accessibilityHint("Closes Account")
+            }
+        }
+        .macSheetFrame(minWidth: 520, idealWidth: 620, minHeight: 600, idealHeight: 720)
+        .task {
+            if await prepareUITestFixture() { return }
+            await loadTokens()
+            await loadBilling()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, hostedBillingEnabled else { return }
+            Task { await loadBilling() }
+        }
+        .alert(
             "Log Out?",
-            isPresented: $showingLogoutConfirm,
-            titleVisibility: .visible
+            isPresented: $showingLogoutConfirm
         ) {
             Button("Log Out", role: .destructive) {
                 Haptics.warning()
                 appModel.auth.logout()
             }
+            .accessibilityIdentifier("account.logout.confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("account.logout.cancel")
         } message: {
             Text("You will be signed out and returned to the login screen. Your spaces and sessions remain on the server.")
         }
-        .confirmationDialog(
+        .alert(
             "Revoke Token?",
             isPresented: Binding(
                 get: { tokenToRevoke != nil },
                 set: { if !$0 { tokenToRevoke = nil } }
-            ),
-            titleVisibility: .visible
+            )
         ) {
             Button("Revoke", role: .destructive) {
                 if let token = tokenToRevoke {
@@ -73,7 +91,9 @@ struct AccountScene: View {
                 }
                 tokenToRevoke = nil
             }
+            .accessibilityIdentifier("account.token.revoke.confirm")
             Button("Cancel", role: .cancel) { tokenToRevoke = nil }
+                .accessibilityIdentifier("account.token.revoke.cancel")
         } message: {
             if let token = tokenToRevoke {
                 Text("The token \"\(token.label)\" will be permanently revoked. Any app using it will lose access immediately.")
@@ -81,13 +101,22 @@ struct AccountScene: View {
                 Text("This action cannot be undone.")
             }
         }
-        .sheet(isPresented: $showingNewTokenSheet) {
-            if let newToken {
-                NewTokenSheet(token: newToken) {
-                    showingNewTokenSheet = false
-                    self.newToken = nil
+        .sheet(item: $newToken) { presentation in
+            NewTokenSheet(token: presentation.value) {
+                newToken = nil
+            }
+        }
+        .sheet(isPresented: $showingServerSheet) {
+            ServerConfigSheet(url: $serverURL) { newURL in
+                if let url = URL(string: newURL) {
+                    appModel.auth.setServerURL(url)
+                    appModel.reconfigureAPI()
+                    Task { await appModel.bootstrap() }
                 }
             }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .macSheetFrame(minWidth: 480, idealWidth: 540, maxWidth: 620, minHeight: 360, idealHeight: 420, maxHeight: 560)
         }
     }
 
@@ -108,14 +137,22 @@ struct AccountScene: View {
                 VStack(alignment: .leading) {
                     Text(appModel.auth.user?.name ?? "Unknown")
                         .font(.headline)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let email = appModel.auth.user?.email {
                         Text(email)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
                     }
                 }
             }
             .padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Signed in as \(appModel.auth.user?.name ?? "Unknown")")
+            .accessibilityValue(appModel.auth.user?.email ?? "Email unavailable")
         }
     }
 
@@ -163,6 +200,8 @@ struct AccountScene: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(name), \(connected ? "connected" : "not connected")")
     }
 
     // MARK: - Tokens
@@ -174,34 +213,41 @@ struct AccountScene: View {
             } else if tokens.isEmpty {
                 Text("No API tokens")
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("account.tokens.empty")
             } else {
-                ForEach(tokens) { token in
-                    VStack(alignment: .leading) {
-                        Text(token.label)
-                            .font(.subheadline)
-                        HStack {
-                            Text("wn_\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            if let lastUsed = token.lastUsedAt {
-                                Text("Last used: \(Format.compactRelative(fromISO: lastUsed))")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("Never used")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                DisclosureGroup(isExpanded: $areTokensExpanded) {
+                    ForEach(tokens) { token in
+                        HStack(alignment: .top, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(token.label)
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                                ViewThatFits(in: .horizontal) {
+                                    tokenMetadata(token)
+                                    tokenMetadata(token, stacked: true)
+                                }
                             }
+                            Spacer(minLength: 4)
+                            Button(role: .destructive) { tokenToRevoke = token } label: {
+                                Label("Revoke Token", systemImage: "trash")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .accessibilityLabel("Revoke \(token.label)")
+                            .accessibilityIdentifier("account.token.\(token.id).revoke")
+                            .accessibilityHint("Asks before permanently revoking this token")
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                tokenToRevoke = token
+                            } label: {
+                                Label("Revoke", systemImage: "trash")
+                            }
+                            .accessibilityIdentifier("account.token.\(token.id).revoke.swipe")
                         }
                     }
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            tokenToRevoke = token
-                        } label: {
-                            Label("Revoke", systemImage: "trash")
-                        }
-                    }
+                } label: {
+                    Text("\(tokens.count) active token\(tokens.count == 1 ? "" : "s")")
+                        .accessibilityIdentifier("account.tokens.disclosure")
                 }
             }
 
@@ -217,11 +263,15 @@ struct AccountScene: View {
                 }
             }
             .disabled(tokens.count >= 10 || isCreatingToken)
+            .accessibilityIdentifier("account.token.create")
+            .accessibilityHint(tokens.count >= 10 ? "Token limit reached; revoke a token first" : "Creates a token that is shown only once")
 
             if let error {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
             }
         } header: {
             Text("API Tokens")
@@ -239,9 +289,10 @@ struct AccountScene: View {
             } else if !hostedBillingEnabled {
                 Label("This server is self-hosted", systemImage: "server.rack")
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("account.billing.selfhosted")
             } else if let billing, let org = appModel.orgs.first {
-                LabeledContent("Plan", value: billing.plan.capitalized)
-                LabeledContent("Status", value: billing.status.capitalized)
+                LabeledContent("Plan", value: billingLabel(billing.plan))
+                LabeledContent("Status", value: billingLabel(billing.status))
                 if billing.status != "active" && billing.status != "trialing" {
                     Text("Agent work is paused until this workspace has an active plan.")
                         .font(.caption)
@@ -250,13 +301,15 @@ struct AccountScene: View {
 
                 if billing.plan == "free" || billing.status == "expired" {
                     Menu {
-                        Button("Starter · $39/month") { Task { await beginCheckout(org.id, plan: "starter") } }
-                        Button("Pro · $99/month") { Task { await beginCheckout(org.id, plan: "pro") } }
-                        Button("Team · $249/month") { Task { await beginCheckout(org.id, plan: "team") } }
+                        Button("Starter · $39/month") { Task { await beginCheckout(org.id, plan: "starter") } }.accessibilityIdentifier("account.billing.plan.starter")
+                        Button("Pro · $99/month") { Task { await beginCheckout(org.id, plan: "pro") } }.accessibilityIdentifier("account.billing.plan.pro")
+                        Button("Team · $249/month") { Task { await beginCheckout(org.id, plan: "team") } }.accessibilityIdentifier("account.billing.plan.team")
                     } label: {
                         Label(billingBusy ? "Opening checkout…" : "Choose a plan", systemImage: "creditcard")
                     }
                     .disabled(billingBusy)
+                    .accessibilityIdentifier("account.billing.plan.menu")
+                    .accessibilityHint("Choose a workspace plan and open secure checkout")
                 } else {
                     Button {
                         Task { await manageBilling(org.id) }
@@ -264,6 +317,8 @@ struct AccountScene: View {
                         Label(billingBusy ? "Opening billing…" : "Manage billing", systemImage: "creditcard")
                     }
                     .disabled(billingBusy)
+                    .accessibilityIdentifier("account.billing.manage")
+                    .accessibilityHint("Opens the secure billing portal")
                 }
             } else {
                 Text("No organization is available for billing.")
@@ -274,6 +329,10 @@ struct AccountScene: View {
                 Text(billingError)
                     .font(.caption)
                     .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Billing error: \(billingError)")
+                    .accessibilitySortPriority(2)
             }
         } header: {
             Text("Hosted Billing")
@@ -288,23 +347,20 @@ struct AccountScene: View {
         Section("Server") {
             HStack {
                 Image(systemName: "server.rack")
-                Text(appModel.auth.serverConfig.baseURL.host ?? "Unknown")
+                Text(appModel.auth.serverConfig.baseURL.absoluteString)
                     .font(.subheadline)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Server, \(appModel.auth.serverConfig.baseURL.absoluteString)")
             Button("Change Server URL") {
                 serverURL = appModel.auth.serverConfig.baseURL.absoluteString
                 showingServerSheet = true
             }
-        }
-        .sheet(isPresented: $showingServerSheet) {
-            ServerConfigSheet(url: $serverURL) { newURL in
-                if let url = URL(string: newURL) {
-                    appModel.auth.setServerURL(url)
-                    appModel.reconfigureAPI()
-                    Task { await appModel.bootstrap() }
-                }
-            }
-            .presentationDetents([.medium])
+            .accessibilityIdentifier("account.server.change")
+            .accessibilityHint("Opens server address settings")
         }
     }
 
@@ -317,6 +373,7 @@ struct AccountScene: View {
             Link(destination: URL(string: "https://github.com/Fornace/waynode")!) {
                 Label("View on GitHub", systemImage: "chevron.left.slash.chevron.right")
             }
+            .accessibilityIdentifier("account.about.github")
         }
     }
 

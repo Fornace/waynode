@@ -19,6 +19,7 @@
 // database. No external services required.
 
 import { spawn } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -85,6 +86,82 @@ console.log("[1] Unauthenticated /api/auth/me returns configured providers");
   assert(status === 200, `returns 200 (got ${status})`);
   assert(body?.user === null, "user is null when unauthenticated");
   assert(body?.providers?.github === true, "providers.github reflects GITHUB_CLIENT_ID config");
+  assert(body?.availableProviders?.github === true, "availableProviders exposes configured GitHub capability");
+}
+
+// === 1b. Native OAuth state is signed, bound, and rejected if tampered ===
+console.log("\n[1b] Native OAuth state is signed and bound to the app nonce");
+{
+  const nonce = Buffer.alloc(32, 7).toString("base64url");
+  const start = await fetch(`${BASE}/auth/github?native=1&native_nonce=${nonce}`, {
+    redirect: "manual",
+  });
+  const authorizationURL = new URL(start.headers.get("location"));
+  const state = authorizationURL.searchParams.get("state");
+  const [payloadPart, signature] = state.split(".");
+  const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString("utf8"));
+  const expectedSignature = createHmac("sha256", process.env.SESSION_SECRET)
+    .update(payloadPart)
+    .digest("base64url");
+  assert(start.status === 302, `native OAuth starts with a redirect (got ${start.status})`);
+  assert(payload.native === true, "signed state marks the native flow");
+  assert(payload.provider === "github", "signed state is provider-bound");
+  assert(payload.nonce === nonce, "signed state carries the exact app nonce");
+  assert(signature === expectedSignature, "state has the expected server HMAC");
+  assert(payload.exp > Date.now() && payload.exp - payload.iat === 600_000, "state has a strict ten-minute lifetime");
+
+  const tampered = await fetch(
+    `${BASE}/auth/github/callback?code=unused&state=${encodeURIComponent(`${state}x`)}`,
+    { redirect: "manual" },
+  );
+  assert(tampered.status === 302, `tampered callback redirects safely (got ${tampered.status})`);
+  assert(
+    tampered.headers.get("location") === "/login?auth_error=invalid_oauth_state",
+    "tampered state is rejected before the provider token exchange",
+  );
+
+  const wrongProvider = await fetch(
+    `${BASE}/auth/gitlab/callback?code=unused&state=${encodeURIComponent(state)}`,
+    { redirect: "manual" },
+  );
+  assert(
+    wrongProvider.headers.get("location") === "/login?auth_error=invalid_oauth_state",
+    "state cannot cross OAuth providers",
+  );
+}
+
+console.log("\n[1c] Browser OAuth state is session-bound and one-shot");
+{
+  const start = await fetch(`${BASE}/auth/github`, { redirect: "manual" });
+  const authorizationURL = new URL(start.headers.get("location"));
+  const state = authorizationURL.searchParams.get("state");
+  const cookie = start.headers.get("set-cookie").split(";", 1)[0];
+  const payload = JSON.parse(Buffer.from(state.split(".", 1)[0], "base64url").toString("utf8"));
+  assert(payload.native === false, "browser state is distinct from native state");
+
+  const withoutSession = await fetch(
+    `${BASE}/auth/github/callback?state=${encodeURIComponent(state)}`,
+    { redirect: "manual" },
+  );
+  assert(
+    withoutSession.headers.get("location") === "/login?auth_error=invalid_oauth_state",
+    "browser state is rejected without its initiating session",
+  );
+
+  const firstUse = await fetch(
+    `${BASE}/auth/github/callback?state=${encodeURIComponent(state)}`,
+    { redirect: "manual", headers: { Cookie: cookie } },
+  );
+  assert(firstUse.status === 302, "browser state is accepted once with its session");
+
+  const replay = await fetch(
+    `${BASE}/auth/github/callback?state=${encodeURIComponent(state)}`,
+    { redirect: "manual", headers: { Cookie: cookie } },
+  );
+  assert(
+    replay.headers.get("location") === "/login?auth_error=invalid_oauth_state",
+    "browser state replay is rejected",
+  );
 }
 
 // === 2. Seed a test user + create a token via DB directly ===
@@ -116,6 +193,7 @@ console.log("\n[3] Bearer token authenticates and returns user");
   assert(status === 200, `returns 200 (got ${status})`);
   assert(body?.user?.id === "test-user", "returns the token's user");
   assert(body?.providers?.github === true, "providers.github true (user has github_id)");
+  assert(body?.availableProviders?.gitlab === false, "availableProviders hides unconfigured GitLab capability");
 }
 
 // === 4. Escalation guard: bearer token cannot create another token ===

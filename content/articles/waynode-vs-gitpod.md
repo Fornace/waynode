@@ -22,7 +22,7 @@ Gitpod no longer exists as a standalone product: it rebranded to Ona in Septembe
 - [OpenAI announced it is acquiring Ona](https://siliconangle.com/2026/06/11/openai-acquires-ai-agent-orchestration-startup-ona/) on June 11, 2026; the team joins the Codex organization. The standalone platform's long-term future is undisclosed.
 - Ona pricing: a Free tier (3 parallel environments, up to 4 vCPU, per the [sunset announcement](https://ona.com/stories/gitpod-classic-payg-sunset)), Core from $20/month, Enterprise custom; usage billed in Ona Compute Units ([pricing page](https://ona.com/pricing)).
 - Ona self-hosting is Enterprise-only (customer-managed VPC on AWS or GCP, custom pricing). Gitpod [ended free self-hosted support in December 2022](https://devclass.com/2022/12/09/gitpod-abandons-self-hosted-product-in-favor-of-dedicated-cloud/).
-- Waynode is MIT-licensed and self-hosts with `docker compose up -d`; workspaces are persistent Git worktrees, not ephemeral containers. Hosted plans start at $39/month.
+- Waynode is MIT-licensed and self-hosts through a guided Docker Compose installer; workspaces are persistent Git worktrees, not ephemeral containers. Hosted plans start at $39/month.
 
 ## What happened to Gitpod?
 
@@ -41,7 +41,7 @@ Two properties distinguish it from the CDE lineage Gitpod came from:
 - The workspace persists. The conversation, files, branches, and terminal state survive between visits. Start at your desk, resume from a phone. Ona Environments are ephemeral by design (Core-plan environments auto-delete after 7 days of inactivity, per the [pricing page](https://ona.com/pricing)).
 - The Git surface is agent-native. Changed files, hunks, diffs, commits, branches, and push live beside the conversation. "Done" means ready for review, not merely finished running.
 
-Waynode connects to GitHub and GitLab via OAuth, and a sandboxed microVM execution path exists when KVM is available.
+Waynode connects to GitHub and GitLab via OAuth. Its default Compose deployment assumes trusted users; KVM/microsandbox deployment is a separate advanced operator path.
 
 ## Waynode vs Ona: comparison table
 
@@ -50,7 +50,7 @@ Waynode connects to GitHub and GitLab via OAuth, and a sandboxed microVM executi
 | Product category | Persistent coding-agent workspace | Agent orchestration + ephemeral cloud environments |
 | Workspace model | Persistent Git worktree on disk; sessions survive between visits | Ephemeral, sandboxed environments; 7-day auto-delete on Core ([source](https://ona.com/pricing)) |
 | License | MIT, fully open source | Core source under AGPL (proprietary license removed after the 2022 self-hosted shutdown); the platform is a commercial service ([source](https://devclass.com/2022/12/09/gitpod-abandons-self-hosted-product-in-favor-of-dedicated-cloud/)) |
-| Self-hosting | Free: `git clone` → `docker compose up -d` | Enterprise plan only: customer-managed VPC on AWS/GCP, custom pricing ([source](https://ona.com/pricing)) |
+| Self-hosting | Free: guided Docker Compose setup; OAuth and model key required | Enterprise plan only: customer-managed VPC on AWS/GCP, custom pricing ([source](https://ona.com/pricing)) |
 | Entry price (hosted) | Starter $39/mo (3 seats, 3M agent tokens, 10 GB) | Core from $20/mo, usage in OCUs (80–2,200 OCUs/mo included; add-ons from $10/40 OCUs) ([source](https://ona.com/pricing)) |
 | Models | Hosted: fast/reasoning/max tiers (Fornace, GLM, Qwen). Self-host: bring your own keys | Private LLM access with MCP support; model flexibility via AWS Bedrock, Google Vertex, or private APIs ([source](https://ona.com/stories/gitpod-is-now-ona)) |
 | Workspace setup | OAuth to GitHub or GitLab; workspace is a clone of your repo | Declarative, via `devcontainer.json` and `automations.yml` ([source](https://ona.com/stories/gitpod-is-now-ona)) |
@@ -70,7 +70,7 @@ If your workload is bursty compute (big builds, GPU jobs), Ona's usage metering 
 
 This is the sharpest difference. Gitpod [dropped its free self-hosted product in December 2022](https://devclass.com/2022/12/09/gitpod-abandons-self-hosted-product-in-favor-of-dedicated-cloud/), and under Ona, self-hosting exists only as an **Enterprise** feature: a deployment inside your VPC on AWS or GCP, at custom pricing ([ona.com/pricing](https://ona.com/pricing)). There is no supported way for an individual or small team to run Ona on their own hardware.
 
-Waynode self-hosts by design: `git clone` the [repo](https://github.com/fornace/waynode), `cp .env.example .env`, `docker compose up -d`, open localhost:3000. Your repos, database, credentials, LLM keys, and billing stay with you; no hosted-billing code is active on self-host. If "self-hosted Gitpod alternative" is your search, note that you are really choosing between two categories: Waynode replaces the *agent workspace* part, not the full CDE feature set (fleet-scale ephemeral environments, standardized dev containers) that Gitpod was known for.
+Waynode self-hosts by design: clone the [repo](https://github.com/fornace/waynode) and run `./scripts/self-host.sh setup`. The guided installer asks for the public URL, an OAuth app, and a model-provider key, then generates secrets, validates Compose, and starts on loopback. Your repos, database, credentials, LLM keys, and billing stay with you; hosted billing is disabled on self-host. If "self-hosted Gitpod alternative" is your search, note that you are really choosing between two categories: Waynode replaces the *agent workspace* part, not the full CDE feature set (fleet-scale ephemeral environments, standardized dev containers) that Gitpod was known for.
 
 ## When is Ona the better choice?
 

@@ -19,7 +19,7 @@ Devin is a hosted autonomous AI software engineer from Cognition: you hand it a 
 **TL;DR**
 
 - **Devin** is a managed product: web app, Slack/Teams integration, a CLI, its own cloud VMs, and usage-based pricing (Free, Pro $20/mo, Max $200/mo, Teams from $80/mo, Enterprise custom as of April 2026).
-- **Waynode** is MIT-licensed software: `docker compose up -d`, your repos, your database, your LLM keys. A managed Waynode Cloud tier exists (Starter $39/mo, Pro $99/mo, Team $249/mo) for teams that want the same stack hosted.
+- **Waynode** is MIT-licensed software with a guided Docker Compose installer: your repos, your database, your LLM keys. A managed Waynode Cloud tier exists (Starter $39/mo, Pro $99/mo, Team $249/mo) for teams that want the same stack hosted.
 - Devin's workspace is a task-scoped session on Cognition's infrastructure; Waynode's workspace is a persistent Git worktree on disk that survives between visits and devices.
 - Devin cannot be self-hosted; Waynode's self-hosted deployment is the primary, free way to run it.
 - Pick Devin for hands-off delegation with zero operations. Pick Waynode for code custody, model choice, and a durable place to work with an agent, including from a phone.
@@ -40,7 +40,7 @@ Git is the primary surface: changed files, hunks, diffs, commits, branches, and 
 
 Two ways to run it:
 
-- **Self-host** (free, MIT): `git clone`, `cp .env.example .env`, `docker compose up -d`, open localhost:3000. Repos, database, credentials, LLM keys, and billing stay with you; no hosted-billing code is active on self-host. You bring your own model keys.
+- **Self-host** (free, MIT): clone the repo and run `./scripts/self-host.sh setup`. The guided installer requires Docker Compose v2, an OAuth app, and a supported model-provider key; it generates secrets, validates Compose, and starts on loopback. Repos, database, credentials, LLM keys, and billing stay with you; hosted billing is disabled on self-host.
 - **Waynode Cloud** (managed hosting of the same open-source stack): Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations. Hosted models include fast/reasoning/max tiers (Fornace models, GLM, Qwen).
 
 ## Waynode vs Devin: side-by-side
@@ -74,7 +74,7 @@ This is the core architectural difference, more than any feature.
 
 With Devin, your code is cloned into Cognition's session VMs, the models are Cognition's, and the workspace exists for the duration of the task. That is precisely what makes it zero-operations: environment blueprints, VM provisioning, and model routing are all someone else's job. The trade-off is that the entire loop (code, credentials, execution) runs on infrastructure you don't operate, and the public docs don't detail self-hosting; a dedicated deployment is an Enterprise conversation.
 
-With Waynode, the workspace is a directory on a machine you control. The session secret and encryption key are operator-owned, OAuth apps are configured per deployment, and a sandboxed microVM execution path exists when KVM is available. The agent's work is ordinary Git state you can inspect with any tool. The trade-off runs the other way: you operate it (Docker, updates, keys), and you don't get Devin's managed extras like orchestrated fleets of agents or a turnkey PR-review product.
+With Waynode, the workspace is a directory on a machine you control. The session secret and encryption key are operator-owned, and OAuth apps are configured per deployment. The default Compose deployment assumes trusted users rather than hardware-isolating them; KVM/microsandbox deployment is a separate advanced operator path. The agent's work is ordinary Git state you can inspect with any tool. The trade-off runs the other way: you operate it (Docker, updates, keys), and you don't get Devin's managed extras like orchestrated fleets of agents or a turnkey PR-review product.
 
 ## When should you pick Devin?
 

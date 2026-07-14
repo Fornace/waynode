@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams, useNavigate, Routes, Route } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LandingPage } from "./pages/LandingPage";
 import { InvitePage } from "./pages/InvitePage";
@@ -9,8 +9,11 @@ import { SpaceSettings } from "./components/SpaceSettings";
 import { AdminPanel } from "./components/AdminPanel";
 import { OrgSettings } from "./components/OrgSettings";
 import { GitSidebar } from "./components/GitSidebar";
-import { OnboardingWizard } from "./components/OnboardingWizard";
+import { AppMainState } from "./components/AppMainState";
 import { AccountSettings } from "./components/AccountSettings";
+import { RedirectOutcome } from "./components/RedirectOutcome";
+import { StateSurface } from "./components/StateSurface";
+import { LoginPage } from "./pages/LoginPage";
 import { api } from "./api/client";
 import * as store from "./lib/sessionStore";
 import { slugWithId, parseSlugSegment } from "./lib/slugs";
@@ -22,17 +25,18 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 function AppContent() {
-  const { user, loading, logout } = useAuth();
+  const { user, availableProviders, loading, error: authError, retry: retryAuth, logout } = useAuth();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  // Pretty URLs: "/<spaceSlug>-<shortId>/<sessionSlug>-<shortId>".
-  // The short id (last 8 hex) is authoritative; the slug is cosmetic.
+  const [orgsLoading, setOrgsLoading] = useState(true);
+  const [spacesLoading, setSpacesLoading] = useState(false);
   const { spaceSeg, sessionSeg } = useParams<{ spaceSeg?: string; sessionSeg?: string }>();
   const urlSpaceShort = parseSlugSegment(spaceSeg);
   const urlSessionShort = parseSlugSegment(sessionSeg);
   const navigate = useNavigate();
+  const location = useLocation();
   const sidebarOpenInitial = useMemo(() => window.innerWidth >= 768, []);
   const [sidebarOpen, setSidebarOpen] = useState(sidebarOpenInitial);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -48,7 +52,15 @@ function AppContent() {
   const [workspaceError, setWorkspaceError] = useState("");
 
   useEffect(() => {
-    if (user) {
+    if (!user) {
+      setOrgs([]);
+      setSpaces([]);
+      setSessions([]);
+      setActiveOrgId(null);
+      setOrgsLoading(true);
+      return;
+    }
+    setOrgsLoading(true);
       const pendingInvite = localStorage.getItem("waynode-pending-invite");
       if (pendingInvite) {
         localStorage.removeItem("waynode-pending-invite");
@@ -64,26 +76,29 @@ function AppContent() {
         .then((d) => { if (d.user?.role === "admin") setIsAdmin(true); })
         .catch(() => {});
       fetch("/api/orgs", { headers: getAuthHeaders(), credentials: "include" })
-        .then(async (r) => { if (!r.ok) throw new Error(`Could not load workspaces (${r.status})`); return r.json(); })
+        .then(async (r) => { if (!r.ok) throw new Error("Waynode couldn’t load your organizations."); return r.json(); })
         .then((data: Org[]) => {
           setOrgs(data);
           setWorkspaceError("");
           if (data.length > 0 && !activeOrgId) setActiveOrgId(data[0].id);
         })
-        .catch((error) => setWorkspaceError(error instanceof Error ? error.message : "Could not load workspaces."));
-    }
+        .catch((error) => setWorkspaceError(error instanceof Error ? error.message : "Could not load organizations."))
+        .finally(() => setOrgsLoading(false));
   }, [user]);
 
   const loadSpaces = useCallback(async () => {
     if (!activeOrgId) return;
+    setSpacesLoading(true);
     try {
       const res = await fetch(`/api/spaces?orgId=${activeOrgId}`, { headers: getAuthHeaders(), credentials: "include" });
-      if (!res.ok) throw new Error(`Could not load repositories (${res.status})`);
+      if (!res.ok) throw new Error("Waynode couldn’t load this organization’s worktrees.");
       const data = await res.json();
       setSpaces(data);
       setWorkspaceError("");
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "Could not load repositories.");
+      setWorkspaceError(error instanceof Error ? error.message : "Could not load worktrees.");
+    } finally {
+      setSpacesLoading(false);
     }
   }, [activeOrgId]);
 
@@ -99,8 +114,6 @@ function AppContent() {
   };
 
   const handleSelectSession = (session: Session, spaceArg?: Space) => {
-    // Prefer the explicitly-passed space (avoids stale-closure lookups when the
-    // space was just created and isn't in `spaces` yet — e.g. right after clone).
     const space = spaceArg || spaces.find((s) => s.id === session.space_id);
     const spacePart = space ? slugWithId(space.repo_name, space.id) : session.space_id;
     navigate(`/${spacePart}/${slugWithId(session.title || "session", session.id)}`);
@@ -121,7 +134,7 @@ function AppContent() {
 
   const handleOnboardingClone = async (repoUrl: string, branch: string) => {
     if (!activeOrgId) {
-      setOnboardingError("Your workspace is still loading. Please try again in a moment.");
+      setOnboardingError("Your organization is still loading. Please try again in a moment.");
       return;
     }
     setOnboardingCloning(true);
@@ -133,14 +146,13 @@ function AppContent() {
       handleSessionCreated(session);
       handleSelectSession(session, space);
     } catch (error) {
-      setOnboardingError(error instanceof Error ? error.message : "Could not create that workspace.");
+      setOnboardingError(error instanceof Error ? error.message : "Could not create that worktree.");
       throw error;
     } finally {
       setOnboardingCloning(false);
     }
   };
 
-  // ── Auto-generated session titles arrive over the live stream. ──
   useEffect(() => {
     if (!user) return;
     return store.onRename((sessionId, title) => {
@@ -150,9 +162,6 @@ function AppContent() {
     });
   }, [user]);
 
-  // ── Resolve the active space/session from the pretty URL. ──
-  // 1. Match against already-loaded lists by short id (cheap, no fetch).
-  // 2. Otherwise hit /api/resolve for deep links; also rewrites stale slugs.
   const [resolvedSpace, setResolvedSpace] = useState<Space | null>(null);
   const [resolvedSession, setResolvedSession] = useState<Session | null>(null);
 
@@ -176,7 +185,6 @@ function AppContent() {
 
   useEffect(() => {
     if (!user || !urlSpaceShort) { setResolvedSpace(null); setResolvedSession(null); return; }
-    // Already resolvable from loaded data — no fetch needed.
     const spaceKnown = spaces.some((s) => parseSlugSegment(slugWithId(s.repo_name, s.id)) === urlSpaceShort);
     const sessionKnown = !urlSessionShort || sessions.some((s) => parseSlugSegment(slugWithId(s.title || "session", s.id)) === urlSessionShort);
     if (spaceKnown && sessionKnown) { setResolvedSpace(null); setResolvedSession(null); return; }
@@ -187,22 +195,17 @@ function AppContent() {
         if (cancelled) return;
         setResolvedSpace(space);
         setResolvedSession(session);
-        // Inject into the loaded lists so downstream components see them.
         setSpaces((prev) => prev.some((s) => s.id === space.id) ? prev : [...prev, space]);
         if (session) setSessions((prev) => prev.some((s) => s.id === session.id) ? prev : [...prev, session]);
-        // Rewrite a stale/mismatched slug silently (replace, not push).
         const wantSession = sessionSlug && urlSessionShort;
         if ((spaceSeg && spaceSeg !== spaceSlug) || (wantSession && sessionSeg !== sessionSlug)) {
           navigate(`/${spaceSlug}${wantSession ? `/${sessionSlug}` : ""}`, { replace: true });
         }
       })
-      .catch(() => { if (!cancelled) { setResolvedSpace(null); setResolvedSession(null); } });
+      .catch(() => { if (!cancelled) { setResolvedSpace(null); setResolvedSession(null); setWorkspaceError("Could not open this worktree or session. It may have moved, or you may no longer have access."); } });
     return () => { cancelled = true; };
   }, [user, urlSpaceShort, urlSessionShort, spaceSeg, sessionSeg, spaces, sessions, navigate]);
 
-  // ── Keep the URL slug fresh when the active session/space gets renamed ──
-  // (e.g. the AI auto-generates a title mid-conversation). The resolver matches
-  // on the ID suffix so a stale slug still works; this just keeps it pretty.
   useEffect(() => {
     if (!activeSession || !urlSessionShort) return;
     const canonical = slugWithId(activeSession.title || "session", activeSession.id);
@@ -224,36 +227,53 @@ function AppContent() {
         const existingIds = new Set(prev.map((s) => s.id));
         return [...prev, ...spaceSessions.filter((s) => !existingIds.has(s.id))];
       });
-    } catch {}
+    } catch (error) {
+      throw error;
+    }
   };
 
   const handleToggleSidebar = () => setSidebarOpen((v) => !v);
 
   const activeOrg = orgs.find((o) => o.id === activeOrgId);
 
-  const workspaceNotice = workspaceError ? <div className="workspace-error" role="alert"><span>Connection problem</span><p>{workspaceError}</p><button type="button" onClick={() => { setWorkspaceError(""); if (activeOrgId) loadSpaces(); }}>Retry</button></div> : null;
+  const retryWorkspace = () => { setWorkspaceError(""); if (activeOrgId) loadSpaces(); else window.location.reload(); };
+  const workspaceNotice = workspaceError && spaces.length > 0 ? <div className="workspace-error" role="alert"><span>Couldn’t refresh Waynode</span><p>{workspaceError}</p><button type="button" onClick={retryWorkspace}>Retry</button></div> : null;
 
   if (loading) {
-    return (
-      <div className="empty-state">
-        <div className="empty-state-icon">⏳</div>
-        <div>Loading...</div>
-      </div>
-    );
+    return <StateSurface title="Checking your session" description="Loading your organizations and worktrees." busy />;
   }
 
-  if (!user) return <LandingPage />;
+  if (authError) return <StateSurface
+    title="Couldn’t reach Waynode"
+    description={`${authError} No worktree or session data was changed.`}
+    tone="error"
+    action={{ label: "Try again", onClick: retryAuth }}
+  />;
+
+  if (!user) return <>
+    <RedirectOutcome />
+    {location.pathname === "/login" ? <LoginPage /> : <LandingPage />}
+  </>;
+
+  if (orgsLoading) return <StateSurface title="Loading Waynode" description="Fetching your organizations and worktrees." busy />;
+
+  const outcomeNotice = <RedirectOutcome
+    canManageBilling={activeOrg?.my_role === "admin"}
+    onOpenBilling={() => setOrgSettingsOpen(true)}
+  />;
 
   if (adminOpen && isAdmin) {
-    return (
+    return <>
+      {outcomeNotice}
       <div className="app-layout">
         <AdminPanel onClose={() => setAdminOpen(false)} />
       </div>
-    );
+    </>;
   }
 
   if (orgSettingsOpen && activeOrg) {
-    return (
+    return <>
+      {outcomeNotice}
       <div className="app-layout">
         <OrgSettings
           org={activeOrg}
@@ -266,27 +286,30 @@ function AppContent() {
           }}
         />
       </div>
-    );
+    </>;
   }
 
   if (accountSettingsOpen) {
-    return (
+    return <>
+      {outcomeNotice}
       <div className="app-layout">
         <AccountSettings
           onClose={() => setAccountSettingsOpen(false)}
           onDeleted={() => { setAccountSettingsOpen(false); logout(); navigate("/"); }}
         />
       </div>
-    );
+    </>;
   }
 
 
-  return (
+  return <>
+    {outcomeNotice}
     <div className={`app-layout ${sidebarOpen ? "sidebar-open" : ""}`}>
       {workspaceNotice}
       <div className="sidebar-overlay" onClick={handleToggleSidebar} />
       <Sidebar
         spaces={spaces}
+        spacesLoading={spacesLoading}
         sessions={sessions}
         activeSessionId={activeSession?.id || null}
         activeSpaceId={activeSpaceId}
@@ -300,6 +323,8 @@ function AppContent() {
         onSpaceExpand={handleSpaceExpand}
         githubConnected={githubConnected}
         gitlabConnected={gitlabConnected}
+        githubAvailable={availableProviders.github}
+        gitlabAvailable={availableProviders.gitlab}
         isAdmin={isAdmin}
         onOpenAdmin={() => setAdminOpen(true)}
         onOpenOrgSettings={() => setOrgSettingsOpen(true)}
@@ -332,27 +357,25 @@ function AppContent() {
         <div className="main-content">
           {!sidebarOpen && (
             <div className="top-bar">
-              <button className="top-bar-menu-btn" onClick={handleToggleSidebar}>☰</button>
+              <button className="top-bar-menu-btn icon-btn" onClick={handleToggleSidebar} aria-label="Open worktree navigation"><MenuIcon /></button>
               {isAdmin && <button className="tab-btn" onClick={() => setAdminOpen(true)}>Admin</button>}
             </div>
           )}
-          {spaces.length === 0 && activeOrgId ? (
-            <OnboardingWizard
-              githubConnected={githubConnected}
-              gitlabConnected={gitlabConnected}
-              cloning={onboardingCloning}
-              error={onboardingError}
-              onClone={handleOnboardingClone}
-            />
-          ) : <div className="empty-state">
-            <div className="empty-state-icon">🚀</div>
-            <div className="empty-state-title">{activeOrg ? activeOrg.name : "Waynode AI"}</div>
-            <div className="empty-state-desc">Clone a repository and create a session to get started</div>
-          </div>}
+          <AppMainState
+            spacesCount={spaces.length} spacesLoading={spacesLoading} workspaceError={workspaceError}
+            activeOrgId={activeOrgId} activeOrg={activeOrg} sidebarOpen={sidebarOpen}
+            githubConnected={githubConnected} gitlabConnected={gitlabConnected}
+            cloning={onboardingCloning} onboardingError={onboardingError}
+            onToggleSidebar={handleToggleSidebar} onClone={handleOnboardingClone} onRetry={retryWorkspace}
+          />
         </div>
       )}
     </div>
-  );
+  </>;
+}
+
+function MenuIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>;
 }
 
 export default function App() {
@@ -360,6 +383,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/invite/:token" element={<InvitePage />} />
+        <Route path="/login" element={<AppContent />} />
         <Route path="/" element={<AppContent />} />
         <Route path="/:spaceSeg" element={<AppContent />} />
         <Route path="/:spaceSeg/:sessionSeg" element={<AppContent />} />

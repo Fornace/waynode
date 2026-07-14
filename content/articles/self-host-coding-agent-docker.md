@@ -4,7 +4,7 @@ description: Step-by-step guide to running a self-hosted AI coding agent on your
 category: guides
 slug: self-host-coding-agent-docker
 date: 2026-07-12
-updated: 2026-07-12
+updated: 2026-07-14
 author: Francesco Frapporti
 keywords: self-host coding agent, self-hosted ai coding assistant docker, run coding agent on your own server
 cover: /covers/self-host-coding-agent-docker.png
@@ -14,46 +14,46 @@ cover: /covers/self-host-coding-agent-docker.png
 
 # How to self-host a coding agent with Docker
 
-Self-hosting a coding agent means running the agent's server, workspaces, and credentials on infrastructure you control, so your repositories and LLM API keys never pass through a third-party SaaS. With a Docker-packaged agent workspace such as [Waynode](https://github.com/fornace/waynode) (open source, MIT), the whole process is: clone the repo, fill in a `.env` file, run `docker compose up -d`, and put a reverse proxy with HTTPS in front. This guide walks through that end to end, using Waynode as the worked example; the pattern (container + secrets + OAuth + reverse proxy + your own model keys) applies to any self-hosted AI coding assistant.
+Self-hosting a coding agent means running the agent's server, workspaces, and credentials on infrastructure you control rather than an agent vendor's SaaS. If you use a hosted model API, prompts and selected code context still go directly to that provider. A Docker-packaged agent workspace such as [Waynode](https://github.com/fornace/waynode) (open source, MIT) still needs real operator configuration: a Git provider OAuth app, model-provider credentials, HTTPS for remote access, and a backup plan. Waynode's guided installer handles the local secrets and Docker Compose validation; this guide walks through the remaining decisions end to end. The pattern (container + secrets + OAuth + reverse proxy + your own model keys) applies to any self-hosted AI coding assistant.
 
 **TL;DR**
 
-- Prerequisites: a Linux server (or local machine) with Docker and Docker Compose, a domain name if you want remote/mobile access, and an LLM API key.
-- Install: `git clone` → `cp .env.example .env` → set `SESSION_SECRET`, `ENCRYPTION_KEY`, OAuth credentials → `docker compose up -d` → app on `localhost:3000`.
+- Prerequisites: a Linux host with Docker Engine and Docker Compose v2, a GitHub or GitLab OAuth app, a supported model-provider key, and a domain if you want remote/mobile access.
+- Install: `git clone` → `./scripts/self-host.sh setup`. The interactive installer generates the server secrets, records OAuth and model configuration, validates Compose, and starts on loopback.
 - Expose it safely with a reverse proxy (Caddy or nginx) terminating HTTPS, and set `APP_URL` to the public URL so OAuth callbacks work.
-- You bring your own model keys; nothing about your code or usage is billed or metered by anyone else. Self-hosted Waynode has no billing code active.
-- Generate both secrets with `openssl rand -hex 32`, keep them out of Git, and never expose the app over plain HTTP beyond localhost.
+- You bring your own model key; Waynode's hosted billing and usage limits are disabled in self-host mode, while your model provider bills its API usage directly.
+- Keep `.env` out of Git and protect it as a credential; never expose the app over plain HTTP beyond localhost.
 
 ## What do you need before you start?
 
 Four things:
 
-1. A host with Docker. Any machine that runs Docker Engine and Docker Compose v2: a home server, a VPS, or your laptop for a first test. A coding agent workspace clones real Git repositories to disk, so budget disk space for the repos you plan to work on plus the container image.
+1. A Linux host with Docker Engine and Docker Compose v2: a home server or a VPS. A coding agent workspace clones real Git repositories to disk, so budget disk space for the repos you plan to work on plus the container image and session history.
 2. A Git provider OAuth app. Waynode authenticates users and clones repositories via GitHub or GitLab OAuth. You create the OAuth app in your own GitHub/GitLab account, so tokens are issued to *your* deployment, not to a vendor.
-3. An LLM API key. Self-hosted deployments bring their own model provider key (for example an Anthropic key for the default configuration). The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs.
+3. An LLM API key and model ID. The guided path supports Anthropic, OpenAI, Google Gemini, or OpenRouter. The agent engine is pi (open source), with pi-codex-goal for autonomous goal-driven runs.
 4. Optionally, a domain name. Only needed if you want HTTPS access from outside the machine, which is most of the point if you want to steer the agent from a phone.
 
-For sandboxed execution, Waynode has a microVM execution path that activates when KVM is available on the host; it is optional, not a prerequisite.
+The default Compose deployment is intended for a trusted individual or small team. Agent commands run inside the Waynode container, whose data volume contains every worktree; it does not provide hardware isolation between users. The separate KVM/microsandbox deployment is an advanced operator path, not a property of the default installer.
 
 ## How do you install the agent with Docker Compose?
 
-The whole install is four commands:
+Clone the repository and run the interactive installer:
 
 ```bash
 git clone https://github.com/fornace/waynode.git
 cd waynode
-cp .env.example .env
-# edit .env (next section), then:
-docker compose up -d
+./scripts/self-host.sh setup
 ```
 
-The app comes up on `http://localhost:3000`. The Compose file defines a single service with a named volume for persistent data: workspaces, database, and terminal/session state live in that volume, which is what makes sessions durable across container restarts.
+Before running it, create a GitHub or GitLab OAuth application and have a supported provider key plus provider-local model ID ready. The installer prints the exact OAuth callbacks, generates different 256-bit session and encryption secrets, writes a mode-`0600` `.env`, validates Compose, builds the service, and waits for its auth endpoint to report healthy. It refuses to overwrite an existing `.env`.
 
-To update later: `git pull`, then `docker compose up -d --build`. The data volume is untouched by rebuilds.
+With the default local URL, the app comes up on `http://localhost:3000`. The Compose file defines a single service with a named volume for persistent data: workspaces, database, and terminal/session state live in that volume, which is what makes sessions durable across container restarts.
+
+Before updating, record the current commit and take a stop-consistent data backup plus a protected copy of `.env`. Then use `git pull --ff-only`, `docker compose up -d --build`, and `./scripts/self-host.sh check`. The data volume is not replaced by a normal rebuild, but database migrations may make rollback require restoring the pre-upgrade archive. See the [complete self-hosting runbook](https://github.com/fornace/waynode/blob/main/docs/SELF-HOSTING.md).
 
 ## Which environment variables matter?
 
-Everything is configured through `.env`. The security-relevant variables:
+The installer writes `.env`; manual installation remains available through `.env.example`. The security-relevant variables are:
 
 | Variable | Purpose | How to set it |
 |---|---|---|
@@ -63,11 +63,12 @@ Everything is configured through `.env`. The security-relevant variables:
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app | Created in GitHub → Settings → Developer settings → OAuth Apps |
 | `GITLAB_CLIENT_ID` / `GITLAB_CLIENT_SECRET` / `GITLAB_BASE_URL` | GitLab OAuth (gitlab.com or self-managed) | Created in GitLab → User Settings → Applications |
 | `PI_DEFAULT_PROVIDER` / `PI_DEFAULT_MODEL` | Which LLM the agent uses by default | Your provider and model id; you supply the API key |
+| `PI_PROVIDER_API_KEY` | One-time first-boot provider credential | The installer encrypts it into Waynode's global secret vault |
 
 Two rules that prevent most self-hosting incidents:
 
 - Never reuse or commit the secrets. If `SESSION_SECRET` leaks, sessions can be forged; if `ENCRYPTION_KEY` leaks alongside a database copy, stored credentials can be decrypted. Keep `.env` out of Git and, for production, load these from a secret manager.
-- Do not enable hosted-billing variables. The Stripe variables in `.env.example` exist only for the managed waynode.fornace.net deployment. Left unset, the billing UI is hidden and billing routes 404; a self-hosted install has no payment or metering code active.
+- Do not set `WAYNODE_DEPLOYMENT=hosted` or enable hosted Stripe variables. The self-host installer writes `WAYNODE_DEPLOYMENT=self-hosted` and refuses the hosted value; hosted billing, payment collection, and Waynode usage limits stay disabled.
 
 ## How do you set up GitHub or GitLab OAuth?
 
@@ -80,7 +81,7 @@ The callback URL must match `APP_URL` exactly: scheme, host, and port. This is t
 
 ## How do you add a reverse proxy and HTTPS?
 
-Keep the app off the public interface and put a TLS-terminating proxy in front. The default Compose file maps `3000:3000`, which binds all interfaces; on an internet-facing server, change the port mapping to `127.0.0.1:3000:3000` so only the proxy can reach it. With [Caddy](https://caddyserver.com/) the whole proxy config is:
+Keep the app off the public interface and put a TLS-terminating proxy in front. The default Compose file binds `127.0.0.1:3000`, so only a proxy on the same host can reach it. Set `WAYNODE_BIND_ADDRESS=0.0.0.0` only when another host must reach the Docker port and a firewall restricts access. With [Caddy](https://caddyserver.com/) the whole proxy config is:
 
 ```
 agent.example.com {
@@ -90,13 +91,15 @@ agent.example.com {
 
 Caddy provisions and renews Let's Encrypt certificates automatically. With nginx, use a standard `proxy_pass http://127.0.0.1:3000` server block plus certbot, and make sure WebSocket upgrade headers (`Upgrade`, `Connection`) are forwarded, since the live agent stream and the in-browser terminal depend on them.
 
-Then set `APP_URL=https://agent.example.com` in `.env`, update the OAuth callback URLs, and `docker compose up -d` to restart. From this point the same workspace, session, and diff view are reachable from any device. Waynode's UI is mobile-first, so following a running task or reviewing changed files from a phone works against your own server.
+Set `APP_URL=https://agent.example.com` during setup so the printed OAuth callbacks are correct. If the URL changes later, update `.env`, update the provider-side callback, and restart with `docker compose up -d`. From this point the same workspace, session, and diff view are reachable from any device. Waynode's UI is mobile-first, so following a running task or reviewing changed files from a phone works against your own server.
 
 Do not expose port 3000 directly to the internet. A coding agent has your repo credentials and can execute code; plain HTTP plus a public port is the one configuration to categorically avoid.
 
 ## How do you bring your own LLM keys?
 
-Self-hosting means the model relationship is also yours: you pay your provider directly at API rates, with no per-seat markup and no token quota imposed by a middleman. Set `PI_DEFAULT_PROVIDER` and `PI_DEFAULT_MODEL` in `.env` and supply the corresponding API key; the default configuration targets Anthropic models, and the model can also be chosen per session.
+Self-hosting means the model relationship is also yours: you pay your provider directly at API rates, with no Waynode per-seat markup or hosted token quota. During setup, choose Anthropic, OpenAI, Google Gemini, or OpenRouter; enter a provider-local model ID and the corresponding API key. On first boot, Waynode maps `PI_PROVIDER_API_KEY` to the provider's exact key name, encrypts it into the global secret vault, and removes the bootstrap names from the live process before starting an agent. Later restarts do not overwrite the encrypted value.
+
+The bootstrap value remains in the root-readable `.env` for disaster recovery. After a verified prompt, you may blank it if the key is stored elsewhere; later rotation and worktree-scoped overrides belong in Settings → Secrets. The installer validates that configuration is present, but only a real prompt can prove the model ID and credential entitlement.
 
 This is the main economic difference from managed agent products: your spend tracks actual usage on your provider bill. The trade-off is that you own capacity planning and cost monitoring yourself: there is no built-in quota to stop a runaway autonomous run except your provider's own limits.
 
@@ -104,11 +107,11 @@ This is the main economic difference from managed agent products: your spend tra
 
 A minimal checklist:
 
-- Generate `SESSION_SECRET` and `ENCRYPTION_KEY` with `openssl rand -hex 32`; store them in a secret manager; never commit `.env`, OAuth client secrets, or provider tokens.
+- Let the installer generate different `SESSION_SECRET` and `ENCRYPTION_KEY` values; store a protected copy of `.env`; never commit it, OAuth client secrets, or provider tokens.
 - Use HTTPS at the reverse proxy for anything beyond localhost. OAuth flows and repo tokens must never cross plain HTTP.
-- An agent workspace holds cloned repos and can run commands. Run it on a dedicated host or VM where possible; enable the KVM-backed microVM sandbox path if your host supports it.
+- An agent workspace holds cloned repos and can run commands. Treat every invited user and repository as trusted on the default Compose deployment; run it on a dedicated host or VM where possible.
 - Grant the OAuth app only the scopes your provider flow requires, and keep it pointed at your deployment's exact callback URL.
-- The stack is a normal Git repo, so `git pull` and rebuild on your own schedule, and read the diff first, which is the audit ability self-hosting buys you.
+- Back up with `./scripts/self-host.sh backup`, keep `.env` separately, copy both off-host, and test restores. The helper stops the service for a consistent archive but does not encrypt, upload, rotate, or validate it for you.
 
 ## Does this recipe work for other self-hosted coding agents?
 
@@ -120,7 +123,7 @@ The architectural difference to check when choosing a tool is what a "workspace"
 
 ### How much does it cost to self-host a coding agent?
 
-The software is free: Waynode is MIT-licensed with no billing code active on self-hosted installs. Your costs are the server (a small VPS suffices for the app; disk scales with your repos) and your LLM provider's API usage, paid directly at provider rates.
+The software is free: Waynode is MIT-licensed, with hosted billing and Waynode usage limits disabled on self-hosted installs. Your costs are the server (disk scales with your repos) and your LLM provider's API usage, paid directly at provider rates.
 
 ### Can I run a self-hosted coding agent without a domain name?
 
@@ -128,7 +131,7 @@ Yes, on `http://localhost:3000` with `APP_URL` left at its default, which is fin
 
 ### What happens to my code and API keys when I self-host?
 
-They stay on your infrastructure. Repositories are cloned to a Docker volume on your host, credentials are encrypted at rest with your own `ENCRYPTION_KEY`, and LLM calls go from your server to your model provider with your key. No intermediary sees code or traffic.
+Repositories and stored credentials stay on your infrastructure. Repositories are cloned to a Docker volume on your host, and credentials are encrypted at rest with your own `ENCRYPTION_KEY`. LLM requests go directly from your server to the model provider you configured, so that provider receives the prompts and selected code context needed for inference; Waynode is not an intermediary in that path.
 
 ### Do I need a GPU to self-host a coding agent?
 
@@ -136,4 +139,4 @@ No. The agent workspace itself is a lightweight web application; the language mo
 
 ### What is the difference between self-hosting Waynode and using Waynode Cloud?
 
-Same open-source stack. Self-host is free and everything (repos, database, keys, billing) stays with you; Waynode Cloud is managed hosting with updates, isolated workspaces, encrypted secrets, backups, and support, from $39/mo (Starter: 3 seats, 3M agent tokens/mo, 10 GB), with a 15-day free trial for new organizations.
+Same open-source stack. Self-host is free and everything (repos, database, keys, billing) stays with you; Waynode Cloud operates the server, updates, encrypted secrets, and Stripe billing from $39/mo (Starter: 3 seats, 3M agent tokens/mo, 10 GB), with a 15-day free trial for new organizations. Interactive terminal access is currently self-hosted only.

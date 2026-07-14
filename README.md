@@ -14,12 +14,12 @@ do **not** enable Waynode hosted billing, usage limits, or payment collection.
 
 ### Waynode Cloud — managed hosting
 
-Waynode Cloud runs the same open-source workspace for your team, with managed
-updates, isolated workspaces, backups, and support. New cloud organizations get
-a 15-day trial; choose Starter, Pro, or Team only when you are ready to keep
-using the service. Web subscriptions use Stripe. Native App Store billing is
-intentionally not enabled until its server-verified entitlement flow is shipped;
-never enter Stripe credentials into a native client.
+Waynode Cloud runs the same open-source workspace with managed server operation,
+updates, isolated workspaces, encrypted secrets, and Stripe billing. New cloud
+organizations get a 15-day trial; choose Starter, Pro, or Team only when you are
+ready to keep using the service. Native App Store billing is intentionally not
+enabled until its server-verified entitlement flow is shipped; never enter
+Stripe credentials into a native client.
 
 > Operators: hosted billing is deliberately disabled unless
 > `WAYNODE_DEPLOYMENT=hosted` is set alongside the Stripe configuration. Do not
@@ -32,16 +32,17 @@ never enter Stripe credentials into a native client.
 ```bash
 git clone https://github.com/fornace/waynode.git
 cd waynode
-cp .env.example .env
-# Edit .env — set SESSION_SECRET, ENCRYPTION_KEY, and OAuth credentials
-docker compose up -d
-# → http://localhost:3000
+./scripts/self-host.sh setup
 ```
 
-For a production self-host, set a public `APP_URL`, use HTTPS at your reverse
-proxy, keep `SESSION_SECRET` and `ENCRYPTION_KEY` in a secret manager, and
-configure GitHub and/or GitLab OAuth callbacks for that exact URL. Never commit
-your `.env`, OAuth client secrets, or provider access tokens.
+The guided setup requires Docker Compose v2, one GitHub or GitLab OAuth app, and
+a supported model-provider key. It generates both server secrets, prints the
+exact OAuth callback URLs, records the selected pi provider and model, encrypts
+the model key into Waynode's secret vault on first boot, validates Compose, and
+starts on loopback by default.
+
+Requirements, reverse-proxy setup, upgrades, and stop-consistent backup/restore
+instructions are in [Self-hosting Waynode](docs/SELF-HOSTING.md).
 
 ### Local Development
 
@@ -49,6 +50,7 @@ your `.env`, OAuth client secrets, or provider access tokens.
 # Terminal 1: backend
 npm install
 cp .env.example .env
+# Fill the required server secrets, OAuth app, provider, and model values.
 npm run dev
 
 # Terminal 2: frontend (hot reload)

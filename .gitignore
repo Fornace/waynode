@@ -5,6 +5,7 @@ frontend/node_modules/
 # Build output
 frontend/dist/
 .build/
+native-app/Waynode.xcodeproj/-Xcc/
 
 # Data (runtime)
 data/
@@ -33,3 +34,6 @@ graphify-out/
 
 # Scratch / local verification artifacts
 _tmp/
+
+# Local self-host backup archives (store protected copies off-host)
+backups/

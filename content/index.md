@@ -1,8 +1,8 @@
 # Waynode
 
-> Open-source, self-hosted coding-agent workspace. Each workspace is a real cloned Git repository with a persistent worktree, terminal, and agent session, reachable from desktop and mobile.
+> Open-source durable worktrees for coding agents. Each worktree is a real cloned Git repository with a persistent branch, agent session, terminal, and review surface, reachable from desktop and mobile.
 
-Waynode gives coding work a real, durable place. Start a task at your desk, inspect the diff on your phone, and finish it from any device, with the repository, terminal, and conversation still there.
+Waynode gives coding work a real, durable place. Start a task at your desk, inspect the diff on your phone, and finish it from any device, with the repository, branch, terminal, and conversation still there.
 
 ## What Waynode is
 
@@ -18,15 +18,20 @@ Waynode gives coding work a real, durable place. Start a task at your desk, insp
 ```bash
 git clone https://github.com/fornace/waynode.git
 cd waynode
-cp .env.example .env   # set SESSION_SECRET, ENCRYPTION_KEY, OAuth credentials
-docker compose up -d   # → http://localhost:3000
+./scripts/self-host.sh setup
 ```
+
+The guided installer requires Docker Compose v2, one GitHub or GitLab OAuth
+application, and a supported model-provider key. It generates the server
+secrets, validates the configuration, and starts Waynode on loopback by
+default. See the [self-hosting guide](https://github.com/fornace/waynode/blob/main/docs/SELF-HOSTING.md)
+for HTTPS, upgrades, backup, and restore.
 
 Your repositories, database, credentials, provider accounts, and billing stay with you. Bring your own LLM keys.
 
 ### Waynode Cloud: managed hosting
 
-The same open-source workspace, managed: updates, isolated workspaces, encrypted secrets, backups, support. Every new organization gets a 15-day free trial.
+The same open-source product, managed: server operation, updates, encrypted secrets, and Stripe billing. Every new organization gets a 15-day free trial with one seat, 5M agent tokens, and 2 GB storage. Hosted worktrees include isolated chat and goals plus Git review, commit, and push. Interactive terminal access remains self-hosted while its hosted credential broker is completed.
 
 | Plan | Price | Seats | Agent tokens / month | Storage |
 |------|-------|-------|----------------------|---------|

@@ -20,6 +20,21 @@ settings:
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: NO
 
+schemes:
+  Waynode:
+    build:
+      targets:
+        Waynode: all
+  WaynodeUITests:
+    build:
+      targets:
+        Waynode: all
+        WaynodeUITests: [test]
+    test:
+      targets:
+        - WaynodeUITests
+      gatherCoverageData: false
+
 targets:
   Waynode:
     type: application
@@ -35,7 +50,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app
         INFOPLIST_FILE: App/Info.plist
-        CODE_SIGN_ENTITLEMENTS: App/Waynode.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
         # One universal target: iPhone, iPad, and Mac share the same bundle
         # identifier, signing team, StoreKit products, and SwiftUI code.
@@ -44,3 +58,18 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
+
+  WaynodeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: WaynodeUITests
+    dependencies:
+      - target: Waynode
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app.uitests
+        TEST_TARGET_NAME: Waynode
+        SUPPORTS_MACCATALYST: YES
+        GENERATE_INFOPLIST_FILE: YES

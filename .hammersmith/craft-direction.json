@@ -1,0 +1,18 @@
+{
+  "run_name": "waynode-craft-direction",
+  "project": "waynode-productization",
+  "workdir": "/tmp/waynode-hammersmith/craft-direction",
+  "max_parallel": 1,
+  "tasks": [
+    {
+      "key": "independent-craft-direction",
+      "task_type": "product-design",
+      "spec": "Act as the independent product-design authority for Waynode. The founder's complete brief is: 'Improve all the aesthetics, but with way more focus and attention to detail. It is not about adding stuff. It is thinking better. From the login screen to the long-forgotten corner. All of it. Simple, beautiful, native, Apple-like. Progressive disclosure, craft in each pixel and possibility of everything including the received generated texts.' Develop the goal and plan yourself; make every product, interaction, visual, copy, platform, and prioritization decision independently. Do not ask questions and do not alter the Waynode repository. Inspect the current source and visual evidence at /Users/ffrappo/works/repos/waynode, plus the verified independent product roadmap at /tmp/waynode-hammersmith/product-discovery/independent-product-roadmap/product-roadmap.md. Produce ./craft-direction.md as the decisive implementation and review authority for public web, authenticated web, iPhone, iPad, and Mac. Define what must be preserved, removed, simplified, disclosed progressively, and made platform-specific; cover every meaningful state and generated content; rank work by visible product impact and dependency; and define observable acceptance evidence. Choose the visual and interaction system rather than listing alternatives. Avoid generic startup conventions unless evidence makes one necessary. Keep it under 3,000 words. Read-only boundary: never modify, create, delete, format, install, commit, or run migrations inside the Waynode repository. You may only write craft-direction.md in your assigned task directory. Avoid nested agents and nested orchestration.",
+      "check": "python3 -c \"from pathlib import Path; p=Path('craft-direction.md'); t=p.read_text() if p.exists() else ''; required=['Direction','Public','Web','iPhone','iPad','Mac','Generated','Progressive','State','Acceptance']; missing=[x for x in required if x.lower() not in t.lower()]; assert p.is_file() and p.stat().st_size > 3000, 'craft direction missing or too small'; assert not missing, 'missing decision areas: ' + ', '.join(missing); assert len(t.split()) < 3000, 'craft direction exceeds 3000 words'; print('craft direction validated:', len(t), 'bytes')\"",
+      "expect_files": ["craft-direction.md"],
+      "timeout_s": 1200,
+      "max_attempts": 1,
+      "verified": "An independently authored cross-platform craft direction makes concrete product-design decisions and defines observable acceptance evidence."
+    }
+  ]
+}

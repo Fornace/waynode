@@ -14,12 +14,12 @@ cover: /covers/self-hosted-vs-cloud-coding-agents.png
 
 # Self-hosted vs cloud coding agents: how to choose
 
-Choose a cloud coding agent when you want zero setup and someone else operating the infrastructure; choose a self-hosted agent when your code, credentials, and LLM spend must stay under your control, and you can accept the operational work that comes with running it. The decision is rarely about agent quality (most self-hostable agents call the same frontier models via API) and mostly about where your repository is cloned, who holds the keys, and how you pay for tokens.
+Choose a cloud coding agent when you want someone else operating the infrastructure and a shorter adoption path; choose a self-hosted agent when your code, credentials, and LLM spend must stay under your control, and you can accept the operational work that comes with running it. The decision is rarely about agent quality (most self-hostable agents call the same frontier models via API) and mostly about where your repository is cloned, who holds the keys, and how you pay for tokens.
 
 **TL;DR**
 
 - **Cloud agents** (OpenAI Codex cloud tasks, Devin, Cursor cloud agents, GitHub Copilot coding agent) clone your repo into vendor-operated sandboxes. Fast to adopt, subscription-priced, but your source and Git credentials transit third-party infrastructure.
-- **Self-hosted agents** run on hardware you control. Your repos, database, and API keys never leave your network, and you pay model providers directly (BYO keys), but you patch, back up, and secure the deployment yourself.
+- **Self-hosted agents** run on hardware you control. Your repo clone, database, and stored credentials stay in your deployment, while inference requests go directly to the model provider you choose; you patch, back up, and secure the deployment yourself.
 - Cost models differ structurally: cloud is subscription plus metered credits; self-hosted is infrastructure cost plus raw API token prices with no markup.
 - Compliance-constrained teams (regulated industries, client-code agencies, air-gapped environments) usually need self-hosting or a vendor VPC deployment.
 - Some tools offer both modes: Devin has a VPC enterprise option, and open-source workspaces like [Waynode](https://github.com/fornace/waynode) can be self-hosted free or used as managed hosting.
@@ -103,7 +103,7 @@ If your team has no one willing to own this, a managed offering is the more trut
 
 ## Where does Waynode fit?
 
-[Waynode](https://github.com/fornace/waynode) is one example of a tool built to offer both modes with the same open-source (MIT) stack. Self-hosted, it runs via `docker compose up -d`; each workspace is a real cloned Git repository on disk, your database and LLM keys stay with you, and you bring your own model keys. [Waynode Cloud](/learn) is the managed version of the same stack, with updates, isolated workspaces, encrypted secrets, and backups handled for you, from $39/mo (Starter: 3 seats, 3M agent tokens/mo, 10 GB) up to $249/mo (Team: 25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations. Because both modes run the same open-source stack, teams can start managed and move to self-hosting (or the reverse) without changing tools. It does not currently offer SSO or compliance certifications, so enterprises with those requirements should evaluate accordingly. Feature-level comparisons against specific cloud agents are collected at [/learn](/learn).
+[Waynode](https://github.com/fornace/waynode) is one example of a tool built to offer both modes with the same open-source (MIT) stack. Self-hosted, it uses a guided Docker Compose installer that collects the OAuth and model-provider configuration, generates server secrets, validates Compose, and starts on loopback; each workspace is a real cloned Git repository on disk, while your database and LLM keys stay with you. [Waynode Cloud](/learn) operates the server, updates, encrypted secrets, and Stripe billing, from $39/mo (Starter: 3 seats, 3M agent tokens/mo, 10 GB) up to $249/mo (Team: 25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations. Interactive terminal access is currently self-hosted only. Because both modes run the same open-source stack, teams can start managed and move to self-hosting (or the reverse) without changing tools. It does not currently offer SSO or compliance certifications, so enterprises with those requirements should evaluate accordingly. Feature-level comparisons against specific cloud agents are collected at [/learn](/learn).
 
 ## FAQ
 
@@ -125,4 +125,4 @@ Major vendors default to no training for business plans: OpenAI states no traini
 
 ### What is the minimum setup to self-host a coding agent workspace?
 
-For Waynode: `git clone`, copy `.env.example` to `.env`, run `docker compose up -d`, and open localhost:3000, plus a GitHub or GitLab OAuth app for repo access and an LLM API key. Comparable open-source tools have similar Docker-based setups; expect an afternoon including OAuth configuration.
+For Waynode: install Docker Compose v2, create a GitHub or GitLab OAuth app, get a supported model-provider key, clone the repo, and run `./scripts/self-host.sh setup`. The installer writes and validates the deployment configuration and starts on loopback; remote access still needs a domain, HTTPS reverse proxy, and matching OAuth callbacks. Comparable open-source tools have similar Docker-based setups; allow time for OAuth and production network configuration rather than treating self-hosting as zero setup.

@@ -13,6 +13,9 @@ jobs:
       - name: Enforce source file length
         run: node scripts/check-file-lengths.mjs
 
+      - name: Verify sandbox image credential boundary
+        run: node scripts/check-sandbox-image.mjs
+
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.9.1
         with:
@@ -34,19 +37,57 @@ jobs:
             --exclude='.env' \
             ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/waynode/
 
-      - name: Rebuild and restart container (sandboxed host)
+      - name: Build, load sandbox, and restart safely
         run: |
-          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} '
-            cd /opt/waynode &&
-            docker compose -f docker-compose.ffrapposerver.yml build &&
-            docker compose -f docker-compose.ffrapposerver.yml up -d &&
-            docker image prune -f
-          '
-        env:
-          # pi reaches fornace-llm over the WireGuard tunnel (not docker DNS)
-          LLM_BASE_URL: 10.200.0.1:4000
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} 'bash -se' <<'REMOTE'
+          set -Eeuo pipefail
+          cd /opt/waynode
+
+          compose_file=docker-compose.ffrapposerver.yml
+          sandbox_archive=$(mktemp /tmp/waynode-sandbox.XXXXXX.tar)
+          trap 'rm -f "$sandbox_archive"' EXIT
+
+          # Verify the exact synced source before any production image build.
+          node scripts/check-sandbox-image.mjs
+
+          # The current service stays running throughout both builds. Build the
+          # server first because its image supplies the matching msb 0.6.6 CLI.
+          docker compose -f "$compose_file" build waynode
+          waynode_image=$(docker compose -f "$compose_file" images -q waynode)
+          test -n "$waynode_image"
+          docker build --file sandbox/Dockerfile --tag waynode-sandbox:latest .
+
+          # Validate the resulting image, not only its Dockerfile. The checker
+          # deliberately reports no matching value if a credential is found.
+          docker run --rm \
+            --volume "$PWD/scripts/check-sandbox-image.mjs:/tmp/check-sandbox-image.mjs:ro" \
+            --entrypoint node waynode-sandbox:latest \
+            /tmp/check-sandbox-image.mjs /root/.pi/agent/models.json
+
+          docker save --output "$sandbox_archive" waynode-sandbox:latest
+
+          # Import through a one-shot server image with no env_file, network,
+          # KVM device, or server credentials. The host cache is the same bind
+          # mount used by the production service. Restart only after inspect
+          # proves the new reference is available to microsandbox.
+          docker run --rm \
+            --network none \
+            --volume /root/.microsandbox:/root/.microsandbox \
+            --volume "$sandbox_archive:/tmp/waynode-sandbox.tar:ro" \
+            "$waynode_image" \
+            msb image load --input /tmp/waynode-sandbox.tar --tag waynode-sandbox:latest --quiet
+          docker run --rm \
+            --network none \
+            --volume /root/.microsandbox:/root/.microsandbox \
+            "$waynode_image" \
+            msb image inspect waynode-sandbox:latest >/dev/null
+
+          docker compose -f "$compose_file" up -d --wait --wait-timeout 120
+          # Keep the just-replaced server image available for an immediate
+          # operator rollback; only stale dangling layers are reclaimed.
+          docker image prune -f --filter until=168h
+          REMOTE
 
       - name: Verify deployment
         run: |
-          sleep 5
           curl -sf -o /dev/null -w "%{http_code}" https://waynode.fornace.net | grep -q "200\|302\|301" && echo "Deploy OK" || (echo "Deploy FAILED" && exit 1)

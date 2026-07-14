@@ -1,29 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Waynode">
-  <!-- Waynode mark: a central node with four radiating paths/ways.
-       Flat, grid-fitted, crisp at 16px. Maskable-safe (mark within ~70% safe zone). -->
-  <defs>
-    <linearGradient id="hub" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#60a5fa"/>
-      <stop offset="1" stop-color="#2563eb"/>
-    </linearGradient>
-  </defs>
-
-  <!-- four orthogonal paths (the "ways") -->
-  <g fill="#3b82f6">
-    <rect x="29" y="11" width="6" height="15" rx="3"/>   <!-- up -->
-    <rect x="29" y="38" width="6" height="15" rx="3"/>   <!-- down -->
-    <rect x="11" y="29" width="15" height="6" rx="3"/>   <!-- left -->
-    <rect x="38" y="29" width="15" height="6" rx="3"/>   <!-- right -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Waynode">
+  <g fill="none" stroke="#3b82f6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 23 24 50 32 15 45 50 55 11" stroke-width="4"/>
+    <path d="m11 23 12 7 9-15 13 12 10-16" stroke-width="3.2" opacity=".8"/>
+    <path d="m24 50 8-13 13 13" stroke-width="3.2" opacity=".82"/>
   </g>
-
-  <!-- central node (rounded square) -->
-  <rect x="25" y="25" width="14" height="14" rx="4" fill="url(#hub)"/>
-
-  <!-- four satellite nodes -->
-  <g fill="#e0f2fe">
-    <circle cx="32" cy="11" r="5"/>   <!-- top -->
-    <circle cx="32" cy="53" r="5"/>   <!-- bottom -->
-    <circle cx="11" cy="32" r="5"/>   <!-- left -->
-    <circle cx="53" cy="32" r="5"/>   <!-- right -->
+  <g fill="#dbeafe" stroke="#60a5fa" stroke-width="1.5">
+    <circle cx="11" cy="23" r="4"/><circle cx="23" cy="30" r="4"/><circle cx="32" cy="15" r="4.5"/><circle cx="45" cy="27" r="4"/>
+    <circle cx="55" cy="11" r="4.5"/><circle cx="24" cy="50" r="4.5"/><circle cx="32" cy="37" r="4.5"/><circle cx="45" cy="50" r="4.5"/>
   </g>
 </svg>

@@ -77,6 +77,7 @@ struct ErrorAlert: ViewModifier {
             set: { if !$0 { message = nil } }
         )) {
             Button("OK", role: .cancel) { message = nil }
+                .accessibilityIdentifier("error.dismiss")
         } message: {
             Text(message ?? "")
         }
@@ -87,6 +88,31 @@ extension View {
     /// Present an alert when `message` is non-nil. Clears on dismiss.
     func errorAlert(_ message: Binding<String?>) -> some View {
         modifier(ErrorAlert(message: message))
+    }
+
+    /// Give utility sheets a useful desktop footprint without imposing a
+    /// desktop-sized minimum on iPhone and iPad.
+    @ViewBuilder
+    func macSheetFrame(
+        minWidth: CGFloat = 480,
+        idealWidth: CGFloat = 600,
+        maxWidth: CGFloat = 760,
+        minHeight: CGFloat = 480,
+        idealHeight: CGFloat = 680,
+        maxHeight: CGFloat = 900
+    ) -> some View {
+        #if targetEnvironment(macCatalyst) || os(macOS)
+        frame(
+            minWidth: minWidth,
+            idealWidth: idealWidth,
+            maxWidth: maxWidth,
+            minHeight: minHeight,
+            idealHeight: idealHeight,
+            maxHeight: maxHeight
+        )
+        #else
+        self
+        #endif
     }
 }
 
@@ -102,9 +128,13 @@ struct ConfirmDestructive: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onTapGesture { isPresented = true }
-            .confirmationDialog(title, isPresented: $isPresented, titleVisibility: .visible) {
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Asks for confirmation")
+            .alert(title, isPresented: $isPresented) {
                 Button(title, role: .destructive, action: action)
+                    .accessibilityIdentifier("destructive.confirm")
                 Button("Cancel", role: .cancel) {}
+                    .accessibilityIdentifier("destructive.cancel")
             } message: {
                 Text(message)
             }

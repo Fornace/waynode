@@ -6,9 +6,8 @@
 # config pointed at the WireGuard tunnel endpoint (10.200.0.1:4000).
 #
 # Security notes:
-#  - The LLM apiKey below is baked in. This is acceptable ONLY because the
-#    microVM's egress network is scoped (via NetworkPolicy) to the LLM host
-#    alone — the key cannot be exfiltrated anywhere it isn't already valid.
+#  - No credential is baked into this image. Hosted chat receives only a
+#    separately provisioned, model/rate-limited runtime virtual key.
 #  - No waynode server code, DB access, or other tenants' repos are present.
 
 FROM node:26-slim
@@ -51,7 +50,7 @@ RUN mkdir -p /root/.pi/agent && echo '{\
     "fornace": {\
       "baseUrl": "http://10.200.0.1:4000/v1",\
       "api": "openai-completions",\
-      "apiKey": "sk-4dea025d8aa9572a2a68b8e4126561519fec29e3cf2fc26f",\
+      "apiKey": "$WAYNODE_LLM_KEY",\
       "compat": {"supportsDeveloperRole": false, "supportsReasoningEffort": false},\
       "models": [\
         {"id": "fornace-fast", "name": "Fornace Fast"},\

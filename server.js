@@ -6,9 +6,11 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import { config } from "./lib/config.mjs";
+import { configuredModelCatalog, providerCredentialKey, resolvePiModel } from "./lib/pi-model.mjs";
 import { passport } from "./lib/auth.mjs";
 import { ensureGitAskpass } from "./lib/git-creds.mjs";
 import { ensurePiProviderConfig } from "./lib/pi-config.mjs";
+import { bootstrapSelfHostedProviderCredential } from "./lib/pi-provider-bootstrap.mjs";
 import { attachTerminalWebSocket } from "./routes/terminal.js";
 
 import authRoutes from "./routes/auth.js";
@@ -37,6 +39,13 @@ ensureGitAskpass();
 // Write pi's fornace LLM provider config from runtime env (LLM_API_KEY),
 // never baked into the Docker image — see lib/pi-config.mjs.
 ensurePiProviderConfig();
+
+// A self-host installer may supply PI_PROVIDER_API_KEY for the first boot.
+// Persist it encrypted, then remove it before any agent process can inherit it.
+const providerBootstrap = bootstrapSelfHostedProviderCredential();
+if (providerBootstrap.status === "created") {
+  console.log(`[provider] encrypted ${providerBootstrap.keyName} for self-host agents`);
+}
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -142,17 +151,14 @@ app.use(contentRoutes);
 
 // Model listing endpoint
 app.get("/api/models", (req, res) => {
-  const models = [
-    { id: "fornace-fast", name: "Fornace Fast", desc: "Quick responses, lower cost" },
-    { id: "fornace-reasoning", name: "Fornace Reasoning", desc: "Balanced quality and speed" },
-    { id: "fornace-max", name: "Fornace Max", desc: "Best quality, slower" },
-    { id: "fornace-vision", name: "Fornace Vision", desc: "Image understanding" },
-    { id: "glm-5.2-fast", name: "GLM 5.2 Fast", desc: "Zhipu GLM fast" },
-    { id: "glm-5.2-reasoning", name: "GLM 5.2 Reasoning", desc: "Zhipu GLM reasoning" },
-    { id: "glm-5.2-max", name: "GLM 5.2 Max", desc: "Zhipu GLM max quality" },
-    { id: "qwen-flash", name: "Qwen Flash", desc: "Alibaba Qwen fast" },
-  ];
-  res.json({ models, configured: !!(config.llm.baseUrl && config.llm.apiKey) });
+  const selected = resolvePiModel();
+  res.json({
+    models: configuredModelCatalog(),
+    configured: true,
+    provider: selected.provider,
+    defaultModel: selected.model,
+    credentialKey: providerCredentialKey(selected.provider),
+  });
 });
 
 if (config.isProd) {
@@ -177,7 +183,7 @@ app.use((err, req, res, next) => {
 });
 
 server.listen(config.port, () => {
-  console.log(`Waynode AI listening on :${config.port} (${config.nodeEnv})`);
+  console.log(`Waynode listening on :${config.port} (${config.nodeEnv})`);
   console.log(`  Repos: ${config.reposDir}`);
   console.log(`  DB:    ${config.dbPath}`);
 });

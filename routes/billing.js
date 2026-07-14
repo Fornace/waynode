@@ -69,6 +69,7 @@ router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, (req, res) 
     plan: subscription.plan,
     status: subscription.status,
     current_period_end: subscription.current_period_end,
+    can_manage_billing: !!subscription.stripe_customer_id,
     usage: {
       tokens_used: usage.tokens_used,
       storage_bytes: storageBytes,

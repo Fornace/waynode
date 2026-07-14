@@ -2,24 +2,25 @@
 /* ── Composer ── */
 .composer {
   border-top: 1px solid var(--border);
-  padding: 16px 20px 24px;
-  padding-bottom: calc(24px + var(--safe-bottom));
+  padding: 12px 20px;
+  padding-bottom: calc(18px + var(--safe-bottom));
   background: var(--bg);
 }
 .composer-inner {
   display: flex;
+  width: min(100%, 920px);
+  margin: 0 auto;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 6px 8px 6px 12px;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
   transition: border-color 0.2s, box-shadow 0.2s;
   align-items: flex-end;
   gap: 8px;
 }
 .composer-inner:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2), inset 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 .attach-btn {
   display: flex;
@@ -29,10 +30,12 @@
   color: var(--text-faint);
   border: none;
   cursor: pointer;
-  padding: 8px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border-radius: 8px;
   transition: all 0.2s;
-  margin-bottom: 3px;
+  margin-bottom: 0;
 }
 .attach-btn:hover:not(:disabled) {
   color: var(--text);
@@ -76,7 +79,7 @@
   gap: 4px;
   align-items: center;
   position: relative;
-  height: 36px;
+  height: 40px;
 }
 .send-btn, .send-caret, .newline-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -86,11 +89,12 @@
 }
 .send-btn, .send-caret {
   background: var(--accent); color: #fff;
+  min-height: 40px;
   padding: 8px 12px;
 }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.send-stop { border-radius: 10px; box-shadow: var(--shadow-md); background: var(--red); }
-.send-stop:hover { background: #dc2626; transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.send-stop { border-radius: 8px; background: var(--red); }
+.send-stop:hover { background: #dc2626; }
 
 /* Split-button: .send-btn (main action) + .send-caret (dropdown handle) share
    one visual pill. The container clips to a shared rounded rect and each
@@ -99,11 +103,9 @@
 .send-split {
   display: flex;
   align-items: stretch;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: var(--shadow-md);
 }
-.send-split:hover { box-shadow: var(--shadow-lg); }
 .send-split .send-btn,
 .send-split .send-caret {
   border-radius: 0;
@@ -125,6 +127,9 @@
   color: var(--text-dim);
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
 }
 .newline-btn:hover {
   background: rgba(255, 255, 255, 0.14);
@@ -157,22 +162,40 @@
   transition: all 0.2s ease;
 }
 .send-menu-item:hover { background: rgba(255, 255, 255, 0.05); }
+.send-menu-item:focus-visible,
+.attach-btn:focus-visible,
+.send-btn:focus-visible,
+.send-caret:focus-visible,
+.newline-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .send-menu-item.goal .send-menu-label { color: var(--accent); }
 .send-menu-label { font-size: 13.5px; font-weight: 600; }
 .send-menu-desc { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
 
 /* mobile: fill width, larger tap targets */
 @media (max-width: 768px) {
-  .chat-messages { padding: 14px 12px 8px; }
-  .msg-bubble { max-width: 88%; }
+  .composer { padding: 10px 12px; padding-bottom: calc(12px + var(--safe-bottom)); }
+  .composer-inner { border-radius: 10px; }
+  .attach-btn, .send-group, .send-btn, .send-caret, .newline-btn { min-height: 44px; }
+  .attach-btn { width: 44px; height: 44px; }
+  .send-group { height: 44px; }
   .send-split { flex: 1; }
   .send-split .send-btn { flex: 1; justify-content: center; padding: 10px; }
   .send-menu { right: 0; left: 0; min-width: 0; }
 }
 
-/* ── Brand mark ── */
-@keyframes wn-spin { to { transform: rotate(360deg); } }
+.composer-notice {
+  width: min(calc(100% - 40px), 920px);
+  margin: 8px auto 0;
+}
 
+@media (max-width: 768px) {
+  .composer-notice { width: calc(100% - 24px); }
+}
+
+/* ── Brand mark ── */
 /* The Waynode mark should feel like a connected system, not a loading
    spinner. When used on a login/invite surface, let the links carry a tiny
    amount of tension and the nodes answer it at an almost imperceptible pace. */

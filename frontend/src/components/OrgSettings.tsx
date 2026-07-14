@@ -1,37 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Org } from "../types";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { OrgBilling, type BillingInfo } from "./OrgBilling";
 
-interface OrgSettingsProps {
-  org: Org;
-  onClose: () => void;
-  onRenamed: (org: Org) => void;
-  onDeleted?: (org: Org) => void;
-}
-
-function getAuthHeaders(): Record<string, string> {
-  const devToken = localStorage.getItem("waynode-dev-token");
-  return devToken ? { "x-dev-token": devToken } : {};
-}
-
-const MODEL_OPTIONS = [
-  { id: "fornace-fast", name: "Fornace Fast" },
-  { id: "fornace-reasoning", name: "Fornace Reasoning" },
-  { id: "fornace-max", name: "Fornace Max" },
-  { id: "glm-5.2-fast", name: "GLM 5.2 Fast" },
-  { id: "glm-5.2-reasoning", name: "GLM 5.2 Reasoning" },
-  { id: "qwen-flash", name: "Qwen Flash" },
-];
-
+interface OrgSettingsProps { org: Org; onClose: () => void; onRenamed: (org: Org) => void; onDeleted?: (org: Org) => void; }
+function getAuthHeaders(): Record<string, string> { const token = localStorage.getItem("waynode-dev-token"); return token ? { "x-dev-token": token } : {}; }
 export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsProps) {
-  // Esc returns from this full-page settings pane (no overlay/focus trap;
-  // it's a pane, not a modal).
-  useEscapeToClose(onClose);
+  const isAdmin = org.my_role === "admin";
+  const canEdit = org.my_role !== "viewer";
   const [tab, setTab] = useState<"general" | "integrations" | "members" | "billing">("general");
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [baseline, setBaseline] = useState<Record<string, string>>({});
   const [members, setMembers] = useState<any[]>([]);
+  const [modelOptions, setModelOptions] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [nameInput, setNameInput] = useState(org.name);
@@ -43,34 +24,41 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
   const [billingError, setBillingError] = useState("");
+  const [billingLoading, setBillingLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const requestClose = useCallback(() => {
+    if (!dirty || window.confirm("Discard unsaved organization settings?")) onClose();
+  }, [dirty, onClose]);
+  useEscapeToClose(requestClose);
 
   useEffect(() => { setNameInput(org.name); }, [org.name]);
   useEffect(() => {
     Promise.all([
       fetch(`/api/orgs/${org.id}/settings`, { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
       fetch(`/api/orgs/${org.id}/members`, { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
-    ]).then(([s, m]) => {
+      fetch("/api/models", { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
+    ]).then(([s, m, modelData]) => {
       setSettings(s);
       setBaseline(s);
       setMembers(m);
+      setModelOptions(modelData.models || []);
     });
   }, [org.id]);
-  // Self-host installs never set STRIPE_SECRET_KEY — /api/billing/enabled
-  // reports false and the Billing tab hides itself entirely.
   useEffect(() => {
     fetch("/api/billing/enabled").then(r => r.json()).then(d => setBillingEnabled(!!d.enabled)).catch(() => setBillingEnabled(false));
   }, []);
-
   useEffect(() => {
-    if (!billingEnabled) return;
+    if (!billingEnabled || !isAdmin) return;
+    setBillingLoading(true);
+    setBillingError("");
     fetch(`/api/orgs/${org.id}/billing`, { headers: getAuthHeaders(), credentials: "include" })
-      .then(r => r.json())
+      .then(async r => { const data = await r.json(); if (!r.ok) throw new Error(data.error || "Could not load billing"); return data; })
       .then(setBilling)
-      .catch(() => {});
-  }, [org.id, billingEnabled]);
-
+      .catch(error => setBillingError(error instanceof Error ? error.message : "Could not load billing"))
+      .finally(() => setBillingLoading(false));
+  }, [org.id, billingEnabled, isAdmin]);
   const startCheckout = async (plan: string) => {
     setBillingError("");
     setBillingBusy(plan);
@@ -88,7 +76,6 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
       setBillingBusy(null);
     }
   };
-
   const openPortal = async () => {
     setBillingError("");
     setBillingBusy("portal");
@@ -105,39 +92,51 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
       setBillingBusy(null);
     }
   };
-
   const save = async () => {
     setSaving(true);
-    await fetch(`/api/orgs/${org.id}/settings`, {
-      method: "PATCH",
-      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    });
-    setBaseline(settings);
-    setSaving(false);
-    setDirty(false);
+    setActionError("");
+    try {
+      const response = await fetch(`/api/orgs/${org.id}/settings`, {
+        method: "PATCH",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (!response.ok) throw new Error("Organization settings could not be saved.");
+      setBaseline(settings);
+      setDirty(false);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "Organization settings could not be saved.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const discard = () => {
-    setSettings(baseline);
-    setDirty(false);
-  };
-
+  const discard = () => { setSettings(baseline); setDirty(false); };
   const updateMemberRole = async (userId: string, role: string) => {
-    await fetch(`/api/orgs/${org.id}/members/${userId}`, {
-      method: "PATCH",
-      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    });
-    setMembers(prev => prev.map(m => m.id === userId ? { ...m, role } : m));
+    setActionError("");
+    try {
+      const response = await fetch(`/api/orgs/${org.id}/members/${userId}`, {
+        method: "PATCH",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!response.ok) throw new Error("The member role could not be changed.");
+      setMembers(prev => prev.map(m => m.id === userId ? { ...m, role } : m));
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "The member role could not be changed.");
+    }
   };
-
-  const removeMember = async (userId: string) => {
-    if (!confirm("Remove this member from the org?")) return;
-    await fetch(`/api/orgs/${org.id}/members/${userId}`, { method: "DELETE", headers: getAuthHeaders() });
-    setMembers(prev => prev.filter(m => m.id !== userId));
+  const removeMember = async (userId: string, memberName: string) => {
+    if (!window.confirm(`Remove “${memberName}” from ${org.name}? They will lose access to this organization’s worktrees and sessions.`)) return;
+    setActionError("");
+    try {
+      const response = await fetch(`/api/orgs/${org.id}/members/${userId}`, { method: "DELETE", headers: getAuthHeaders() });
+      if (!response.ok) throw new Error(`${memberName} could not be removed.`);
+      setMembers(prev => prev.filter(m => m.id !== userId));
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "The member could not be removed.");
+    }
   };
-
   const saveName = async () => {
     const name = nameInput.trim();
     if (!name || name === org.name) return;
@@ -154,7 +153,6 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
       setNameSaving(false);
     }
   };
-
   const deleteOrg = async () => {
     if (!confirm(`Delete "${org.name}"? This permanently deletes every space, session, and setting in this org. This cannot be undone.`)) return;
     setDeleteError("");
@@ -170,7 +168,6 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
       setDeleting(false);
     }
   };
-
   const createInvite = async () => {
     setInviteError("");
     setInviteCopied(false);
@@ -188,11 +185,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
     }
   };
 
-  const copyInvite = async () => {
-    await navigator.clipboard.writeText(inviteUrl);
-    setInviteCopied(true);
-  };
-
+  const copyInvite = async () => { await navigator.clipboard.writeText(inviteUrl); setInviteCopied(true); };
   return (
     <div className="settings-page">
       <div className="admin-header">
@@ -201,19 +194,20 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
             <div style={{ fontSize: 18, fontWeight: 700 }}>{org.name}</div>
             <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>Org Settings · {org.slug}</div>
           </div>
-          <button className="btn-secondary" onClick={onClose}>← Back</button>
+          <button className="btn-secondary" onClick={requestClose}>← Back</button>
         </div>
-        <div className="tabs" style={{ marginTop: 14 }}>
-          <button className={`tab-btn ${tab === "general" ? "active" : ""}`} onClick={() => setTab("general")}>General</button>
-          <button className={`tab-btn ${tab === "integrations" ? "active" : ""}`} onClick={() => setTab("integrations")}>Integrations</button>
-          <button className={`tab-btn ${tab === "members" ? "active" : ""}`} onClick={() => setTab("members")}>Members</button>
-          {billingEnabled && (
-            <button className={`tab-btn ${tab === "billing" ? "active" : ""}`} onClick={() => setTab("billing")}>Billing</button>
+        <div className="tabs" style={{ marginTop: 14 }} role="tablist" aria-label="Organization settings sections">
+          <button role="tab" aria-selected={tab === "general"} className={`tab-btn ${tab === "general" ? "active" : ""}`} onClick={() => setTab("general")}>General</button>
+          {canEdit && <button role="tab" aria-selected={tab === "integrations"} className={`tab-btn ${tab === "integrations" ? "active" : ""}`} onClick={() => setTab("integrations")}>Integrations</button>}
+          <button role="tab" aria-selected={tab === "members"} className={`tab-btn ${tab === "members" ? "active" : ""}`} onClick={() => setTab("members")}>Members</button>
+          {billingEnabled && isAdmin && (
+            <button role="tab" aria-selected={tab === "billing"} className={`tab-btn ${tab === "billing" ? "active" : ""}`} onClick={() => setTab("billing")}>Billing</button>
           )}
         </div>
       </div>
 
       <div className="settings-body">
+        {actionError && <div className="workspace-error settings-inline-error" role="alert"><span>Action failed</span><p>{actionError}</p><button type="button" onClick={() => setActionError("")}>Dismiss</button></div>}
         {tab === "general" && (
           <div className="settings-section">
             <div className="settings-section-title">Identity</div>
@@ -225,16 +219,18 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     className="form-input"
+                    aria-label="Organization name"
                     value={nameInput}
                     onChange={(e) => setNameInput(e.target.value)}
+                    disabled={!isAdmin}
                   />
-                  <button
+                  {isAdmin && <button
                     className="btn-primary"
                     onClick={saveName}
                     disabled={nameSaving || !nameInput.trim() || nameInput.trim() === org.name}
                   >
                     {nameSaving ? "Saving…" : "Save"}
-                  </button>
+                  </button>}
                 </div>
               </div>
             </div>
@@ -252,10 +248,12 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
                 </div>
                 <select
                   className="form-input"
-                  value={settings.default_model || "fornace-fast"}
+                  aria-label="Default model"
+                  value={modelOptions.some(m => m.id === settings.default_model) ? settings.default_model : modelOptions[0]?.id || ""}
                   onChange={(e) => { setSettings({ ...settings, default_model: e.target.value }); setDirty(true); }}
+                  disabled={!canEdit}
                 >
-                  {MODEL_OPTIONS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  {modelOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
             </div>
@@ -274,7 +272,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
                 <button className="admin-action-btn danger" onClick={deleteOrg} disabled={deleting}>
                   {deleting ? "Deleting…" : "Delete Organization"}
                 </button>
-                {deleteError && <div className="field-row-hint" style={{ color: "var(--red)" }}>{deleteError}</div>}
+                {deleteError && <div className="field-row-hint" role="alert" style={{ color: "var(--red)" }}>{deleteError}</div>}
               </div>
             </div>
           </div>
@@ -338,7 +336,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
                   <span className="field-row-label">Invite a teammate</span>
                   <span className="field-row-hint">Generates a shareable link that adds anyone who opens it as an editor</span>
                 </div>
-                {inviteUrl ? (
+                {!isAdmin ? <span className="field-row-hint">Only organization admins can create invites.</span> : inviteUrl ? (
                   <div style={{ display: "flex", gap: 8 }}>
                     <input className="form-input" readOnly value={inviteUrl} onClick={(e) => (e.target as HTMLInputElement).select()} />
                     <button className="btn-secondary" onClick={copyInvite}>{inviteCopied ? "Copied!" : "Copy"}</button>
@@ -366,14 +364,14 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
                         {m.email && <div className="kv-sub">{m.email}</div>}
                       </div>
                     </div>
-                    <div className="kv-actions">
-                      <select className="role-select" value={m.role} onChange={(e) => updateMemberRole(m.id, e.target.value)}>
+                    {isAdmin && <div className="kv-actions">
+                      <select className="role-select" aria-label={`Role for ${m.name}`} value={m.role} onChange={(e) => updateMemberRole(m.id, e.target.value)}>
                         <option value="admin">admin</option>
                         <option value="editor">editor</option>
                         <option value="viewer">viewer</option>
                       </select>
-                      <button className="admin-action-btn danger" onClick={() => removeMember(m.id)}>Remove</button>
-                    </div>
+                      <button className="admin-action-btn danger" onClick={() => removeMember(m.id, m.name || m.email || "this member")}>Remove</button>
+                    </div>}
                   </div>
                 ))}
               </div>
@@ -381,12 +379,14 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
           </div>
         )}
 
+        {tab === "billing" && billingLoading && <div className="kv-empty">Loading billing…</div>}
+        {tab === "billing" && billingError && !billing && <div className="workspace-error" role="alert"><span>Billing unavailable</span><p>{billingError}</p></div>}
         {tab === "billing" && billing && (
           <OrgBilling billing={billing} busy={billingBusy} error={billingError} onCheckout={startCheckout} onOpenPortal={openPortal} />
         )}
       </div>
 
-      {dirty && (
+      {dirty && canEdit && (
         <div className="settings-save-bar">
           <span className="save-dot">Unsaved changes</span>
           <button className="btn-secondary" onClick={discard}>Discard</button>

@@ -18,6 +18,7 @@ import { getSpace } from "../lib/spaces.mjs";
 import { getOrgSetting } from "../lib/orgs.mjs";
 import { billingEnabled } from "../lib/config.mjs";
 import { checkQuota } from "../lib/billing.mjs";
+import { configuredModelCatalog, resolvePiModel } from "../lib/pi-model.mjs";
 
 const router = Router();
 
@@ -48,13 +49,20 @@ router.post("/api/spaces/:spaceId/sessions", requireAuth, requireSpaceAccess, (r
   // Precedence: explicit request body > org's default_model setting > global env default.
   const space = getSpace(req.params.spaceId);
   const orgDefaultModel = space?.org_id ? getOrgSetting(space.org_id, "default_model") : null;
+  const validDefault = configuredModelCatalog().some((entry) => entry.id === orgDefaultModel)
+    ? orgDefaultModel
+    : config.pi.defaultModel;
 
+  const selection = resolvePiModel({
+    provider: provider || config.pi.defaultProvider,
+    model: model || validDefault,
+  });
   const session = createSession({
     spaceId: req.params.spaceId,
     userId: req.user.id,
     title,
-    model: model || orgDefaultModel || config.pi.defaultModel,
-    provider: provider || config.pi.defaultProvider,
+    model: selection.model,
+    provider: selection.provider,
   });
   res.json(session);
 });
@@ -120,8 +128,15 @@ router.patch("/api/sessions/:sessionId", requireAuth, (req, res) => {
 router.post("/api/sessions/:sessionId/model", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
-  const { model } = req.body;
+  const { model, provider } = req.body;
   if (!model || typeof model !== "string") return res.status(400).json({ error: "model required" });
+
+  let selection;
+  try {
+    selection = resolvePiModel({ provider: provider || session.provider, model });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 
   const handle = getAgentIfActive(session.id);
   if (handle) {
@@ -130,14 +145,14 @@ router.post("/api/sessions/:sessionId/model", requireAuth, async (req, res) => {
     // desync. (When no agent is running, there's nothing to validate against —
     // the next spawn will catch an unknown id.)
     try {
-      await handle.setModel("fornace", model);
+      await handle.setModel(selection.provider, selection.model);
     } catch (err) {
       return res.status(400).json({ error: `Model not applied: ${err.message}` });
     }
   }
 
-  updateSession(session.id, { model });
-  res.json({ ok: true, model, live: !!handle });
+  updateSession(session.id, { model: selection.model, provider: selection.provider });
+  res.json({ ok: true, model: selection.model, provider: selection.provider, live: !!handle });
 });
 
 router.delete("/api/sessions/:sessionId", requireAuth, (req, res) => {

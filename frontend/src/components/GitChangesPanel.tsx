@@ -231,7 +231,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
           <div className="git-review-layout">
             <div className="git-file-browser">
               <label className="git-select-all">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label={allSelected ? "Deselect all changed files" : "Select all changed files"} />
                 <span>{allSelected ? "Deselect all" : "Select all"}</span>
               </label>
               <ul className="git-file-list">
@@ -242,8 +242,9 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
                         type="checkbox"
                         checked={selected.has(f.path)}
                         onChange={() => toggle(f.path)}
+                        aria-label={`${selected.has(f.path) ? "Deselect" : "Select"} ${f.path} for commit`}
                       />
-                      <span className="git-status-dot" style={{ background: STATUS_COLOR[f.status] }} title={f.status} />
+                      <span className="git-status-dot" style={{ background: STATUS_COLOR[f.status] }} title={f.status} aria-hidden="true" />
                       <button className="git-file-info" onClick={() => openEditor(f.path, f.status)} aria-label={`Open ${f.path} in editor`}>
                         <span className="git-file-name">{basename(f.path)}</span>
                         <span className="git-file-dir">{dirname(f.path)}</span>
@@ -259,16 +260,18 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
                         className={`git-chev ${expanded === f.path ? "open" : ""}`}
                         onClick={() => loadDiff(f.path)}
                         title="View diff"
+                        aria-label={`${expanded === f.path ? "Hide" : "View"} diff for ${f.path}`}
+                        aria-expanded={expanded === f.path}
                       >›</button>
                     </div>
                   </li>
                 ))}
               </ul>
             </div>
-            <section className="git-diff-pane" aria-live="polite">
+            <section className="git-diff-pane" aria-live="polite" aria-label="Selected file diff">
               {expanded ? <>
                 <div className="git-diff-pane-head"><b>{basename(expanded)}</b><span>Unified diff</span></div>
-                {loadingDiff ? <div className="git-diff-loading">Loading diff…</div> : <DiffView text={diff} />}
+                {loadingDiff ? <div className="git-diff-loading" role="status">Loading diff…</div> : <DiffView text={diff} />}
               </> : <div className="git-diff-empty"><span>⌘</span><b>Select a file to inspect its diff</b><small>Review changes before you commit and push.</small></div>}
             </section>
           </div>
@@ -284,11 +287,11 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
       )}
 
       {msg && (
-        <div className={`git-msg git-msg-${msg.kind}`}>
+        <div className={`git-msg git-msg-${msg.kind}`} role={msg.kind === "error" ? "alert" : "status"}>
           {msg.kind === "success" ? <CheckIcon /> : <WarnIcon />}
           <span className="git-msg-text">{msg.text}</span>
           {msg.kind === "error" && (
-            <button className="git-msg-dismiss" onClick={() => setMsg(null)} title="Dismiss">
+            <button className="git-msg-dismiss" onClick={() => setMsg(null)} title="Dismiss" aria-label="Dismiss Git error">
               <CloseIcon />
             </button>
           )}
@@ -302,12 +305,14 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
         <input
           className="git-input"
           placeholder="Summary (required)"
+          aria-label="Commit summary"
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
         />
         <textarea
           className="git-input git-textarea"
           placeholder="Description (optional)"
+          aria-label="Commit description"
           value={description}
           rows={2}
           onChange={(e) => setDescription(e.target.value)}

@@ -3,8 +3,8 @@
 // server browser) driven over its REST action API. No local browser install.
 //
 // Auth: dev-token (DEV_AUTH_TOKEN) injected into the page's localStorage, so the
-// whole app — REST, SSE, and the terminal WebSocket — runs authenticated as the
-// dev user against prod, with no OAuth login step.
+// whole app — REST, SSE, and the terminal capability check — runs authenticated
+// as the dev user against hosted prod, with no OAuth login step.
 //
 // Usage:
 //   DEV_TOKEN=<prod DEV_AUTH_TOKEN> node e2e/run-rest.mjs
@@ -118,7 +118,6 @@ try {
   });
 
   let sessionUrl = null;
-  let terminalAvailable = true;
   await flow("open-session", async () => {
     await call("browser_click", { selector: ".space-item", timeout: 10000 });
     await call("browser_wait", { selector: ".space-sessions", timeout: 8000 });
@@ -167,75 +166,59 @@ try {
     console.log(`   → ${target}`);
   });
 
-  await flow("terminal-open", async () => {
-    // Wait for any in-flight chat turn to settle first: opening the terminal
-    // reclaims the chat agent (mutex), and getTerminal waits on a running turn.
-    // If we don't let it finish, the terminal pty never spawns within the timeout.
+  let terminalGateOpened = false;
+  await flow("hosted-terminal-disabled", async () => {
+    // Hosted production must fail closed even for an authenticated, paid user.
+    // Wait for chat to settle so an agent-busy response cannot mask the
+    // deployment capability decision.
     for (let i = 0; i < 20; i++) {
       const busy = await jval(await call("browser_evaluate", { script: "return !!document.querySelector('.stream-cursor, .msg-typing')" }));
       if (!busy) break;
       await call("browser_wait", { time: 3000 });
     }
-    await call("browser_evaluate", { script: "[...document.querySelectorAll('.workspace-tabs button')].find(b=>b.textContent.trim()==='Terminal')?.click()" });
-    await call("browser_wait", { selector: ".terminal-container", timeout: 12000 });
-    // wait until xterm has rendered rows (pi TUI painted)
-    let ok = false;
-    for (let i = 0; i < 20; i++) {
-      await call("browser_wait", { time: 2500 });
-      const v = await jval(await call("browser_evaluate", { script: "return (document.querySelector('.xterm-rows')?.textContent||'').trim().length > 2 || !!document.querySelector('.terminal-container canvas')" }));
-      if (v) { ok = true; break; }
-    }
-    if (!ok) {
-      const disabled = await jval(await call("browser_evaluate", {
-        script: "return /terminal unavailable|temporarily unavailable/i.test(document.querySelector('.terminal-container')?.textContent || '')",
-      }));
-      if (disabled) {
-        terminalAvailable = false;
-        await shot("05-terminal-disabled");
-        console.log("   terminal safety gate shown (sandboxed host)");
-        return;
-      }
-      throw new Error("terminal never rendered");
-    }
-    await shot("05-terminal");
-    console.log("   pi TUI painted");
-  });
 
-  await flow("terminal-survival", async () => {
-    if (!terminalAvailable) {
-      console.log("   (skipped: terminal safety gate is active)");
+    const initiallyVisible = await jval(await call("browser_evaluate", {
+      script: "return [...document.querySelectorAll('.workspace-tabs button')].some(b=>b.textContent.trim()==='Terminal')",
+    }));
+    if (!initiallyVisible) {
+      console.log("   terminal capability already hidden");
       return;
     }
-    // marker via /name so the live session has unique state
-    const marker = `E2E-${Date.now().toString(36)}`;
-    await call("browser_evaluate", { script: "document.querySelector('.terminal-container').click()" });
-    await call("browser_type", { selector: ".terminal-container", text: `/name ${marker}\n`, delay: 8 });
-    await call("browser_wait", { time: 2500 });
-    await shot("06-before");
-    // simulate browser-close: tear down the WS by clearing session state + a fresh
-    // navigation. The server pty must survive and re-attach (buffer replay + redraw).
-    await call("browser_clear_session", {});
-    await call("browser_evaluate", { script: INJECT });
-    await call("browser_navigate", { url: sessionUrl, waitUntil: "networkidle", timeout: 30000 });
-    await call("browser_evaluate", { script: "[...document.querySelectorAll('.workspace-tabs button')].find(b=>b.textContent.trim()==='Terminal')?.click()" });
+
+    await call("browser_evaluate", { script: "[...document.querySelectorAll('.workspace-tabs button')].find(b=>b.textContent.trim()==='Terminal').click()" });
     await call("browser_wait", { selector: ".terminal-container", timeout: 12000 });
-    let ok = false;
-    for (let i = 0; i < 14; i++) {
+    let state = null;
+    for (let i = 0; i < 12; i++) {
       await call("browser_wait", { time: 2500 });
-      const v = await jval(await call("browser_evaluate", { script: "return (document.querySelector('.xterm-rows')?.textContent||'').trim().length > 2" }));
-      if (v) { ok = true; break; }
+      state = await jval(await call("browser_evaluate", {
+        script: `const text=(document.querySelector('.terminal-container')?.textContent||'').toLowerCase();
+          return {
+            unavailable: text.includes('terminal unavailable') && text.includes('not available on waynode cloud'),
+            hidden: ![...document.querySelectorAll('.workspace-tabs button')].some(b=>b.textContent.trim()==='Terminal'),
+            output: (document.querySelector('.xterm-rows')?.textContent||'').trim().length,
+          }`,
+      }));
+      if (state?.unavailable && state?.hidden) break;
     }
-    if (!ok) throw new Error("terminal blank after clear_session — pty did NOT survive");
-    await shot("07-after");
-    const len = await jval(await call("browser_evaluate", { script: "return (document.querySelector('.xterm-rows')?.textContent||'').length" }));
-    console.log(`   re-attached in fresh session (${len} chars) — pty survived`);
+    if (!state?.unavailable) throw new Error("hosted terminal did not show its capability denial");
+    if (!state.hidden) throw new Error("Terminal control remained visible after hosted denial");
+    if (state.output > 0) throw new Error("hosted terminal produced interactive output before denial");
+    terminalGateOpened = true;
+    await shot("05-terminal-disabled");
+    console.log("   hosted capability denied and hidden");
   });
 
-  await flow("mutex", async () => {
-    await call("browser_evaluate", { script: "[...document.querySelectorAll('.workspace-tabs button')].find(b=>b.textContent.trim()==='Chat')?.click()" });
+  await flow("chat-after-terminal-gate", async () => {
+    if (terminalGateOpened) {
+      await call("browser_evaluate", { script: "[...document.querySelectorAll('.terminal-state-actions button')].find(b=>b.textContent.trim()==='Return to chat')?.click()" });
+    }
     await call("browser_wait", { selector: ".composer-input", timeout: 10000 });
-    await shot("08-back-to-chat");
-    console.log("   chat re-acquired (terminal reclaimed)");
+    const hidden = await jval(await call("browser_evaluate", {
+      script: "return ![...document.querySelectorAll('.workspace-tabs button')].some(b=>b.textContent.trim()==='Terminal')",
+    }));
+    if (!hidden) throw new Error("Terminal control reappeared after returning to chat");
+    await shot("06-back-to-chat");
+    console.log("   chat remained available; terminal stayed hidden");
   });
 
 } finally {

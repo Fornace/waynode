@@ -46,8 +46,6 @@
 			</dict>
 		</dict>
 	</dict>
-	<key>WaynodeKeychainAccessGroup</key>
-	<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

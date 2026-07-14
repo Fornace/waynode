@@ -1,0 +1,13 @@
+# Optional Waynode Cloud/Fornace network attachment.
+# Ordinary self-hosters should use docker-compose.yml by itself.
+services:
+  waynode:
+    container_name: waynode
+    networks:
+      - default
+      - fornace-llm
+
+networks:
+  fornace-llm:
+    external: true
+    name: fornace-llm_default

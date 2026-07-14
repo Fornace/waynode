@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { Session, GoalStatus } from "../types";
-import { MessageRow } from "./ChatMessage";
+import { MessageRow, StartingAgent } from "./ChatMessage";
+import { ChatComposer } from "./ChatComposer";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
-import { isTouchDevice } from "../utils/device";
 
 interface ChatTabProps {
   session: Session;
@@ -16,6 +16,7 @@ export function ChatTab({ session }: ChatTabProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [showJump, setShowJump] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -57,6 +58,7 @@ export function ChatTab({ session }: ChatTabProps) {
     const onScroll = () => {
       const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
       stickToBottom.current = dist < 120; // near bottom → keep pinned
+      setShowJump(!stickToBottom.current);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
@@ -130,6 +132,18 @@ export function ChatTab({ session }: ChatTabProps) {
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   };
 
+  const jumpToLatest = () => {
+    stickToBottom.current = true;
+    setShowJump(false);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  };
+
+  const quoteInReply = (markdown: string) => {
+    const quote = markdown.split("\n").map((line) => `> ${line}`).join("\n");
+    setInput((current) => `${current.trim() ? `${current.trim()}\n\n` : ""}${quote}\n\n`);
+    requestAnimationFrame(() => { autosize(); inputRef.current?.focus(); });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -173,31 +187,27 @@ export function ChatTab({ session }: ChatTabProps) {
   return (
     <div className="chat-tab">
       {goal && goal.status && (
-        <div className="goal-banner">
+        <div className="goal-banner" role="status" aria-live="polite">
           <span className={`goal-badge ${goal.status}`}>
-            {goal.status === "active" && "●"}
-            {goal.status === "paused" && "⏸"}
-            {goal.status === "complete" && "✓"}
-            {goal.status === "budgetLimited" && "⚠"}
-            {" "}Goal: {goal.status}
+            <span aria-hidden="true" /> Goal · {goal.status === "budgetLimited" ? "budget limited" : goal.status}
           </span>
         </div>
       )}
 
-      <div className="chat-messages" ref={messagesRef}>
+      <div className="chat-messages" ref={messagesRef} aria-label="Session conversation" aria-busy={streaming}>
+        <div className="chat-lane">
         {state.items.length === 0 && !streaming && (
           <div className="chat-empty">
-            <div className="chat-empty-mark" aria-hidden="true">✦</div>
             <div className="chat-empty-title">What should we do in {session.title || "this workspace"}?</div>
             <div className="chat-empty-desc">The agent can inspect the repository, make changes, run checks, and leave the worktree ready for review.</div>
             <div className="chat-starters" aria-label="Suggested prompts">
               {[
-                ["⌕", "Explain this codebase"],
-                ["◇", "Find and fix a bug"],
-                ["＋", "Build a focused feature"],
-              ].map(([icon, prompt]) => (
+                "Explain this codebase",
+                "Find and fix a bug",
+                "Build a focused feature",
+              ].map((prompt) => (
                 <button key={prompt} onClick={() => { setInput(prompt); requestAnimationFrame(() => inputRef.current?.focus()); }}>
-                  <span aria-hidden="true">{icon}</span><b>{prompt}</b><i>→</i>
+                  <b>{prompt}</b><i aria-hidden="true">→</i>
                 </button>
               ))}
             </div>
@@ -211,31 +221,23 @@ export function ChatTab({ session }: ChatTabProps) {
             // The stream flag is global to the session, not per-message — only
             // the very last item in the list can be the one currently being
             // generated. Without this guard, every historical assistant
-            // message would re-show the typing dots / blinking cursor
+            // message would re-show the active generation state
             // whenever ANY turn (even a later, unrelated one) is streaming.
             streaming={streaming && idx === state.items.length - 1}
+            phase={state.status}
+            onQuote={quoteInReply}
           />
         ))}
-        {/* Between sending and the server's `message_start` event, the last
-            item is still the user's own just-sent message (no assistant item
-            exists yet to host the dots inside MessageRow). Without this,
-            there's a multi-second window — agent boot + model latency —
-            where NOTHING indicates the app is working. Render the same
-            three-dot affordance as a standalone placeholder in that gap. */}
+        {/* Between send and the server's `message_start`, there is no
+            assistant item yet. Keep that first-token wait legible. */}
         {streaming && state.items[state.items.length - 1]?.role === "user" && (
-          <div className="msg msg-assistant">
-            <div className="msg-avatar">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-            </div>
-            <div className="msg-body">
-              <div className="msg-typing"><span /><span /><span /></div>
-            </div>
-          </div>
+          <div className="agent-preflight"><StartingAgent phase={state.status} /></div>
         )}
         <div ref={bottomRef} />
+        </div>
       </div>
 
-      {state.status && <div className="chat-status" role="status">{state.status}</div>}
+      {showJump && <button className="chat-jump" type="button" onClick={jumpToLatest}>Jump to latest ↓</button>}
       {uploadError && (
         <div className="composer-notice" role="alert">
           <span>{uploadError}</span>
@@ -243,115 +245,22 @@ export function ChatTab({ session }: ChatTabProps) {
         </div>
       )}
 
-      <div className="composer">
-        <div className="composer-inner">
-          <input 
-            type="file" 
-            multiple 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            style={{ display: "none" }} 
-          />
-          <button 
-            className="attach-btn" 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || streaming}
-            title="Upload files"
-          >
-            {uploading ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="spin"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-            )}
-          </button>
-          
-          <textarea
-            ref={inputRef}
-            className="composer-input"
-            placeholder={streaming ? "Type a follow-up…" : "Message the agent…"}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              autosize();
-            }}
-            onKeyDown={handleKeyDown}
-            rows={1}
-          />
-          <div className="send-group">
-            {isTouchDevice() && !streaming && (
-              <button className="newline-btn" onClick={insertNewline} title="New line">
-                <NewlineIcon />
-              </button>
-            )}
-            {streaming ? (
-              <button className="send-btn send-stop" onClick={handleAbort} title="Stop">
-                <StopIcon />
-              </button>
-            ) : (
-              <>
-                <div className="send-split">
-                  <button
-                    className="send-btn"
-                    onClick={() => sendMessage(false)}
-                    disabled={!input.trim()}
-                    title="Send"
-                  >
-                    <SendIcon />
-                  </button>
-                  <button
-                    className="send-caret"
-                    onClick={() => setShowDropdown((v) => !v)}
-                    title="More options"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-                  </button>
-                </div>
-                {showDropdown && (
-                  <div className="send-menu">
-                    <button className="send-menu-item" onClick={() => sendMessage(false)}>
-                      <span className="send-menu-label">Send</span>
-                      <span className="send-menu-desc">Normal conversation</span>
-                    </button>
-                    <button className="send-menu-item goal" onClick={() => sendMessage(true)}>
-                      <span className="send-menu-label">🎯 Send as Goal</span>
-                      <span className="send-menu-desc">Autonomous: creates goal, runs until complete</span>
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      <ChatComposer
+        input={input}
+        streaming={streaming}
+        uploading={uploading}
+        showDropdown={showDropdown}
+        inputRef={inputRef}
+        fileInputRef={fileInputRef}
+        onInput={setInput}
+        onAutosize={autosize}
+        onKeyDown={handleKeyDown}
+        onFileUpload={handleFileUpload}
+        onInsertNewline={insertNewline}
+        onAbort={handleAbort}
+        onSend={sendMessage}
+        onToggleDropdown={() => setShowDropdown((value) => !value)}
+      />
     </div>
-  );
-}
-
-// ── Inline SVG icons ──
-
-function SendIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-    </svg>
-  );
-}
-
-function StopIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-      <rect x="5" y="5" width="14" height="14" rx="2" />
-    </svg>
-  );
-}
-
-function NewlineIcon() {
-  // Standard "return/newline" glyph (corner-down-left arrow), distinct from
-  // the send paper-plane so it doesn't read as a second submit action.
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 10 4 15 9 20" />
-      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
-    </svg>
   );
 }

@@ -1,25 +1,32 @@
 services:
   waynode:
-    build: .
-    container_name: waynode
+    build:
+      context: .
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
     ports:
-      - "3000:3000"
+      # Loopback is the safe default. Set WAYNODE_BIND_ADDRESS=0.0.0.0 only
+      # when a firewall or reverse proxy is ready to receive public traffic.
+      - "${WAYNODE_BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
     volumes:
       - waynode-data:/data
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
-      - DATA_DIR=/data
-    networks:
-      - default
-      - fornace-net
-
-networks:
-  fornace-net:
-    external: true
-    name: fornace-llm_default
+      NODE_ENV: production
+      DATA_DIR: /data
+      PORT: 3000
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/auth/me').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
 
 volumes:
   waynode-data:

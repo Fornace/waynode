@@ -37,6 +37,7 @@ try {
   const trialOrg = createOrg({ name: "Trial org", userId: "owner" });
   assert.equal(getSubscription(trialOrg.id).plan, "trial");
   assert.equal(getSubscription(trialOrg.id).status, "trialing");
+  assert.equal(getSubscription(trialOrg.id).stripe_customer_id, null);
   const invite = createInvite(trialOrg.id, { createdBy: "owner" });
   assert.equal(acceptInvite(invite.token, "guest").error, "seat_limit");
 

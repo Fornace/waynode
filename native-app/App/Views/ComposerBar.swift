@@ -25,6 +25,7 @@ struct ComposerBar: View {
     var onAbort: () -> Void
 
     @State private var isGoalMode: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,13 +36,16 @@ struct ComposerBar: View {
                         .font(.caption2)
                     Text(error)
                         .font(.caption2)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                 }
                 .foregroundStyle(.red)
                 .padding(.horizontal, 16)
                 .padding(.top, 6)
                 .transition(.opacity)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(errorAccessibilityLabel(error))
+                .accessibilityIdentifier("composer.error")
             }
 
             // Goal-mode hint strip
@@ -67,7 +71,7 @@ struct ComposerBar: View {
                 // Goal toggle
                 Button {
                     Haptics.light()
-                    withAnimation(.smooth) { isGoalMode.toggle() }
+                    withAnimation(reduceMotion ? nil : .smooth) { isGoalMode.toggle() }
                 } label: {
                     Image(systemName: isGoalMode ? "target" : "scope")
                         .font(.system(size: 17, weight: .medium))
@@ -77,6 +81,8 @@ struct ComposerBar: View {
                 .buttonStyle(.plain)
                 .disabled(isGoalActive)
                 .accessibilityLabel(isGoalMode ? "Disable goal mode" : "Enable goal mode")
+                .accessibilityIdentifier("composer.goal")
+                .frame(minWidth: 44, minHeight: 44)
 
                 // Auto-growing text field — the key fix.
                 // TextField(axis: .vertical) + lineLimit properly constrains
@@ -88,6 +94,9 @@ struct ComposerBar: View {
                     .padding(.horizontal, 2)
                     .padding(.vertical, 7)
                     .frame(minHeight: 32)
+                    .accessibilityLabel("Message")
+                    .accessibilityHint("Type a message for the coding agent")
+                    .accessibilityIdentifier("composer.input")
 
                 // Send / Abort
                 sendOrAbortButton
@@ -110,13 +119,13 @@ struct ComposerBar: View {
             .padding(.horizontal, 10)
             .padding(.top, 4)
             .padding(.bottom, 6)
-            .animation(.smooth, value: isFocused.wrappedValue)
+            .animation(reduceMotion ? nil : .smooth, value: isFocused.wrappedValue)
         }
         .background(.bar)
-        .animation(.smooth, value: error != nil)
-        .animation(.smooth, value: isSending)
-        .animation(.smooth, value: isGoalActive)
-        .animation(.smooth, value: isGoalMode)
+        .animation(reduceMotion ? nil : .smooth, value: error != nil)
+        .animation(reduceMotion ? nil : .smooth, value: isSending)
+        .animation(reduceMotion ? nil : .smooth, value: isGoalActive)
+        .animation(reduceMotion ? nil : .smooth, value: isGoalMode)
     }
 
     // MARK: - Send / Abort
@@ -134,6 +143,8 @@ struct ComposerBar: View {
             .buttonStyle(.plain)
             .transition(.scale.combined(with: .opacity))
             .accessibilityLabel(isGoalActive ? "Abort goal" : "Stop generation")
+            .accessibilityIdentifier("composer.stop")
+            .frame(minWidth: 44, minHeight: 44)
         } else {
             Button {
                 send()
@@ -151,6 +162,10 @@ struct ComposerBar: View {
             .disabled(!canSend)
             .transition(.scale.combined(with: .opacity))
             .accessibilityLabel("Send message")
+            .accessibilityIdentifier("composer.send")
+            .accessibilityHint("Sends the current draft")
+            .keyboardShortcut(.return, modifiers: .command)
+            .frame(minWidth: 44, minHeight: 44)
         }
     }
 
@@ -171,9 +186,14 @@ struct ComposerBar: View {
         Haptics.light()
         onSend(trimmed, isGoalMode)
         if isGoalMode {
-            withAnimation(.smooth) { isGoalMode = false }
+            withAnimation(reduceMotion ? nil : .smooth) { isGoalMode = false }
         }
         // Keep focus so the keyboard stays open for the next message
         isFocused.wrappedValue = true
+    }
+
+    private func errorAccessibilityLabel(_ error: String) -> String {
+        guard !text.isEmpty else { return error }
+        return "Message not sent. \(error). Your draft is still available. Send again to retry."
     }
 }
