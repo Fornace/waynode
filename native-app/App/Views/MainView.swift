@@ -115,6 +115,7 @@ struct MainView: View {
 private struct WorkbenchView: View {
     @Environment(AppModel.self) private var appModel
     @State private var showingAccount = false
+    @State private var showingCloneSheet = false
     @State private var showingNewSession = false
     @State private var newSessionTitle = ""
     @State private var sessionError: String?
@@ -123,18 +124,39 @@ private struct WorkbenchView: View {
         @Bindable var model = appModel
         NavigationSplitView {
             List(selection: $model.selectedSpaceId) {
-                ForEach(model.spaces) { space in
-                    SpaceRow(space: space)
-                        .tag(space.id)
+                if model.spaces.isEmpty {
+                    if model.isLoadingSpaces {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else {
+                        ContentUnavailableView {
+                            Label("No Workspaces", systemImage: "folder.badge.plus")
+                        } description: {
+                            Text("Clone a repository to create your first persistent workspace.")
+                        } actions: {
+                            Button("Clone Repository") { showingCloneSheet = true }
+                                .buttonStyle(.glassProminent)
+                        }
                         .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                    }
+                } else {
+                    ForEach(model.spaces) { space in
+                        SpaceRow(space: space)
+                            .tag(space.id)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                    }
                 }
             }
             .listStyle(.sidebar)
             .navigationTitle("Workspaces")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        showingCloneSheet = true
+                    } label: {
+                        Label("Clone Repository", systemImage: "plus")
+                    }
                     Button {
                         showingAccount = true
                     } label: {
@@ -157,12 +179,38 @@ private struct WorkbenchView: View {
         } content: {
             List(selection: $model.selectedSessionId) {
                 if let spaceId = model.selectedSpaceId {
-                    ForEach(model.sessions(forSpace: spaceId)) { session in
-                        SessionRow(session: session)
-                            .tag(session.id)
+                    let sessions = model.sessions(forSpace: spaceId)
+                    if sessions.isEmpty {
+                        if model.isLoadingSessions {
+                            HStack { Spacer(); ProgressView(); Spacer() }
+                        } else if let error = model.sessionsError {
+                            ContentUnavailableView {
+                                Label("Couldn’t Load Sessions", systemImage: "wifi.exclamationmark")
+                            } description: {
+                                Text(error)
+                            } actions: {
+                                Button("Retry") { Task { await model.refreshSessions(spaceId: spaceId) } }
+                            }
                             .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                        } else {
+                            ContentUnavailableView {
+                                Label("No Sessions", systemImage: "plus.bubble")
+                            } description: {
+                                Text("Start a focused conversation inside this workspace.")
+                            } actions: {
+                                Button("New Session", action: openNewSession)
+                                    .buttonStyle(.glassProminent)
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                    } else {
+                        ForEach(sessions) { session in
+                            SessionRow(session: session)
+                                .tag(session.id)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                        }
                     }
                 } else {
                     ContentUnavailableView("Choose a workspace", systemImage: "folder")
@@ -173,9 +221,7 @@ private struct WorkbenchView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        newSessionTitle = ""
-                        sessionError = nil
-                        showingNewSession = true
+                        openNewSession()
                     } label: {
                         Label("New Session", systemImage: "plus.bubble")
                     }
@@ -196,6 +242,9 @@ private struct WorkbenchView: View {
         .sheet(isPresented: $showingAccount) {
             NavigationStack { AccountScene() }
         }
+        .sheet(isPresented: $showingCloneSheet) {
+            CloneSheet()
+        }
         .sheet(isPresented: $showingNewSession) {
             NewSessionSheet(
                 title: $newSessionTitle,
@@ -205,6 +254,12 @@ private struct WorkbenchView: View {
             )
             .presentationDetents([.medium])
         }
+    }
+
+    private func openNewSession() {
+        newSessionTitle = ""
+        sessionError = nil
+        showingNewSession = true
     }
 
     private func createSession() {

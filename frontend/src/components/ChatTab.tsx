@@ -15,6 +15,7 @@ export function ChatTab({ session }: ChatTabProps) {
   const [goal, setGoal] = useState<GoalStatus | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const messagesRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -134,6 +135,7 @@ export function ChatTab({ session }: ChatTabProps) {
     if (!files || files.length === 0) return;
     
     setUploading(true);
+    setUploadError("");
     try {
       const formData = new FormData();
       Array.from(files).forEach(f => formData.append("files", f));
@@ -158,10 +160,10 @@ export function ChatTab({ session }: ChatTabProps) {
         });
         autosize();
       } else {
-        alert("Upload failed: " + (data.err || "Unknown error"));
+        setUploadError(data.err || "The files could not be uploaded.");
       }
-    } catch (err: any) {
-      alert("Upload failed: " + err.message);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "The files could not be uploaded.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -185,9 +187,20 @@ export function ChatTab({ session }: ChatTabProps) {
       <div className="chat-messages" ref={messagesRef}>
         {state.items.length === 0 && !streaming && (
           <div className="chat-empty">
-            <div className="chat-empty-icon">💬</div>
-            <div className="chat-empty-title">Start a conversation</div>
-            <div className="chat-empty-desc">Send a message, or use Goal mode for autonomous execution.</div>
+            <div className="chat-empty-mark" aria-hidden="true">✦</div>
+            <div className="chat-empty-title">What should we do in {session.title || "this workspace"}?</div>
+            <div className="chat-empty-desc">The agent can inspect the repository, make changes, run checks, and leave the worktree ready for review.</div>
+            <div className="chat-starters" aria-label="Suggested prompts">
+              {[
+                ["⌕", "Explain this codebase"],
+                ["◇", "Find and fix a bug"],
+                ["＋", "Build a focused feature"],
+              ].map(([icon, prompt]) => (
+                <button key={prompt} onClick={() => { setInput(prompt); requestAnimationFrame(() => inputRef.current?.focus()); }}>
+                  <span aria-hidden="true">{icon}</span><b>{prompt}</b><i>→</i>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -222,7 +235,13 @@ export function ChatTab({ session }: ChatTabProps) {
         <div ref={bottomRef} />
       </div>
 
-      {state.status && <div className="chat-status">{state.status}</div>}
+      {state.status && <div className="chat-status" role="status">{state.status}</div>}
+      {uploadError && (
+        <div className="composer-notice" role="alert">
+          <span>{uploadError}</span>
+          <button onClick={() => setUploadError("")} aria-label="Dismiss upload error">×</button>
+        </div>
+      )}
 
       <div className="composer">
         <div className="composer-inner">

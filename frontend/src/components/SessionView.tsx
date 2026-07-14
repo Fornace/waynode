@@ -23,6 +23,7 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [currentModel, setCurrentModel] = useState(session.model || "");
   const [gitSnapshot, setGitSnapshot] = useState<GitSnapshot | null>(null);
+  const [modelError, setModelError] = useState("");
 
   // Global shortcut (Layer 3): Ctrl/Cmd+Shift+T toggles Chat <-> Terminal when
   // no input or modal is focused. Reserved chord per docs/KEYBOARD-CONTRACT.md.
@@ -59,12 +60,13 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
 
   const handleModelChange = async (model: string) => {
     const prev = currentModel;
+    setModelError("");
     setCurrentModel(model); // optimistic — reverts below if the live agent rejects it
     try {
       await api.sessions.setModel(session.id, model);
     } catch (err) {
       setCurrentModel(prev);
-      console.error("[model] switch failed:", (err as Error).message);
+      setModelError(err instanceof Error ? err.message : "The model could not be changed.");
     }
   };
 
@@ -83,11 +85,11 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
         </div>
         
         {/* Modern Model Selector */}
-        <div style={{ position: "relative" }}>
+        <div className="model-select-wrap">
           <select className="model-select" value={currentModel} onChange={(e) => handleModelChange(e.target.value)}>
             {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--text-dim)" }}>
+          <div className="model-select-chevron" aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </div>
         </div>
@@ -109,6 +111,12 @@ export function SessionView({ session, space, sidebarOpen, onToggleSidebar, onOp
         <button className={gitOpen ? "active" : ""} onClick={onToggleGit}>Git {gitSnapshot && gitSnapshot.files.length > 0 ? gitSnapshot.files.length : ""}</button>
         <button className={activeTab === "terminal" ? "active" : ""} onClick={() => setActiveTab("terminal")}>Terminal</button>
       </div>
+      {modelError && (
+        <div className="workspace-notice" role="alert">
+          <span>Couldn’t change model: {modelError}</span>
+          <button onClick={() => setModelError("")} aria-label="Dismiss model error">×</button>
+        </div>
+      )}
       </div>
 
       <div className="session-area">
