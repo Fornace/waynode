@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { ChatItem, Block } from "../types";
+import { appendText, appendThinking, appendTool, setToolOutput } from "./sessionBlocks";
 
 /**
  * sessionStore
@@ -200,39 +201,6 @@ function applyEvent(e: SessionEntry, ev: any) {
       emit(e);
       return;
   }
-}
-
-function appendText(blocks: Block[], text: string): Block[] {
-  const out = blocks.slice();
-  const last = out[out.length - 1];
-  if (last && last.type === "text") out[out.length - 1] = { ...last, text: last.text + text };
-  else out.push({ type: "text", text });
-  return out;
-}
-
-function appendThinking(blocks: Block[], text: string): Block[] {
-  const out = blocks.slice();
-  const last = out[out.length - 1];
-  if (last && last.type === "thinking") out[out.length - 1] = { ...last, text: last.text + text };
-  else out.push({ type: "thinking", text });
-  return out;
-}
-
-function appendTool(blocks: Block[], t: { id: string; name: string; args: any }): Block[] {
-  const out = blocks.slice();
-  if (!out.some((b) => b.type === "tool" && b.id === t.id)) {
-    out.push({ type: "tool", id: t.id, name: t.name, args: t.args, output: "", status: "running" });
-  }
-  return out;
-}
-
-function setToolOutput(
-  blocks: Block[],
-  id: string,
-  output: string,
-  status: "running" | "done" | "error"
-): Block[] {
-  return blocks.map((b) => (b.type === "tool" && b.id === id ? { ...b, output, status } : b));
 }
 
 // ── SSE lifecycle ──

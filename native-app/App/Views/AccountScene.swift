@@ -12,23 +12,23 @@ import WaynodeCore
 //   • Logout
 
 struct AccountScene: View {
-    @Environment(AppModel.self) private var appModel
-    @Environment(\.openURL) private var openURL
-    @State private var tokens: [APIClient.TokenInfo] = []
-    @State private var newToken: String?
-    @State private var isLoadingTokens = false
-    @State private var isCreatingToken = false
-    @State private var error: String?
-    @State private var showingServerSheet = false
-    @State private var serverURL = ""
-    @State private var tokenToRevoke: APIClient.TokenInfo?
-    @State private var showingLogoutConfirm = false
-    @State private var showingNewTokenSheet = false
-    @State private var hostedBillingEnabled = false
-    @State private var billing: APIClient.BillingInfo?
-    @State private var isLoadingBilling = false
-    @State private var billingBusy = false
-    @State private var billingError: String?
+    @Environment(AppModel.self) var appModel
+    @Environment(\.openURL) var openURL
+    @State var tokens: [APIClient.TokenInfo] = []
+    @State var newToken: String?
+    @State var isLoadingTokens = false
+    @State var isCreatingToken = false
+    @State var error: String?
+    @State var showingServerSheet = false
+    @State var serverURL = ""
+    @State var tokenToRevoke: APIClient.TokenInfo?
+    @State var showingLogoutConfirm = false
+    @State var showingNewTokenSheet = false
+    @State var hostedBillingEnabled = false
+    @State var billing: APIClient.BillingInfo?
+    @State var isLoadingBilling = false
+    @State var billingBusy = false
+    @State var billingError: String?
 
     var body: some View {
         List {
@@ -328,185 +328,4 @@ struct AccountScene: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
-    // MARK: - Hosted billing actions
-
-    private func loadBilling() async {
-        guard let api = appModel.currentAPI() else { return }
-        isLoadingBilling = true
-        billingError = nil
-        defer { isLoadingBilling = false }
-        do {
-            hostedBillingEnabled = try await api.hostedBillingEnabled()
-            guard hostedBillingEnabled, let org = appModel.orgs.first else { return }
-            billing = try await api.billing(orgId: org.id)
-        } catch {
-            billingError = error.localizedDescription
-        }
-    }
-
-    private func beginCheckout(_ orgId: String, plan: String) async {
-        guard let api = appModel.currentAPI() else { return }
-        billingBusy = true
-        billingError = nil
-        defer { billingBusy = false }
-        do {
-            openURL(try await api.startCheckout(orgId: orgId, plan: plan))
-        } catch {
-            billingError = error.localizedDescription
-        }
-    }
-
-    private func manageBilling(_ orgId: String) async {
-        guard let api = appModel.currentAPI() else { return }
-        billingBusy = true
-        billingError = nil
-        defer { billingBusy = false }
-        do {
-            openURL(try await api.openBillingPortal(orgId: orgId))
-        } catch {
-            billingError = error.localizedDescription
-        }
-    }
-
-    // MARK: - Logout
-
-    private var logoutSection: some View {
-        Section {
-            Button(role: .destructive) {
-                showingLogoutConfirm = true
-            } label: {
-                Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
-                    .frame(maxWidth: .infinity)
-            }
-        } footer: {
-            Text("You will need to sign in again to access your spaces.")
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var initials: String {
-        guard let name = appModel.auth.user?.name, !name.isEmpty else { return "?" }
-        let parts = name.split(separator: " ")
-        if parts.count >= 2 {
-            return String(parts[0].prefix(1) + parts[1].prefix(1)).uppercased()
-        }
-        return String(name.prefix(2)).uppercased()
-    }
-
-    // MARK: - Token actions
-
-    private func loadTokens() async {
-        guard let api = appModel.currentAPI() else { return }
-        isLoadingTokens = true
-        error = nil
-        do {
-            tokens = try await api.listTokens()
-        } catch {
-            self.error = error.localizedDescription
-        }
-        isLoadingTokens = false
-    }
-
-    private func createToken() async {
-        guard let api = appModel.currentAPI() else { return }
-        error = nil
-        isCreatingToken = true
-        do {
-            let label = "iOS App — \(formattedDate)"
-            let created = try await api.createToken(label: label)
-            newToken = created.token
-            await loadTokens()
-            Haptics.success()
-            showingNewTokenSheet = true
-        } catch {
-            self.error = error.localizedDescription
-            Haptics.error()
-        }
-        isCreatingToken = false
-    }
-
-    private func revokeToken(_ token: APIClient.TokenInfo) async {
-        guard let api = appModel.currentAPI() else { return }
-        do {
-            try await api.revokeToken(id: token.id)
-            await loadTokens()
-            Haptics.success()
-        } catch {
-            self.error = error.localizedDescription
-            Haptics.error()
-        }
-    }
-
-    private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter.string(from: Date())
-    }
-}
-
-// MARK: - New Token Sheet
-
-/// Shows a freshly-created token with copy button. The token is shown only
-/// once — the user must copy it before dismissing. Uses a dedicated sheet
-/// (not onDisappear) to prevent accidental clearing on scroll.
-struct NewTokenSheet: View {
-    let token: String
-    var onDone: () -> Void
-    @State private var hasCopied = false
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.green)
-
-                Text("Token Created")
-                    .font(.title2.bold())
-
-                Text("Copy this token now. For security, it will not be shown again.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-
-                // Token display — selectable for manual copy
-                Text(token)
-                    .font(.caption.monospaced())
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .frame(maxWidth: .infinity)
-                    .background(.thinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal)
-
-                Button {
-                    copyToClipboard(token)
-                    Haptics.success()
-                    hasCopied = true
-                } label: {
-                    Label(hasCopied ? "Copied!" : "Copy Token", systemImage: hasCopied ? "checkmark" : "doc.on.doc")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .padding(.horizontal)
-
-                Spacer()
-            }
-            .padding(.top, 40)
-            .navigationTitle("New Token")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        onDone()
-                    }
-                    .disabled(!hasCopied)
-                }
-            }
-            .interactiveDismissDisabled(!hasCopied)
-        }
-    }
 }

@@ -15,7 +15,8 @@
     "test:billing": "node e2e/test-billing.mjs",
     "test:app-store": "node e2e/test-app-store.mjs",
     "test:content": "node e2e/test-content.mjs",
-    "test": "npm run test:billing && npm run test:app-store && npm run test:auth && npm run test:account-deletion && npm run test:content && npm run typecheck"
+    "check:file-lengths": "node scripts/check-file-lengths.mjs",
+    "test": "npm run check:file-lengths && npm run test:billing && npm run test:app-store && npm run test:auth && npm run test:account-deletion && npm run test:content && npm run typecheck"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.11",

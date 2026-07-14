@@ -54,7 +54,7 @@ public actor APIClient {
         }
     }
 
-    private func request<T: Decodable & Sendable>(
+    func request<T: Decodable & Sendable>(
         _ path: String,
         method: String = "GET",
         body: (some Encodable & Sendable)? = nil as EmptyBody?,
@@ -69,7 +69,7 @@ public actor APIClient {
     }
 
     /// Fire-and-forget request returning void (checks for errors only).
-    private func requestVoid(
+    func requestVoid(
         _ path: String,
         method: String,
         body: (some Encodable & Sendable)? = nil as EmptyBody?,
@@ -122,7 +122,7 @@ public actor APIClient {
     }
 
     private struct ErrorBody: Decodable { let error: String }
-    private struct EmptyBody: Encodable, Sendable {}
+    struct EmptyBody: Encodable, Sendable {}
 
     // MARK: - Auth
 
@@ -363,276 +363,7 @@ public actor APIClient {
         return w.goal ?? GoalStatus()
     }
 
-    // MARK: - Git
-
-    public func getGitSnapshot(_ spaceId: String) async throws -> GitSnapshot {
-        try await request("/api/spaces/\(spaceId)/git")
-    }
-
-    public func getGitDiff(_ spaceId: String, file: String? = nil) async throws -> GitDiffResponse {
-        var query: [URLQueryItem] = []
-        if let file { query.append(.init(name: "path", value: file)) }
-        return try await request("/api/spaces/\(spaceId)/git/diff", query: query)
-    }
-
-    public struct CommitBody: Encodable, Sendable {
-        public var summary: String
-        public var description: String?
-        public var files: [String]
-        public init(summary: String, description: String? = nil, files: [String]) {
-            self.summary = summary; self.description = description; self.files = files
-        }
-    }
-
-    public struct CommitResponse: Decodable, Sendable {
-        public var ok: Bool
-        public var error: String?
-        public var commit: String?
-    }
-
-    public func commitFiles(_ spaceId: String, message: String, files: [String]) async throws -> CommitResponse {
-        try await request("/api/spaces/\(spaceId)/git/commit", method: "POST",
-                          body: CommitBody(summary: message, description: nil, files: files))
-    }
-
-    public struct SwitchBranchBody: Encodable, Sendable {
-        public var branchName: String
-        public var mode: String // "stash" | "carry" | "clean"
-        public init(branchName: String, mode: String) { self.branchName = branchName; self.mode = mode }
-    }
-
-    public func switchBranch(_ spaceId: String, branch: String, mode: String = "stash") async throws {
-        struct Resp: Decodable { let ok: Bool; let error: String? }
-        let r: Resp = try await request("/api/spaces/\(spaceId)/git/switch-branch", method: "POST",
-                                        body: SwitchBranchBody(branchName: branch, mode: mode))
-        if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Failed to switch branch") }
-    }
-
-    public func createBranch(_ spaceId: String, name: String) async throws {
-        struct Body: Encodable { let branchName: String }
-        struct Resp: Decodable { let ok: Bool; let error: String? }
-        let r: Resp = try await request("/api/spaces/\(spaceId)/git/create-branch", method: "POST",
-                                        body: Body(branchName: name))
-        if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Failed to create branch") }
-    }
-
-    public func pullBranch(_ spaceId: String) async throws {
-        struct Resp: Decodable { let ok: Bool; let error: String? }
-        let r: Resp = try await request("/api/spaces/\(spaceId)/git/pull", method: "POST")
-        if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Pull failed") }
-    }
-
-    public func pushBranch(_ spaceId: String, setUpstream: Bool = true) async throws {
-        struct Body: Encodable { let setUpstream: Bool }
-        struct Resp: Decodable { let ok: Bool; let error: String? }
-        let r: Resp = try await request("/api/spaces/\(spaceId)/git/push", method: "POST",
-                                        body: Body(setUpstream: setUpstream))
-        if !r.ok { throw APIError(statusCode: 409, message: r.error ?? "Push failed") }
-    }
-
-    // MARK: - Tokens
-
-    public struct TokenInfo: Codable, Identifiable, Sendable, Hashable {
-        public var id: String
-        public var label: String
-        public var lastUsedAt: String?
-        public var createdAt: String
-
-        // Server returns DB rows with snake_case columns (last_used_at,
-        // created_at). Explicit CodingKeys handle the mapping since we
-        // can't use .convertFromSnakeCase (it conflicts with other models
-        // that declare snake_case CodingKey rawValues).
-        enum CodingKeys: String, CodingKey {
-            case id, label
-            case lastUsedAt = "last_used_at"
-            case createdAt = "created_at"
-        }
-    }
-
-    public struct CreateTokenResponse: Decodable, Sendable {
-        public var id: String
-        public var token: String // raw token — shown once
-        public var label: String
-    }
-
-    private struct TokenListResponse: Decodable, Sendable {
-        let tokens: [TokenInfo]
-    }
-
-    public func listTokens() async throws -> [TokenInfo] {
-        let resp: TokenListResponse = try await request("/api/tokens")
-        return resp.tokens
-    }
-
-    public func createToken(label: String) async throws -> CreateTokenResponse {
-        struct Body: Encodable { let label: String }
-        return try await request("/api/tokens", method: "POST", body: Body(label: label))
-    }
-
-    public func revokeToken(id: String) async throws {
-        try await requestVoid("/api/tokens/\(id)", method: "DELETE")
-    }
-
-    // MARK: - Hosted billing
-
-    public struct BillingEnabledResponse: Decodable, Sendable {
-        public let enabled: Bool
-    }
-
-    public struct BillingInfo: Decodable, Sendable {
-        public let plan: String
-        public let status: String
-        public let currentPeriodEnd: String?
-
-        enum CodingKeys: String, CodingKey {
-            case plan, status
-            case currentPeriodEnd = "current_period_end"
-        }
-    }
-
-    private struct CheckoutResponse: Decodable, Sendable { let url: URL }
-
-    public func hostedBillingEnabled() async throws -> Bool {
-        let response: BillingEnabledResponse = try await request("/api/billing/enabled")
-        return response.enabled
-    }
-
-    public func billing(orgId: String) async throws -> BillingInfo {
-        try await request("/api/orgs/\(orgId)/billing")
-    }
-
-    public func startCheckout(orgId: String, plan: String) async throws -> URL {
-        struct Body: Encodable, Sendable { let plan: String }
-        let response: CheckoutResponse = try await request(
-            "/api/orgs/\(orgId)/billing/checkout", method: "POST", body: Body(plan: plan)
-        )
-        return response.url
-    }
-
-    public func openBillingPortal(orgId: String) async throws -> URL {
-        let response: CheckoutResponse = try await request(
-            "/api/orgs/\(orgId)/billing/portal", method: "POST"
-        )
-        return response.url
-    }
-
-    // MARK: - Models
-
-    public func listModels() async throws -> ModelsResponse {
-        try await request("/api/models")
-    }
-
-    // MARK: - Repos (GitHub / GitLab browse)
-
-    public func listGithubRepos() async throws -> [RepoGroup] {
-        try await request("/api/repos/github")
-    }
-
-    public func listGitlabRepos() async throws -> [RepoGroup] {
-        try await request("/api/repos/gitlab")
-    }
 }
-
-// MARK: - Git types (from getSnapshot)
-
-public struct GitSnapshot: Decodable, Hashable, Sendable {
-    public var currentBranch: String
-    public var detached: Bool
-    public var upstream: String?
-    public var ahead: Int
-    public var behind: Int
-    public var hasUncommittedChanges: Bool
-    public var files: [GitFile]
-    public var commits: [GitCommit]
-    public var branches: [GitBranch]
-    public var defaultBranch: String
-
-    enum CodingKeys: String, CodingKey {
-        case currentBranch, detached, upstream, ahead, behind
-        case hasUncommittedChanges, files, commits, branches, defaultBranch
-    }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        currentBranch = try c.decodeIfPresent(String.self, forKey: .currentBranch) ?? ""
-        detached = try c.decodeIfPresent(Bool.self, forKey: .detached) ?? false
-        upstream = try c.decodeIfPresent(String.self, forKey: .upstream)
-        ahead = try c.decodeIfPresent(Int.self, forKey: .ahead) ?? 0
-        behind = try c.decodeIfPresent(Int.self, forKey: .behind) ?? 0
-        hasUncommittedChanges = try c.decodeIfPresent(Bool.self, forKey: .hasUncommittedChanges) ?? false
-        files = try c.decodeIfPresent([GitFile].self, forKey: .files) ?? []
-        commits = try c.decodeIfPresent([GitCommit].self, forKey: .commits) ?? []
-        branches = try c.decodeIfPresent([GitBranch].self, forKey: .branches) ?? []
-        defaultBranch = try c.decodeIfPresent(String.self, forKey: .defaultBranch) ?? "main"
-    }
-}
-
-public struct GitFile: Decodable, Hashable, Identifiable, Sendable {
-    public var id: String { path }
-    public var path: String
-    public var status: String // M, A, D, untracked, modified, ...
-    public var staged: Bool
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        path = try c.decodeIfPresent(String.self, forKey: .path) ?? ""
-        status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
-        // Server sends `staged` as a String (e.g. "M", " ", "untracked",
-        // "conflict") — the X field of `git status --porcelain`. Convert to
-        // Bool: non-empty and non-space means staged.
-        if let s = try? c.decodeIfPresent(String.self, forKey: .staged) {
-            staged = !s.isEmpty && s != " "
-        } else {
-            staged = (try? c.decodeIfPresent(Bool.self, forKey: .staged)) ?? false
-        }
-    }
-
-    enum CodingKeys: String, CodingKey { case path, status, staged }
-}
-
-public struct GitCommit: Decodable, Hashable, Identifiable, Sendable {
-    public var id: String { hash }
-    public var hash: String
-    public var message: String
-    public var author: String
-    public var date: String
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        hash = try c.decodeIfPresent(String.self, forKey: .hash) ?? ""
-        // Server sends `subject` (the git log %s field), not `message`.
-        message = try c.decodeIfPresent(String.self, forKey: .message)
-            ?? c.decodeIfPresent(String.self, forKey: .subject) ?? ""
-        author = try c.decodeIfPresent(String.self, forKey: .author) ?? ""
-        date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-    }
-
-    enum CodingKeys: String, CodingKey { case hash, message, subject, author, date }
-}
-
-public struct GitBranch: Decodable, Hashable, Identifiable, Sendable {
-    public var id: String { name }
-    public var name: String
-    public var current: Bool
-    public var isDefault: Bool
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
-        // Server doesn't send `current`; it's derived by the caller by
-        // comparing branch.name to snapshot.currentBranch. Default false.
-        current = (try? c.decodeIfPresent(Bool.self, forKey: .current)) ?? false
-        isDefault = (try? c.decodeIfPresent(Bool.self, forKey: .isDefault)) ?? false
-    }
-
-    enum CodingKeys: String, CodingKey { case name, current, isDefault }
-}
-
-public struct GitDiffResponse: Decodable, Sendable {
-    public var diff: String
-    public var error: String?
-}
-
 // MARK: - JSON helpers
 
 extension JSONEncoder {

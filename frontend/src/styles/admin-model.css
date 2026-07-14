@@ -1,0 +1,134 @@
+
+/* ── Thinking block ── */
+
+.thinking-block {
+  margin-bottom: 6px;
+  border-left: 2px solid var(--text-faint);
+  padding-left: 10px;
+}
+
+.thinking-block summary {
+  font-size: 11px;
+  color: var(--text-faint);
+  cursor: pointer;
+  user-select: none;
+}
+
+.thinking-block[open] summary {
+  margin-bottom: 4px;
+}
+
+.thinking-content {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* ── Admin panel ── */
+
+.admin-panel {
+  background: var(--bg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-header {
+  padding: 24px 32px;
+  padding-top: calc(24px + var(--safe-top));
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(17, 17, 19, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.role-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.role-badge.admin { background: rgba(59,130,246,0.15); color: var(--accent); }
+.role-badge.user { background: var(--bg-elevated); color: var(--text-dim); }
+.role-badge.disabled { background: rgba(239,68,68,0.15); color: var(--red); }
+
+.admin-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.admin-action-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+}
+
+.admin-action-btn:hover { background: var(--bg-hover); color: var(--text); }
+.admin-action-btn.danger:hover { background: rgba(239,68,68,0.15); color: var(--red); }
+
+/* ── Model selector ── */
+
+.model-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 6px 28px 6px 12px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.model-select:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.model-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}

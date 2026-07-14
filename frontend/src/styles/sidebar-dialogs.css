@@ -1,0 +1,256 @@
+
+/* Sidebar-level actions (Clone Repository, Org Settings) — deliberately
+   heavier than a .space-item row so they read as actions, not content:
+   left-aligned like the list below them but with their own border/shadow
+   chrome and an accent-tinted hover/active state instead of the neutral
+   gray .space-item:hover tint. */
+.new-space-btn {
+  margin: 4px 8px;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, rgba(77, 121, 235, .9), rgba(70, 170, 220, .88));
+  border: 1px solid rgba(155, 188, 255, .34);
+  border-radius: 9px;
+  font-size: 13px;
+  color: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: calc(100% - 16px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 650;
+  box-shadow: 0 7px 16px rgba(24, 72, 160, .18), inset 0 1px rgba(255,255,255,.15);
+}
+
+.new-space-btn svg { color: #e8f1ff; flex-shrink: 0; }
+
+.new-space-btn:hover {
+  background: linear-gradient(135deg, #578cf0, #55b2dc);
+  border-color: rgba(190,212,255,.6);
+  color: #fff;
+}
+
+.new-space-btn:active { transform: translateY(1px); box-shadow: none; }
+.sidebar-settings-btn { margin-top: 8px; background: rgba(255,255,255,.035); border-color: rgba(255,255,255,.1); color: var(--text-dim); box-shadow: none; }
+.sidebar-settings-btn svg { color: var(--text-dim); }.sidebar-settings-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(153,181,235,.3); color: var(--text); }.sidebar-settings-btn:hover svg { color: #bad0ff; }
+
+.new-session-btn {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.new-session-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.terminal-container {
+  flex: 1;
+  padding: 4px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.terminal-container .xterm {
+  height: 100%;
+  padding: 8px;
+  background: #0f0f11;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: rgba(30, 30, 30, 0.65);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 24px;
+  width: 460px;
+  max-width: 90vw;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+  animation: modal-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text);
+}
+
+.modal-field { margin-bottom: 12px; }
+
+.modal-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.modal-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.modal-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.btn-secondary {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.btn-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+.btn-primary {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(0,0,0,0.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; background: var(--bg-hover) !important; color: var(--text-dim) !important; }
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    box-sizing: border-box;
+    /* Keep header/footer clear of the status bar, home indicator and any
+       landscape-side notch so the close/menu buttons stay tappable in PWA. */
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
+    transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  }
+
+  .top-bar-menu-btn {
+    display: block;
+  }
+
+  .top-bar {
+    /* Solid, not translucent — on mobile there's nothing but the plain
+       --bg body behind the safe-area strip, so a blurred translucent
+       background made the status-bar inset read as a different shade than
+       the bar itself. A flat color that matches --bg-surface removes the
+       seam and doubles as a lighter, more "native" bar. */
+    background: var(--bg-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 8px 12px;
+    padding-top: calc(8px + var(--safe-top));
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .workspace-chrome { background: var(--bg-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .workspace-chrome .top-bar { padding-bottom: 7px; }
+  .session-identity { text-align: center; justify-items: center; }
+  .session-repo-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-title-name { max-width: 180px; }
+  .workspace-context { display: flex; }
+  .workspace-tabs { justify-content: space-around; gap: 0; border-top: 1px solid rgba(255,255,255,.05); }
+  .workspace-tabs button { flex: 1; padding: 11px 2px; }
+
+  .top-bar-title {
+    font-size: 12.5px;
+    flex-shrink: 1;
+  }
+
+  /* Model select shrinks to an icon-sized affordance instead of pushing the
+     tab switcher off-screen; the dropdown itself still opens full width. */
+  .model-select {
+    max-width: 84px;
+    padding: 6px 22px 6px 8px;
+    font-size: 12px;
+  }
+
+  /* Settings/git/menu icon buttons keep their fixed .icon-btn hit target on
+     mobile too; just make sure they never get squeezed by flex. */
+  .top-bar .icon-btn {
+    flex-shrink: 0;
+  }
+
+  /* Chat/Terminal segmented switcher: shrink text/padding rather than clip —
+     stays fully visible and tappable down to 375px. */
+  .tabs {
+    flex-shrink: 0;
+  }
+  .tabs .tab-btn {
+    padding: 4px 10px;
+    font-size: 12.5px;
+  }
+
+  .composer {
+    padding: 8px;
+    /* The base rule's safe-bottom handling gets clobbered by this override —
+       reapply it here so the composer isn't cropped by the home indicator. */
+    padding-bottom: calc(8px + var(--safe-bottom));
+  }
+  .composer-notice {
+    margin-inline: 8px;
+  }
+  .composer-input { font-size: 16px; }
+  .chat-messages { padding: 10px; }
+
+  .repo-picker-modal {
+    width: 95vw !important;
+    max-height: 90vh;
+    border-radius: 12px;
+  }
+}

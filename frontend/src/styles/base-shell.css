@@ -1,0 +1,389 @@
+
+:root {
+  --bg: #0a0a0b;
+  --bg-surface: #111113;
+  --bg-elevated: #1c1c1f;
+  --bg-hover: #28282c;
+  --border: rgba(255, 255, 255, 0.12);
+  --text: #f3f4f6;
+  --text-dim: #9ca3af;
+  --text-faint: #667085;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --radius: 10px;
+  --sidebar-w: 260px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+
+  /* iOS / mobile-PWA safe areas (status bar, notch, home indicator).
+     Resolve to 0 on devices without insets (most desktops). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.4);
+  color: inherit;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+input, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  box-sizing: border-box;
+  background-color: var(--bg);
+}
+.workspace-error { position: fixed; z-index: 100; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: min(620px, calc(100vw - 32px)); padding: 10px 12px; border: 1px solid #8a5a30; border-radius: 10px; color: #ffe2bd; background: #2b1d15; box-shadow: 0 14px 35px rgba(0,0,0,.3); font-size: 13px; }
+.workspace-error span { font-weight: 750; white-space: nowrap; }.workspace-error p { margin: 0; color: #e7c6a4; }.workspace-error button { margin-left: auto; padding: 6px 9px; border: 1px solid #ad7b48; border-radius: 6px; color: #fff0df; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
+
+.app-layout.sidebar-open .sidebar {
+  transform: translateX(0);
+}
+
+/* The dimming overlay only matters on mobile, where the sidebar slides over
+   the content (position: fixed). On desktop the sidebar is docked in-flow,
+   so showing the overlay there would intercept pointer events across the
+   whole main content (top-bar tabs, composer, etc.). Scope it to mobile. */
+@media (max-width: 768px) {
+  .app-layout.sidebar-open .sidebar-overlay {
+    display: block;
+  }
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 9;
+}
+
+.sidebar {
+  width: var(--sidebar-w);
+  background: linear-gradient(180deg, #12151d 0%, var(--bg-surface) 38%, #0f1013 100%);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 10;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--shadow-lg);
+}
+
+.sidebar-header {
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-logo {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.3px;
+}
+
+/* Shared trigger row for the org-switcher (sidebar header) and user menu
+   (sidebar footer) — both open a .send-dropdown and should feel like the
+   same kind of control: full-width, same padding/radius, same hover tint. */
+.menu-trigger-row {
+  padding: 6px 8px;
+  margin: -6px -8px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+.menu-trigger-row:hover { background: var(--bg-hover); }
+
+/* Sizing/hover come from .icon-btn-ghost (shared small icon-trigger
+   convention); this rule only sets the glyph's font-size. */
+.sidebar-collapse-btn {
+  font-size: 13px;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+
+.space-group {
+  margin-bottom: 7px;
+}
+
+.space-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-bottom: 2px;
+}
+
+.space-item:hover { background: rgba(255, 255, 255, 0.055); color: var(--text); }
+.space-item.active { background: linear-gradient(90deg, rgba(54,91,174,.24), rgba(47,67,111,.11)); box-shadow: inset 0 0 0 1px rgba(114,149,234,.13); color: var(--text); }
+
+.space-chevron {
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.space-chevron.expanded { transform: rotate(90deg); }
+
+.space-sessions {
+  margin: 3px 0 0 15px;
+  border-left: 1px solid rgba(139, 166, 224, 0.13);
+  padding-left: 5px;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px 7px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  margin-top: 2px;
+  position: relative;
+}
+
+.session-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-dim); }
+.session-item.active { background: rgba(53, 92, 181, .14); color: #a9c6ff; }
+.session-item.archived { opacity: 0.6; cursor: default; }
+
+/* Compact icon-trigger variant for controls embedded in an already-small row
+   (session list item). Same visual language as .icon-btn-ghost (transparent
+   at rest, --bg-hover tint on hover, 8px radius) but sized down to fit a
+   28px-tall row instead of forcing a full 36px target that would overflow it. */
+.session-menu-btn {
+  opacity: 0;
+  color: var(--text-faint);
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.session-item:hover .session-menu-btn,
+.session-item:focus-within .session-menu-btn { opacity: 1; }
+.session-menu-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+/* Compound selector (not just .session-menu) so this wins over the later
+   .send-dropdown rule regardless of stylesheet order — both have class-level
+   specificity, so source order would otherwise let .send-dropdown's
+   bottom:100% clobber this and collapse the menu (seen when the trigger sits
+   near the bottom of the sidebar, e.g. the last session in a space). */
+.send-dropdown.session-menu {
+  position: absolute;
+  top: 100%;
+  bottom: auto;
+  right: 0;
+  left: auto;
+  z-index: 20;
+  margin-top: 2px;
+  margin-bottom: 0;
+  min-width: 160px;
+}
+
+.session-unarchive-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.session-unarchive-btn:hover { background: rgba(255, 255, 255, 0.06); }
+
+.archived-toggle {
+  margin-top: 4px;
+  padding: 5px 8px 5px 12px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.archived-toggle:hover { color: var(--text-dim); }
+
+.space-git-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--amber);
+  background: rgba(245, 158, 11, 0.14);
+  padding: 2px 6px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.session-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+
+.sidebar-footer {
+  padding: 12px 14px;
+  padding-bottom: calc(12px + var(--safe-bottom));
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.user-name {
+  font-size: 12px;
+  color: var(--text-dim);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.top-bar {
+  padding: 10px 16px;
+  /* Keep the mobile menu (hamburger) button clear of the status bar / 5G
+     indicator when installed as a PWA (viewport-fit=cover). */
+  padding-top: calc(10px + var(--safe-top));
+  border-bottom: 1px solid var(--border);
+  background: rgba(17, 17, 19, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 5;
+}
+
+.top-bar-title {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-chrome {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: rgba(17, 17, 19, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 5;
+}
+.workspace-chrome .top-bar { border-bottom: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.session-identity { display: grid; gap: 2px; align-content: center; line-height: 1.15; }
+.session-repo-name { color: var(--text-dim); font-size: 11px; font-weight: 550; }
+.session-title-name { color: var(--text); font-size: 13px; font-weight: 680; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-context {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 24px);
+  margin: 0 12px 10px;
+  padding: 10px 11px;
+  color: var(--text-dim);
+  border: 1px solid rgba(107, 139, 206, .25);
+  border-radius: 11px;
+  background: rgba(46, 71, 122, .15);
+  text-align: left;
+}
+.workspace-context:hover, .workspace-context.active { border-color: rgba(105, 145, 238, .65); background: rgba(59, 95, 170, .2); }
+.workspace-context-icon { color: #9ab9ff; font-size: 18px; }.workspace-context b { color: var(--text); font: 650 12px var(--mono); }.workspace-context small { color: var(--text-faint); font-size: 11px; }.workspace-sync { margin-left: auto; color: var(--text-faint); font-size: 10px; white-space: nowrap; }.workspace-sync.synced { color: var(--green); }
+.workspace-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  padding: 0 12px;
+}
+.workspace-tabs button { position: relative; padding: 10px 2px; color: var(--text-dim); font-size: 12.5px; font-weight: 600; }
+.workspace-tabs button:hover { color: var(--text); }.workspace-tabs button.active { color: var(--text); }.workspace-tabs button.active::after { content: ""; position: absolute; height: 2px; bottom: 0; left: 0; right: 0; border-radius: 99px; background: #91b3ff; }

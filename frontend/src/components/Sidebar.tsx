@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import type { Space, Session, Org, GitSnapshot } from "../types";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import { RepoPicker } from "./RepoPicker";
+import { OrgSwitcher, SessionMenu, UserMenu } from "./SidebarMenus";
 
 interface SidebarProps {
   spaces: Space[];
@@ -31,8 +32,6 @@ interface SidebarProps {
   onLogout: () => void;
 }
 
-import { WaynodeMark } from "./Brand";
-
 export function Sidebar({
   spaces, sessions, activeSessionId, activeSpaceId,
   onToggleSidebar, onSelectSession, onSpaceCreated, onSessionCreated, onSessionArchived, onSessionDeleted, onSpaceExpand,
@@ -41,32 +40,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set());
   const [showPicker, setShowPicker] = useState(false);
-  const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
-  const [showNewOrgInput, setShowNewOrgInput] = useState(false);
-  const [newOrgName, setNewOrgName] = useState("");
-  const [creatingOrg, setCreatingOrg] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [error, setError] = useState("");
-  const orgSwitcherRef = useRef<HTMLDivElement>(null);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close the org switcher / user menu dropdowns on outside click — same
-  // lightweight pattern as SessionMenu below (no full modal/focus-trap needed
-  // for these small popovers).
-  useEffect(() => {
-    if (!showOrgSwitcher && !showUserMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (showOrgSwitcher && orgSwitcherRef.current && !orgSwitcherRef.current.contains(e.target as Node)) {
-        setShowOrgSwitcher(false);
-        setShowNewOrgInput(false);
-      }
-      if (showUserMenu && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setShowUserMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showOrgSwitcher, showUserMenu]);
 
   // Lazily-fetched, per-space git status — only populated when a space is
   // expanded (or refreshed after a git action), never polled globally.
@@ -227,78 +201,21 @@ export function Sidebar({
     }
   };
 
-  const handleCreateOrg = async () => {
-    const name = newOrgName.trim();
-    if (!name) return;
-    setCreatingOrg(true);
+  const handleCreateOrg = async (name: string) => {
     try {
       const org = await api.orgs.create(name);
       onOrgCreated(org);
       onSelectOrg(org.id);
-      setNewOrgName("");
-      setShowNewOrgInput(false);
-      setShowOrgSwitcher(false);
     } catch (err) {
       setError((err as Error).message);
-    } finally {
-      setCreatingOrg(false);
+      throw err;
     }
   };
-
-  const activeOrg = orgs.find((o) => o.id === activeOrgId);
 
   return (
     <>
       <div className="sidebar">
-        <div className="sidebar-header">
-          <div ref={orgSwitcherRef} style={{ flex: 1, position: "relative" }}>
-            <button
-              className="menu-trigger-row"
-              style={{ fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 8, width: "100%", letterSpacing: "-0.3px", color: "var(--text)" }}
-              onClick={() => setShowOrgSwitcher(!showOrgSwitcher)}
-            >
-              <WaynodeMark size={20} />
-              <span>{activeOrg?.name || "Waynode"}</span>
-              <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>▾</span>
-            </button>
-            {showOrgSwitcher && (
-              <div className="send-dropdown" style={{ position: "absolute", top: "100%", bottom: "auto", left: 0, marginTop: 4 }}>
-                {orgs.map((org) => (
-                  <button
-                    key={org.id}
-                    className="send-dropdown-item"
-                    style={org.id === activeOrgId ? { color: "var(--accent)" } : {}}
-                    onClick={() => { onSelectOrg(org.id); setShowOrgSwitcher(false); }}
-                  >
-                    <div>{org.name}</div>
-                    {org.space_count !== undefined && <div className="item-desc">{org.space_count} spaces</div>}
-                  </button>
-                ))}
-                {showNewOrgInput ? (
-                  <div style={{ display: "flex", gap: 6, padding: "6px 10px" }}>
-                    <input
-                      className="modal-input"
-                      style={{ flex: 1 }}
-                      placeholder="Workspace name"
-                      autoFocus
-                      value={newOrgName}
-                      onChange={(e) => setNewOrgName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleCreateOrg(); if (e.key === "Escape") setShowNewOrgInput(false); }}
-                    />
-                    <button className="btn-primary" onClick={handleCreateOrg} disabled={creatingOrg || !newOrgName.trim()}>
-                      {creatingOrg ? "…" : "Add"}
-                    </button>
-                  </div>
-                ) : (
-                  <button className="send-dropdown-item" onClick={() => setShowNewOrgInput(true)}>
-                    + New Workspace
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <button className="sidebar-collapse-btn icon-btn-ghost" onClick={onToggleSidebar}>✕</button>
-        </div>
+        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} onSelect={onSelectOrg} onCreate={handleCreateOrg} onToggleSidebar={onToggleSidebar} />
 
         <div className="sidebar-content">
           <button type="button" className="new-space-btn" onClick={() => setShowPicker(true)}>
@@ -406,37 +323,7 @@ export function Sidebar({
           })}
         </div>
 
-        {user && (
-          <div ref={userMenuRef} className="sidebar-footer" style={{ position: "relative" }}>
-            <button
-              className="menu-trigger-row"
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, textAlign: "left" }}
-            >
-              {user.avatar_url && <img className="user-avatar" src={user.avatar_url} alt="" />}
-              <span className="user-name">{user.name}</span>
-            </button>
-            {showUserMenu && (
-              <div className="send-dropdown" style={{ position: "absolute", bottom: "100%", left: 0, marginBottom: 4 }}>
-                <div className="send-dropdown-item" style={{ cursor: "default", opacity: 0.8 }}>
-                  <div>{user.name}</div>
-                  {user.email && <div className="item-desc">{user.email}</div>}
-                </div>
-                {isAdmin && (
-                  <button className="send-dropdown-item" onClick={() => { setShowUserMenu(false); onOpenAdmin(); }}>
-                    Admin
-                  </button>
-                )}
-                <button className="send-dropdown-item" onClick={() => { setShowUserMenu(false); onOpenAccountSettings(); }}>
-                  Account settings
-                </button>
-                <button className="send-dropdown-item" onClick={() => { setShowUserMenu(false); onLogout(); }}>
-                  Log out
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {user && <UserMenu user={user} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} onOpenAccountSettings={onOpenAccountSettings} onLogout={onLogout} />}
       </div>
 
       {showPicker && (
@@ -455,38 +342,5 @@ export function Sidebar({
         </div>
       )}
     </>
-  );
-}
-
-interface SessionMenuItem {
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-}
-
-function SessionMenu({ items, onClose }: { items: SessionMenuItem[]; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
-
-  return (
-    <div className="send-dropdown session-menu" ref={ref} onClick={(e) => e.stopPropagation()}>
-      {items.map((item) => (
-        <button
-          key={item.label}
-          className="send-dropdown-item"
-          style={item.danger ? { color: "var(--red)" } : undefined}
-          onClick={() => { item.onClick(); onClose(); }}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
   );
 }

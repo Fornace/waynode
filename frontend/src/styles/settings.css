@@ -1,0 +1,239 @@
+
+/* ── Settings (Org + Space) ── */
+
+.settings-page {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-body {
+  padding: 24px 20px calc(40px + var(--safe-bottom));
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.settings-section { margin-bottom: 28px; }
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 4px 10px;
+}
+
+.settings-hint {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  padding: 12px 14px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  border-radius: 10px;
+}
+
+/* Group form fields into a bordered card with dividers between rows. */
+.field-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.field-row:last-child { border-bottom: none; }
+.field-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.field-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.field-row-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+.field-card .form-input,
+.field-card .model-select { width: 100%; }
+
+/* Key/value list (secrets, members) ── card rows instead of bare table lines. */
+.kv-list { display: flex; flex-direction: column; gap: 8px; }
+.kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.2s ease;
+}
+.kv-row:hover { border-color: rgba(255,255,255,0.18); }
+.kv-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.kv-text { min-width: 0; }
+.kv-name { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kv-sub { font-size: 11.5px; color: var(--text-faint); }
+.kv-key {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kv-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
+}
+.kv-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.kv-empty {
+  text-align: center;
+  padding: 30px 16px;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.add-kv-card {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.add-kv-row { display: flex; gap: 8px; align-items: center; }
+.add-kv-row .form-input { flex: 1; min-width: 0; }
+
+/* Billing: usage progress bars + plan comparison cards. */
+.usage-bar-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent, #6366f1);
+  transition: width 0.3s ease;
+}
+.usage-bar-fill.usage-bar-warn { background: var(--amber, #f59e0b); }
+.usage-bar-fill.usage-bar-over { background: var(--red, #ef4444); }
+.usage-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.plan-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plan-card.plan-card-current { border-color: var(--accent, #6366f1); box-shadow: 0 0 0 1px var(--accent, #6366f1); }
+.plan-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.plan-card-price { font-size: 20px; font-weight: 700; color: var(--text); }
+.plan-card-price span { font-size: 11px; font-weight: 500; color: var(--text-faint); }
+.plan-card-specs { font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+
+.role-select {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Sticky save bar that floats above content when there are unsaved changes. */
+.settings-save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px calc(12px + var(--safe-bottom));
+  background: linear-gradient(to top, var(--bg) 65%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.save-dot {
+  font-size: 12px; color: var(--amber);
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-right: auto;
+}
+.save-dot::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--amber);
+}
+
+/* Space Settings modal ── wider, scrollable body. */
+.settings-modal {
+  width: 680px;
+  max-width: 92vw;
+  max-height: 88vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.settings-modal-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(0,0,0,0.2);
+  flex-wrap: wrap;
+}
+.settings-modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.agents-editor {
+  width: 100%;
+  min-height: 320px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}

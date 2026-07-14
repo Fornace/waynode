@@ -387,46 +387,7 @@ beyond the Phase-0 additions in `PLAN.md` (api_tokens + push_devices + APNs).
 
 ---
 
-## 12. What is NOT native / needs a decision
+## 12. Decisions and delivery sequence
 
-1. **SwiftTerm vs a thin xterm.js-in-WKWebView** — SwiftTerm is the truly-native
-   choice; WebView is a fallback if SwiftTerm lags a feature. Recommend SwiftTerm.
-2. **TCA (The Composable Architecture) vs vanilla `@Observable`** — both work with
-   Swift 6 strict concurrency. TCA gives testable state machines for the streaming
-   reducers; vanilla is lighter. Recommend TCA for chat/terminal reducers at least.
-3. **Markdown rendering** — Apple's `Text` supports CommonMark via `AttributedString(markdown:)`;
-   code blocks need a custom block view. No third-party dep needed for MVP.
-4. **iPhone-only vs universal** — go **universal** from day one; the
-   `.sidebarAdaptable` pattern makes iPad/Mac nearly free.
-
----
-
-## 13. Build order (1:1 with `PLAN.md` phases)
-
-| Phase | Native deliverable |
-|---|---|
-| 0 (server plumbing) | nothing native yet; validate api_tokens end-to-end via curl |
-| 1 | **AuthView + API token** + bare `SpacesScene` (read-only list) — proves transport |
-| 2 | **ChatView** read + send + SSE streaming (no tool blocks yet) |
-| 3 | Rich blocks (thinking/tool), model picker, goal pill |
-| 4 | **TerminalView** (SwiftTerm over WS) + keybar accessory |
-| 5 | **GitInspector** + **CloneSheet** + Live Activity for goals |
-| 6 | Admin/Org/Space settings, polish, TestFlight |
-
----
-
-### TL;DR for Francesco
-- **One navigation codebase**: `TabView(.sidebarAdaptable)` → bottom bar on iPhone,
-  sidebar on iPad/Mac. Apple-blessed, matches the web's sidebar mental model.
-- **Glass on chrome, matte on content**: tab bars / toolbars / input bar /
-  inspector get Liquid Glass automatically via standard components; chat messages,
-  git diffs, terminal output stay matte (this is the HIG rule, not a choice).
-- **Primary action = `.glassProminent`** (Send, Clone, Start Goal). Everything else
-  = `.glass`.
-- **"Survives being killed"** = server-resident work + APNs + a Live Activity in
-  the Dynamic Island. The app is a beautiful control + observation surface; pi
-  never runs on the phone.
-- Icon: 3-layer Waynode mark in Icon Composer.
-
-*See `apple-liquid-glass-reference.md` for the underlying Apple guidance this is
-grounded in, and `../PLAN.md` for the server-side additions and full roadmap.*
+The remaining native-vs-web decisions, phased build order, and implementation
+summary live in [iOS 27 native decisions](ios27-native-decisions.md).
