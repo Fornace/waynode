@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { passport, resolveApiToken, requireAuth, prepareAccountDeletion, deletePreparedAccount } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
-import { createToken, countTokens, listTokens, revokeToken } from "../lib/api-tokens.mjs";
+import { createToken, countTokens, listTokens, revokeRawToken, revokeToken } from "../lib/api-tokens.mjs";
 
 const NATIVE_MAX_TOKENS = 10;
 import db from "../lib/db.mjs";
@@ -204,6 +204,17 @@ router.get("/api/auth/me", (req, res) => {
     providers: getLinkedProviders(req.user.id),
     availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId },
   });
+});
+
+router.delete("/api/auth/native-token", requireAuth, (req, res) => {
+  if (req.authMethod !== "bearer") {
+    return res.status(403).json({ error: "Only the current native bearer token can revoke itself." });
+  }
+  const rawToken = req.headers.authorization?.slice("Bearer ".length).trim();
+  if (!revokeRawToken(req.user.id, rawToken)) {
+    return res.status(404).json({ error: "Token not found" });
+  }
+  res.json({ ok: true });
 });
 
 router.post("/auth/logout", (req, res) => {

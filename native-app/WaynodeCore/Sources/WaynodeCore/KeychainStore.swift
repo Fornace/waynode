@@ -1,6 +1,12 @@
 import Foundation
 import Security
 
+public protocol CredentialStore: Sendable {
+    func readToken() -> String?
+    func writeToken(_ token: String) throws
+    func deleteToken()
+}
+
 // MARK: - KeychainStore
 //
 // Thin wrapper over the iOS/macOS Keychain Services API for persisting the
@@ -9,7 +15,7 @@ import Security
 // in the app's default, code-signing-derived keychain namespace. Waynode does
 // not share credentials with another app or extension.
 
-public struct KeychainStore: Sendable {
+public struct KeychainStore: CredentialStore {
     public let service: String
     public let account: String
 

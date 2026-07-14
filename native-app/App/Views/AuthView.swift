@@ -84,7 +84,31 @@ struct AuthView: View {
 
             // Auth buttons
             VStack(spacing: 12) {
-                if let providers = appModel.auth.providers, providers.github == true {
+                if appModel.auth.hasRecoverableVerificationFailure {
+                    Text("Your saved sign-in is still secure on this device.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        Task { await retryStoredCredential() }
+                    } label: {
+                        Label("Retry Secure Session", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .disabled(appModel.auth.isLoading)
+                    .accessibilityIdentifier("auth.session.retry")
+                    Button("Sign Out") {
+                        Task { await appModel.auth.logoutRevokingCurrentToken() }
+                    }
+                        .frame(minHeight: 44)
+                        .disabled(appModel.auth.isLoading)
+                        .accessibilityIdentifier("auth.session.signout")
+                }
+
+                if !appModel.auth.hasRecoverableVerificationFailure,
+                   let providers = appModel.auth.providers, providers.github == true {
                     Button {
                         Task { await startAuth(provider: "github") }
                     } label: {
@@ -96,7 +120,8 @@ struct AuthView: View {
                     .disabled(session != nil)
                 }
 
-                if let providers = appModel.auth.providers, providers.gitlab == true {
+                if !appModel.auth.hasRecoverableVerificationFailure,
+                   let providers = appModel.auth.providers, providers.gitlab == true {
                     Button {
                         Task { await startAuth(provider: "gitlab") }
                     } label: {
@@ -109,7 +134,8 @@ struct AuthView: View {
                 }
 
                 // If we don't know providers yet, show loading or retry.
-                if appModel.auth.providers == nil {
+                if !appModel.auth.hasRecoverableVerificationFailure,
+                   appModel.auth.providers == nil {
                     if isFetchingProviders {
                         ProgressView()
                             .controlSize(.large)
@@ -227,6 +253,12 @@ struct AuthView: View {
             }
         }
     }
+
+    private func retryStoredCredential() async {
+        await appModel.auth.verifyToken()
+        if appModel.auth.isAuthenticated { await appModel.bootstrap() }
+    }
+
     private func startAuth(provider: String) async {
         guard session == nil else { return }
         error = nil

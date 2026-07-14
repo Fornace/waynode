@@ -12,6 +12,7 @@
 //   ONLY=auth,chat    run a subset
 // ─────────────────────────────────────────────────────────────────────────
 import https from "https";
+import { randomUUID } from "crypto";
 import { mkdirSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -94,6 +95,7 @@ const shot = async (label) => {
 };
 
 const INJECT = `localStorage.setItem('waynode-dev-token','${DEV_TOKEN}');`;
+let isolatedSessionId = null;
 
 // ── Acquire an isolated browser session (own cookies/tabs/WS) ──
 {
@@ -119,17 +121,25 @@ try {
 
   let sessionUrl = null;
   await flow("open-session", async () => {
-    await call("browser_click", { selector: ".space-item", timeout: 10000 });
-    await call("browser_wait", { selector: ".space-sessions", timeout: 8000 });
-    // Expanding a space reveals its sessions. Prefer one of those so the
-    // smoke test does not create unnecessary production sessions; create a
-    // session only when the space is genuinely empty.
-    const hasSession = await jval(await call("browser_evaluate", { script: "return !!document.querySelector('.space-sessions .session-item')" }));
-    if (hasSession) {
-      await call("browser_click", { selector: ".space-sessions .session-item", timeout: 8000 });
-    } else {
-      await call("browser_click", { selector: ".space-sessions .new-session-btn", timeout: 8000 });
-    }
+    const title = `Waynode E2E ${Date.now()}`;
+    const created = await jval(await call("browser_evaluate", {
+      script: `const token = localStorage.getItem('waynode-dev-token');
+        const headers = {'Content-Type':'application/json', 'x-dev-token':token};
+        const spacesResponse = await fetch('/api/spaces', {headers, credentials:'include'});
+        if (!spacesResponse.ok) return {error:'spaces HTTP '+spacesResponse.status};
+        const spaces = await spacesResponse.json();
+        if (!spaces.length) return {error:'no space available'};
+        const response = await fetch('/api/spaces/'+spaces[0].id+'/sessions', {
+          method:'POST', headers, credentials:'include', body:${JSON.stringify(JSON.stringify({ title }))}
+        });
+        if (!response.ok) return {error:'create HTTP '+response.status};
+        return {space:spaces[0], session:await response.json()};`,
+    }));
+    if (!created?.session?.id) throw new Error(created?.error || "isolated session was not created");
+    isolatedSessionId = created.session.id;
+    const shortId = (id) => id.replaceAll("-", "").slice(0, 8).toLowerCase();
+    sessionUrl = `${BASE}/${shortId(created.space.id)}/${shortId(created.session.id)}`;
+    await call("browser_navigate", { url: sessionUrl, waitUntil: "networkidle", timeout: 30000 });
     await call("browser_wait", { selector: ".workspace-tabs", timeout: 10000 });
     const r = await call("browser_evaluate", { script: "return { url: location.href, tabs: !!document.querySelector('.workspace-tabs') }" });
     const v = await jval(r);
@@ -140,18 +150,78 @@ try {
   });
 
   await flow("chat-send", async () => {
-    await call("browser_type", { selector: ".composer-input", text: "Reply with exactly: E2E-OK", clearFirst: true, timeout: 10000 });
-    await call("browser_click", { selector: ".send-btn", timeout: 8000 });
-    // poll for assistant reply containing E2E-OK (.msg is the message row)
-    let got = false;
-    for (let i = 0; i < 30; i++) {
-      await call("browser_wait", { time: 3000 });
-      const v = await jval(await call("browser_evaluate", { script: "return [...document.querySelectorAll('.msg, .msg-text, .chat-message-content')].some(e => /E2E-OK/i.test(e.textContent||''))" }));
-      if (v) { got = true; break; }
+    const nonce = `WAYNODE_E2E_${randomUUID()}`;
+    const prompt = `Reply with exactly: ${nonce}`;
+    await call("browser_evaluate", {
+      script: `const probe = {ready:false, done:false, messageId:null, text:'', error:null};
+        const token = localStorage.getItem('waynode-dev-token');
+        const stream = new EventSource('/api/sessions/${isolatedSessionId}/stream?t='+encodeURIComponent(token));
+        stream.onmessage = (message) => {
+          const event = JSON.parse(message.data);
+          if (event.type === 'sync') probe.ready = true;
+          if (event.type === 'message_start' && !probe.messageId) probe.messageId = event.messageId;
+          if (event.type === 'text_delta' && event.messageId === probe.messageId) probe.text += event.delta || '';
+          if (event.type === 'error') probe.error = event.message || 'stream error';
+          if (event.type === 'end') { probe.done = true; stream.close(); }
+        };
+        stream.onerror = () => { if (!probe.ready) probe.error = 'stream did not connect'; };
+        window.__waynodeChatProbe = probe;
+        return true;`,
+    });
+    let ready = false;
+    for (let i = 0; i < 12; i++) {
+      await call("browser_wait", { time: 2500 });
+      const probe = await jval(await call("browser_evaluate", { script: "return window.__waynodeChatProbe" }));
+      if (probe?.error) throw new Error(probe.error);
+      if (probe?.ready) { ready = true; break; }
     }
-    if (!got) throw new Error("no assistant reply with E2E-OK");
+    if (!ready) throw new Error("isolated session stream did not become ready");
+
+    await call("browser_type", { selector: ".composer-input", text: prompt, clearFirst: true, timeout: 10000 });
+    await call("browser_click", { selector: ".send-btn", timeout: 8000 });
+    let streamed = null;
+    for (let i = 0; i < 40; i++) {
+      await call("browser_wait", { time: 2500 });
+      const probe = await jval(await call("browser_evaluate", { script: "return window.__waynodeChatProbe" }));
+      if (probe?.error) throw new Error(probe.error);
+      if (probe?.done) { streamed = probe.text.trim(); break; }
+    }
+    if (streamed !== nonce) throw new Error(`assistant stream mismatch: ${streamed || "no completed reply"}`);
+
+    let persisted = null;
+    for (let i = 0; i < 12; i++) {
+      await call("browser_wait", { time: 2500 });
+      persisted = await jval(await call("browser_evaluate", {
+        script: `const token = localStorage.getItem('waynode-dev-token');
+          const response = await fetch('/api/sessions/${isolatedSessionId}/messages', {headers:{'x-dev-token':token}, credentials:'include'});
+          if (!response.ok) return {error:'history HTTP '+response.status};
+          const messages = await response.json();
+          const userIndex = messages.findIndex(message => message.role === 'user' && message.content === ${JSON.stringify(prompt)});
+          const assistant = userIndex < 0 ? null : messages.slice(userIndex + 1).find(message => message.role === 'assistant');
+          return {userFound:userIndex >= 0, assistant:assistant?.content || ''};`,
+      }));
+      if (persisted?.error) throw new Error(persisted.error);
+      if (persisted?.userFound && persisted.assistant.trim() === streamed) break;
+    }
+    if (!persisted?.userFound || persisted.assistant.trim() !== streamed) {
+      throw new Error("assistant reply was streamed but not persisted with its user turn");
+    }
+
+    const reloadUrl = await jval(await call("browser_evaluate", { script: "return location.href" }));
+    await call("browser_navigate", { url: reloadUrl, waitUntil: "networkidle", timeout: 30000 });
+    await call("browser_wait", { selector: ".workspace-tabs", timeout: 10000 });
+    let hydrated = false;
+    for (let i = 0; i < 12; i++) {
+      await call("browser_wait", { time: 2500 });
+      hydrated = await jval(await call("browser_evaluate", {
+        script: `const replies = [...document.querySelectorAll('.msg-assistant .msg-text')];
+          return replies.some(reply => (reply.textContent || '').trim() === ${JSON.stringify(nonce)});`,
+      }));
+      if (hydrated) break;
+    }
+    if (!hydrated) throw new Error("persisted assistant reply did not hydrate after reload");
     await shot("03-chat");
-    console.log("   assistant replied");
+    console.log("   assistant streamed, persisted, and rehydrated");
   });
 
   await flow("model-switch", async () => {
@@ -222,6 +292,14 @@ try {
   });
 
 } finally {
+  if (isolatedSessionId) {
+    const cleanup = await jval(await call("browser_evaluate", {
+      script: `const token = localStorage.getItem('waynode-dev-token');
+        const response = await fetch('/api/sessions/${isolatedSessionId}', {method:'DELETE', headers:{'x-dev-token':token}, credentials:'include'});
+        return {ok:response.ok, status:response.status};`,
+    }).catch(() => null));
+    if (!cleanup?.ok) console.warn(`isolated session cleanup failed (HTTP ${cleanup?.status || "unknown"})`);
+  }
   if (!process.env.KEEP) await call("browser_close_session", {}).catch(() => {});
 }
 

@@ -69,8 +69,9 @@ struct AccountScene: View {
         ) {
             Button("Log Out", role: .destructive) {
                 Haptics.warning()
-                appModel.auth.logout()
+                Task { await appModel.auth.logoutRevokingCurrentToken() }
             }
+            .disabled(appModel.auth.isLoading)
             .accessibilityIdentifier("account.logout.confirm")
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("account.logout.cancel")

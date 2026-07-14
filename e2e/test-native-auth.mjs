@@ -251,6 +251,21 @@ console.log("\n[8] Revoked token is immediately invalid");
   assert(status === 401, `revoked token returns 401 (got ${status})`);
 }
 
+// === 9. Native logout revokes the exact bearer token ===
+console.log("\n[9] Native token can revoke itself during logout");
+{
+  const logoutToken = createToken("test-user", "native-logout-test").token;
+  const { status, body } = await getJSON("/api/auth/native-token", {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${logoutToken}` },
+  });
+  assert(status === 200 && body?.ok === true, `current token revokes itself (got ${status})`);
+  const after = await getJSON("/api/auth/me", {
+    headers: { Authorization: `Bearer ${logoutToken}` },
+  });
+  assert(after.status === 401, `logged-out native token is unusable (got ${after.status})`);
+}
+
 // === Done ===
 console.log(`\n${passed} passed, ${failed} failed.`);
 proc.kill("SIGTERM");

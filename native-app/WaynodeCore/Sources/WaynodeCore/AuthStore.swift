@@ -32,6 +32,7 @@ public final class AuthStore {
     public private(set) var user: User?
     public private(set) var providers: AuthMeResponse.Providers?
     public private(set) var isLoading: Bool = false
+    public private(set) var hasRecoverableVerificationFailure = false
     public var error: String?
 
     /// True once the initial launch-time token verification has settled
@@ -44,10 +45,16 @@ public final class AuthStore {
     /// the auth callback, then persisted to Keychain after verification.
     public var pendingToken: String?
 
-    public let keychain: KeychainStore
+    public let keychain: any CredentialStore
+    private let authAPIOverride: (any NativeAuthAPI)?
 
-    public init(serverConfig: ServerConfig? = nil, keychain: KeychainStore = KeychainStore()) {
+    public init(
+        serverConfig: ServerConfig? = nil,
+        keychain: any CredentialStore = KeychainStore(),
+        authAPI: (any NativeAuthAPI)? = nil
+    ) {
         self.keychain = keychain
+        self.authAPIOverride = authAPI
         // Load persisted config.
         if let config = Self.loadServerConfig() {
             self.serverConfig = config
@@ -115,26 +122,29 @@ public final class AuthStore {
 
     public func verifyToken() async {
         guard let token else {
+            hasRecoverableVerificationFailure = false
             hasCompletedLaunchCheck = true
             return
         }
         isLoading = true
+        hasRecoverableVerificationFailure = false
         error = nil
-        let api = APIClient(baseURL: serverConfig.baseURL, token: token)
+        let api = makeAuthAPI(token: token)
         do {
             let resp = try await api.authMe()
-            self.user = resp.user
+            guard let user = resp.user else {
+                throw APIClient.APIError(statusCode: -1, message: "Server returned no user")
+            }
+            self.user = user
             self.providers = resp.providers
-            await api.setToken(nil) // clear the transient token on the client
-            isLoading = false
+        } catch let apiError as APIClient.APIError where apiError.statusCode == 401 {
+            clearLocalAuthentication(message: "Session expired. Please log in again.")
         } catch {
-            // Token is invalid — clear it.
-            self.token = nil
-            self.user = nil
-            keychain.deleteToken()
-            self.error = "Session expired. Please log in again."
-            isLoading = false
+            user = nil
+            hasRecoverableVerificationFailure = true
+            self.error = "Couldn't verify your saved session. Check the connection and retry."
         }
+        isLoading = false
         hasCompletedLaunchCheck = true
     }
 
@@ -145,14 +155,18 @@ public final class AuthStore {
     public func completeAuth(token: String) async {
         isLoading = true
         error = nil
-        let api = APIClient(baseURL: serverConfig.baseURL, token: token)
+        let api = makeAuthAPI(token: token)
         do {
             let resp = try await api.authMe()
+            guard let user = resp.user else {
+                throw APIClient.APIError(statusCode: -1, message: "Server returned no user")
+            }
             // Token is valid — persist it.
             try keychain.writeToken(token)
             self.token = token
-            self.user = resp.user
+            self.user = user
             self.providers = resp.providers
+            hasRecoverableVerificationFailure = false
             isLoading = false
         } catch {
             self.error = "Login failed: \(error.localizedDescription)"
@@ -168,11 +182,35 @@ public final class AuthStore {
     }
 
     public func logout() {
+        clearLocalAuthentication()
+    }
+
+    public func logoutRevokingCurrentToken() async {
+        guard let token else {
+            logout()
+            return
+        }
+        isLoading = true
+        var warning: String?
+        do {
+            try await makeAuthAPI(token: token, forLogout: true).revokeCurrentToken()
+        } catch let apiError as APIClient.APIError where apiError.statusCode == 401 {
+            // The credential is already invalid, which is equivalent to revocation.
+        } catch {
+            warning = "Signed out on this device. The server couldn't be reached to revoke its token."
+        }
+        clearLocalAuthentication(message: warning)
+    }
+
+    private func clearLocalAuthentication(message: String? = nil) {
         token = nil
         user = nil
         providers = nil
-        error = nil
+        error = message
         pendingToken = nil
+        isLoading = false
+        hasRecoverableVerificationFailure = false
+        hasCompletedLaunchCheck = true
         keychain.deleteToken()
     }
 
@@ -186,6 +224,7 @@ public final class AuthStore {
         }
         self.error = nil
         self.isLoading = false
+        self.hasRecoverableVerificationFailure = false
         self.hasCompletedLaunchCheck = true
     }
 
@@ -197,6 +236,7 @@ public final class AuthStore {
         providers = .init(github: true, gitlab: true, dev: true)
         error = nil
         isLoading = false
+        hasRecoverableVerificationFailure = false
         hasCompletedLaunchCheck = true
     }
     #endif
@@ -212,6 +252,16 @@ public final class AuthStore {
 
     private static let serverConfigKey = "waynode.serverConfig"
     private static let nativeAuthAttemptKey = "waynode.nativeAuthAttempt"
+
+    private func makeAuthAPI(token: String, forLogout: Bool = false) -> any NativeAuthAPI {
+        if let authAPIOverride { return authAPIOverride }
+        return APIClient(
+            baseURL: serverConfig.baseURL,
+            token: token,
+            requestTimeout: forLogout ? 5 : 30,
+            waitsForConnectivity: !forLogout
+        )
+    }
 
     private struct NativeAuthAttempt: Codable {
         let nonce: String

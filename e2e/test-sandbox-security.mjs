@@ -1,6 +1,6 @@
 /** Hosted sandbox credential boundary and fail-closed regression. */
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,8 +19,11 @@ const {
   canFallbackToDirect,
   enforceHostedSandbox,
   enforceTerminalAvailability,
+  getSandboxPiArgs,
+  getSandboxSessionDir,
 } = await import("../lib/pi-runner.mjs");
 
+const escapedRoot = mkdtempSync(join(tmpdir(), "waynode-sandbox-escape-"));
 try {
   db.prepare("INSERT INTO users (id, name, email, github_token) VALUES (?, ?, ?, ?)")
     .run("owner", "Owner", "owner@example.test", "persistent-github-token");
@@ -74,6 +77,28 @@ try {
   assert.throws(() => enforceTerminalAvailability("hosted"), /not available on Waynode Cloud/);
   assert.doesNotThrow(() => enforceTerminalAvailability("self-hosted"));
 
+  const hostSessionDir = join(root, ".waynode", "sessions", "session");
+  mkdirSync(hostSessionDir, { recursive: true });
+  const guestSessionDir = getSandboxSessionDir({ workspaceDir: root, sessionDir: hostSessionDir });
+  assert.equal(guestSessionDir, "/workspace/.waynode/sessions/session");
+  assert.throws(
+    () => getSandboxSessionDir({ workspaceDir: root, sessionDir: escapedRoot }),
+    /must be inside the worktree/,
+  );
+  symlinkSync(escapedRoot, join(root, "escaped-session"));
+  assert.throws(
+    () => getSandboxSessionDir({ workspaceDir: root, sessionDir: join(root, "escaped-session") }),
+    /must be inside the worktree/,
+  );
+  const guestArgs = getSandboxPiArgs({
+    session: { ...session, pi_session_dir: hostSessionDir },
+    prompt: "persist this turn",
+    isGoal: false,
+    workspaceDir: root,
+  });
+  assert.equal(guestArgs[guestArgs.indexOf("--session-dir") + 1], guestSessionDir);
+  assert.equal(guestArgs.includes(hostSessionDir), false, "host paths never enter guest pi arguments");
+
   const dockerfile = readFileSync(new URL("../sandbox/Dockerfile", import.meta.url), "utf8");
   assert.equal(dockerfile.match(/sk-[A-Za-z0-9_-]{12,}/g), null, "sandbox image contains no literal API credential");
   assert.match(dockerfile, /"apiKey": "\$WAYNODE_LLM_KEY"/, "sandbox provider config references runtime env");
@@ -81,4 +106,5 @@ try {
   console.log("sandbox security regression passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
+  rmSync(escapedRoot, { recursive: true, force: true });
 }

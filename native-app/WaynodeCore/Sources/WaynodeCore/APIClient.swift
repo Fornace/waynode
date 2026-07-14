@@ -17,15 +17,20 @@ public actor APIClient {
     public let onUnauthorized: AsyncStream<Void>.Continuation
     public let unauthorizedStream: AsyncStream<Void>
 
-    public init(baseURL: URL, token: String? = nil) {
+    public init(
+        baseURL: URL,
+        token: String? = nil,
+        requestTimeout: TimeInterval = 30,
+        waitsForConnectivity: Bool = true
+    ) {
         self.baseURL = baseURL
         self.token = token
         let (stream, cont) = AsyncStream.makeStream(of: Void.self)
         self.unauthorizedStream = stream
         self.onUnauthorized = cont
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 30
-        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = requestTimeout
+        config.waitsForConnectivity = waitsForConnectivity
         self.session = URLSession(configuration: config)
     }
 
