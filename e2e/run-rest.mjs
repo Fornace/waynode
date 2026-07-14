@@ -123,7 +123,8 @@ try {
   await flow("open-session", async () => {
     const title = `Waynode E2E ${Date.now()}`;
     const created = await jval(await call("browser_evaluate", {
-      script: `const token = localStorage.getItem('waynode-dev-token');
+      script: `return (async () => {
+        const token = localStorage.getItem('waynode-dev-token');
         const headers = {'Content-Type':'application/json', 'x-dev-token':token};
         const spacesResponse = await fetch('/api/spaces', {headers, credentials:'include'});
         if (!spacesResponse.ok) return {error:'spaces HTTP '+spacesResponse.status};
@@ -133,7 +134,8 @@ try {
           method:'POST', headers, credentials:'include', body:${JSON.stringify(JSON.stringify({ title }))}
         });
         if (!response.ok) return {error:'create HTTP '+response.status};
-        return {space:spaces[0], session:await response.json()};`,
+        return {space:spaces[0], session:await response.json()};
+      })();`,
     }));
     if (!created?.session?.id) throw new Error(created?.error || "isolated session was not created");
     isolatedSessionId = created.session.id;
@@ -192,13 +194,15 @@ try {
     for (let i = 0; i < 12; i++) {
       await call("browser_wait", { time: 2500 });
       persisted = await jval(await call("browser_evaluate", {
-        script: `const token = localStorage.getItem('waynode-dev-token');
+        script: `return (async () => {
+          const token = localStorage.getItem('waynode-dev-token');
           const response = await fetch('/api/sessions/${isolatedSessionId}/messages', {headers:{'x-dev-token':token}, credentials:'include'});
           if (!response.ok) return {error:'history HTTP '+response.status};
           const messages = await response.json();
           const userIndex = messages.findIndex(message => message.role === 'user' && message.content === ${JSON.stringify(prompt)});
           const assistant = userIndex < 0 ? null : messages.slice(userIndex + 1).find(message => message.role === 'assistant');
-          return {userFound:userIndex >= 0, assistant:assistant?.content || ''};`,
+          return {userFound:userIndex >= 0, assistant:assistant?.content || ''};
+        })();`,
       }));
       if (persisted?.error) throw new Error(persisted.error);
       if (persisted?.userFound && persisted.assistant.trim() === streamed) break;
@@ -294,9 +298,11 @@ try {
 } finally {
   if (isolatedSessionId) {
     const cleanup = await jval(await call("browser_evaluate", {
-      script: `const token = localStorage.getItem('waynode-dev-token');
+      script: `return (async () => {
+        const token = localStorage.getItem('waynode-dev-token');
         const response = await fetch('/api/sessions/${isolatedSessionId}', {method:'DELETE', headers:{'x-dev-token':token}, credentials:'include'});
-        return {ok:response.ok, status:response.status};`,
+        return {ok:response.ok, status:response.status};
+      })();`,
     }).catch(() => null));
     if (!cleanup?.ok) console.warn(`isolated session cleanup failed (HTTP ${cleanup?.status || "unknown"})`);
   }
