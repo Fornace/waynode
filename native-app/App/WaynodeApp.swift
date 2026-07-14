@@ -22,7 +22,12 @@ struct WaynodeApp: App {
         if let idx = CommandLine.arguments.firstIndex(of: "-dev-token"),
            idx + 1 < CommandLine.arguments.count {
             let token = CommandLine.arguments[idx + 1]
-            try? auth.keychain.writeToken(token)
+            do {
+                try auth.keychain.writeToken(token)
+                print("Waynode diagnostics: test credential persisted")
+            } catch {
+                print("Waynode diagnostics: test credential persistence failed: \(error.localizedDescription)")
+            }
             auth.markAuthenticated(token: token)
         }
         #endif

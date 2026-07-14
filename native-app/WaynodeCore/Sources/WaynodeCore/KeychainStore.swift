@@ -52,6 +52,9 @@ public struct KeychainStore: Sendable {
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
+        #if DEBUG
+        print("Waynode diagnostics: keychain read status \(status)")
+        #endif
         guard status == errSecSuccess,
               let data = item as? Data,
               let token = String(data: data, encoding: .utf8) else {
@@ -76,6 +79,9 @@ public struct KeychainStore: Sendable {
         }
 
         let status = SecItemAdd(attributes as CFDictionary, nil)
+        #if DEBUG
+        print("Waynode diagnostics: keychain write status \(status)")
+        #endif
         guard status == errSecSuccess else {
             throw KeychainError.unhandledStatus(status)
         }
