@@ -11,6 +11,7 @@ import { passport } from "./lib/auth.mjs";
 import { ensureGitAskpass } from "./lib/git-creds.mjs";
 import { ensurePiProviderConfig } from "./lib/pi-config.mjs";
 import { bootstrapSelfHostedProviderCredential } from "./lib/pi-provider-bootstrap.mjs";
+import { SQLiteSessionStore } from "./lib/sqlite-session-store.mjs";
 import { attachTerminalWebSocket } from "./routes/terminal.js";
 
 import authRoutes from "./routes/auth.js";
@@ -87,6 +88,7 @@ app.use("/api/", apiLimiter);
 app.use(cors({ origin: config.appUrl, credentials: true }));
 
 const sessionMiddleware = session({
+  store: new SQLiteSessionStore(),
   secret: config.sessionSecret,
   resave: false,
   saveUninitialized: false,

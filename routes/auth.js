@@ -32,6 +32,15 @@ const NATIVE_SCHEME = "waynode";
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const NATIVE_NONCE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
+function clearBrowserSessionCookie(res) {
+  res.clearCookie("connect.sid", {
+    path: "/",
+    httpOnly: true,
+    secure: config.isProd,
+    sameSite: "lax",
+  });
+}
+
 function freshNonce() {
   return randomBytes(32).toString("base64url");
 }
@@ -221,7 +230,10 @@ router.post("/auth/logout", (req, res) => {
   req.logout(() => {
     // Destroy the server-side session too.  Merely calling passport logout
     // clears req.user but leaves a usable session identifier in the browser.
-    req.session?.destroy(() => res.json({ ok: true }));
+    req.session?.destroy(() => {
+      clearBrowserSessionCookie(res);
+      res.json({ ok: true });
+    });
   });
 });
 
@@ -267,7 +279,10 @@ router.delete("/api/auth/account", requireAuth, (req, res) => {
   }
 
   req.logout(() => {
-    req.session?.destroy(() => res.json({ ok: true }));
+    req.session?.destroy(() => {
+      clearBrowserSessionCookie(res);
+      res.json({ ok: true });
+    });
   });
 });
 
