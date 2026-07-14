@@ -53,8 +53,9 @@ jobs:
           # The current service stays running throughout both builds. Build the
           # server first because its image supplies the matching msb 0.6.6 CLI.
           docker compose -f "$compose_file" build waynode
-          waynode_image=$(docker compose -f "$compose_file" images -q waynode)
+          waynode_image=$(docker compose -f "$compose_file" config --images | head -n 1)
           test -n "$waynode_image"
+          docker image inspect "$waynode_image" >/dev/null
           docker build --file sandbox/Dockerfile --tag waynode-sandbox:latest .
 
           # Validate the resulting image, not only its Dockerfile. The checker

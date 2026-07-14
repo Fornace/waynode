@@ -18,12 +18,22 @@ WORKDIR = os.environ["WAYNODE_OBS_WORKDIR"]
 
 
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def write_chunk(self, value: str):
+        data = value.encode()
+        self.wfile.write(f"{len(data):X}\r\n".encode())
+        self.wfile.write(data)
+        self.wfile.write(b"\r\n")
+        self.wfile.flush()
+
     def do_GET(self):
         if self.path != f"/run/{TOKEN}":
             self.send_error(404)
             return
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
         self.end_headers()
         process = subprocess.Popen(
             COMMAND,
@@ -37,11 +47,16 @@ class Handler(BaseHTTPRequestHandler):
         assert process.stdout is not None
         try:
             for line in process.stdout:
-                self.wfile.write(line.encode())
-                self.wfile.flush()
+                self.write_chunk(line)
             code = process.wait()
-            self.wfile.write(f"__EXIT__={code}\n".encode())
-            self.wfile.flush()
+            self.write_chunk(f"__EXIT__={code}\n")
+            if code == 0:
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+            else:
+                # An incomplete chunked response makes curl fail too, so the
+                # durable workflow cannot mistake a failed child for success.
+                self.close_connection = True
         except (BrokenPipeError, ConnectionResetError):
             process.terminate()
             process.wait(timeout=10)
