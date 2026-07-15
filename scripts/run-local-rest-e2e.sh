@@ -205,10 +205,11 @@ echo "[browser-e2e] worktree is ready; launching $E2E_DRIVER browser driver"
 export BASE_URL="$E2E_BASE_URL"
 export DEV_TOKEN
 export WAYNODE_NONPROD_CONFIRMED=1
-export ONLY=${ONLY:-auth,open-session,chat-send,model-switch}
 if [[ "$E2E_DRIVER" == "local" ]]; then
+  export ONLY=${ONLY:-auth,open-session,chat-send,model-switch,git-review}
   node "$ROOT/e2e/run.mjs"
 else
+  export ONLY=${ONLY:-auth,open-session,chat-send,model-switch}
   "$ROOT/scripts/run-rest-e2e-nonprod.sh"
 fi
 

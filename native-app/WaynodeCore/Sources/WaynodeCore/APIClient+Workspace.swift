@@ -33,6 +33,24 @@ extension APIClient {
                           body: CommitBody(summary: message, description: nil, files: files))
     }
 
+    private struct DiscardFileBody: Encodable, Sendable {
+        var path: String
+        var confirmation = "DISCARD TRACKED FILE"
+    }
+
+    private struct GitMutationResponse: Decodable, Sendable {
+        var ok: Bool
+        var data: GitSnapshot
+    }
+
+    public func discardTrackedFile(_ spaceId: String, path: String) async throws -> GitSnapshot {
+        let response: GitMutationResponse = try await request(
+            "/api/spaces/\(spaceId)/git/discard-file", method: "POST",
+            body: DiscardFileBody(path: path)
+        )
+        return response.data
+    }
+
     public struct SwitchBranchBody: Encodable, Sendable {
         public var branchName: String
         public var mode: String // "stash" | "carry" | "clean"

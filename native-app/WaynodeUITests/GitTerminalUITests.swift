@@ -7,36 +7,61 @@ final class GitTerminalUITests: WaynodeUITestCase {
         let any = app.descendants(matching: .any)
         XCTAssertTrue(any["git.surface"].waitForExistence(timeout: 8))
         XCTAssertTrue(any["git.file.Sources/Waynode.swift.review"].waitForExistence(timeout: 4))
-        any["git.file.Sources/Waynode.swift.review"].tap()
+        activate(any["git.file.Sources/Waynode.swift.review"])
+        #if targetEnvironment(macCatalyst)
+        let inlineDiff = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Added line in Sources/Waynode.swift")
+        ).firstMatch
+        XCTAssertTrue(inlineDiff.waitForExistence(timeout: 4))
+        #else
         XCTAssertTrue(any["git.diff.surface"].waitForExistence(timeout: 4))
         capture(app, "git-file-diff")
         app.buttons["git.diff.done"].tap()
         XCTAssertTrue(any["git.surface"].waitForExistence(timeout: 3))
-        any["git.file.Sources/Waynode.swift.select"].tap()
+        #endif
+        activate(any["git.file.Sources/Waynode.swift.select"])
         XCTAssertTrue(app.buttons["git.commit.open"].isEnabled)
-        app.buttons["git.commit.open"].tap()
+        activate(app.buttons["git.commit.open"])
         XCTAssertTrue(any["git.commit.surface"].waitForExistence(timeout: 4))
-        app.buttons["git.commit.cancel"].tap()
+        activate(app.buttons["git.commit.cancel"])
         XCTAssertFalse(any["git.commit.surface"].waitForExistence(timeout: 3))
-        app.buttons["git.commit.open"].tap()
+        activate(app.buttons["git.commit.open"])
         let message = any["git.commit.message"]
         message.tap()
         message.typeText("Polish every interaction")
         capture(app, "git-commit")
-        app.buttons["git.commit.confirm"].tap()
+        activate(app.buttons["git.commit.confirm"])
         XCTAssertFalse(any["git.commit.surface"].waitForExistence(timeout: 3))
-        any["git.branches.disclosure"].firstMatch.tap()
-        app.buttons["git.branch.review/ui-polish"].tap()
-        dialogButton(app, id: "git.branch.switch.cancel", label: "Cancel").tap()
-        app.buttons["git.branch.review/ui-polish"].tap()
-        dialogButton(app, id: "git.branch.switch.confirm", label: "Switch to review/ui-polish").tap()
+        activate(any["git.branches.disclosure"].firstMatch)
+        activate(app.buttons["git.branch.review/ui-polish"])
+        activateDialogAction(app, id: "git.branch.switch.cancel", label: "Cancel", cancellation: true)
+        activate(app.buttons["git.branch.review/ui-polish"])
+        activateDialogAction(app, id: "git.branch.switch.confirm", label: "Switch to review/ui-polish")
         let summary = any["git.branch.summary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 3))
         XCTAssertEqual(summary.value as? String, "review/ui-polish")
-        app.buttons["git.pull"].tap()
+        #if !targetEnvironment(macCatalyst)
+        activate(app.buttons["git.pull"])
         XCTAssertTrue(app.alerts["Git action failed"].waitForExistence(timeout: 4))
-        dialogButton(app, id: "git.error.dismiss", label: "OK").tap()
+        activateDialogAction(app, id: "git.error.dismiss", label: "OK")
         XCTAssertFalse(app.alerts["Git action failed"].waitForExistence(timeout: 3))
+        #endif
+    }
+
+    func testTrackedFileDiscardRequiresConfirmation() {
+        let app = launchFixture(["-ui-test-git"])
+        let any = app.descendants(matching: .any)
+        let discard = any["git.file.Sources/Waynode.swift.discard"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 8))
+        XCTAssertFalse(any["git.file.README.md.discard"].exists, "Added files must not offer ambiguous discard")
+        XCTAssertFalse(any["git.file.scratch-notes.txt.discard"].exists, "Untracked files must never offer discard")
+
+        activate(discard)
+        activateDialogAction(app, id: "git.discard.cancel", label: "Keep Changes", cancellation: true)
+        XCTAssertTrue(discard.waitForExistence(timeout: 3))
+        activate(discard)
+        activateDialogAction(app, id: "git.discard.confirm", label: "Discard Changes")
+        XCTAssertFalse(discard.waitForExistence(timeout: 4))
     }
 
     func testDiffFailureShowsRetryWithoutInventingDiffLines() {

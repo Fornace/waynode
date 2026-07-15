@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { api } from "../api/client";
 import type { Space, GitSnapshot } from "../types";
 import { BranchesPanel } from "./GitBranchesPanel";
@@ -17,6 +17,29 @@ interface GitSidebarProps {
 
 type Tab = "changes" | "branches";
 
+const REVIEW_WIDTH_KEY = "waynode.git-review.width";
+const REVIEW_DEFAULT_WIDTH = 720;
+const REVIEW_MIN_WIDTH = 420;
+const REVIEW_MAX_WIDTH = 960;
+const REVIEW_OVERLAY_QUERY = "(max-width: 1100px)";
+
+function maxReviewWidth() {
+  return Math.max(REVIEW_MIN_WIDTH, Math.min(REVIEW_MAX_WIDTH, window.innerWidth * 0.5));
+}
+
+function clampReviewWidth(value: number) {
+  return Math.round(Math.min(maxReviewWidth(), Math.max(REVIEW_MIN_WIDTH, value)));
+}
+
+function savedReviewWidth() {
+  try {
+    const saved = Number(window.localStorage.getItem(REVIEW_WIDTH_KEY));
+    return clampReviewWidth(Number.isFinite(saved) && saved > 0 ? saved : REVIEW_DEFAULT_WIDTH);
+  } catch {
+    return clampReviewWidth(REVIEW_DEFAULT_WIDTH);
+  }
+}
+
 // A git operation hit a snag (merge conflict, divergent pull, rejected push).
 // The sidebar surfaces it as an inline card AND drops a system message into the
 // chat, offering to let pi (which lives in the same working tree) resolve it.
@@ -28,15 +51,77 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
   const [issue, setIssue] = useState<GitIssue | null>(null);
   const esRef = useRef<EventSource | null>(null);
   const panelRef = useRef<HTMLElement>(null);
-  const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 768px)").matches);
+  const [compact, setCompact] = useState(() => window.matchMedia(REVIEW_OVERLAY_QUERY).matches);
+  const [reviewWidth, setReviewWidth] = useState(savedReviewWidth);
+  const reviewWidthRef = useRef(reviewWidth);
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const [resizing, setResizing] = useState(false);
   useEscapeToClose(onClose, panelRef, open && compact);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 768px)");
+    const media = window.matchMedia(REVIEW_OVERLAY_QUERY);
     const update = () => setCompact(media.matches);
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+
+  useEffect(() => {
+    const update = () => {
+      const next = clampReviewWidth(reviewWidthRef.current);
+      reviewWidthRef.current = next;
+      setReviewWidth(next);
+    };
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const oldCursor = document.body.style.cursor;
+    const oldUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const move = (event: PointerEvent) => {
+      if (!dragRef.current) return;
+      const next = clampReviewWidth(dragRef.current.startWidth + dragRef.current.startX - event.clientX);
+      reviewWidthRef.current = next;
+      setReviewWidth(next);
+    };
+    const finish = () => {
+      dragRef.current = null;
+      setResizing(false);
+      try { window.localStorage.setItem(REVIEW_WIDTH_KEY, String(reviewWidthRef.current)); } catch {}
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", finish, { once: true });
+    return () => {
+      document.body.style.cursor = oldCursor;
+      document.body.style.userSelect = oldUserSelect;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+    };
+  }, [resizing]);
+
+  const persistWidth = (next: number) => {
+    const width = clampReviewWidth(next);
+    reviewWidthRef.current = width;
+    setReviewWidth(width);
+    try { window.localStorage.setItem(REVIEW_WIDTH_KEY, String(width)); } catch {}
+  };
+
+  const resizeWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    let next: number | null = null;
+    if (event.key === "ArrowLeft") next = reviewWidth + 32;
+    else if (event.key === "ArrowRight") next = reviewWidth - 32;
+    else if (event.key === "Home") next = REVIEW_MIN_WIDTH;
+    else if (event.key === "End") next = maxReviewWidth();
+    if (next === null) return;
+    event.preventDefault();
+    persistWidth(next);
+  };
 
   // ── Live data: only poll while open ──
   useEffect(() => {
@@ -73,13 +158,33 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
     <>
       <aside
         ref={panelRef}
-        className={`git-panel ${open ? "open" : ""}`}
+        className={`git-panel ${open ? "open" : ""} ${resizing ? "is-resizing" : ""}`}
+        style={{ "--git-review-width": `${reviewWidth}px` } as CSSProperties}
         role="complementary"
         aria-labelledby="git-review-title"
         aria-hidden={!open}
         inert={!open}
         tabIndex={-1}
       >
+        <div
+          className="git-resize-handle"
+          role="separator"
+          aria-label="Resize Git review"
+          aria-orientation="vertical"
+          aria-valuemin={REVIEW_MIN_WIDTH}
+          aria-valuemax={maxReviewWidth()}
+          aria-valuenow={reviewWidth}
+          aria-valuetext={`${reviewWidth} pixels wide`}
+          tabIndex={0}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            dragRef.current = { startX: event.clientX, startWidth: reviewWidthRef.current };
+            setResizing(true);
+          }}
+          onDoubleClick={() => persistWidth(REVIEW_DEFAULT_WIDTH)}
+          onKeyDown={resizeWithKeyboard}
+        />
         <header className="git-header">
           <div className="git-header-title">
             <span className="git-worktree-icon"><BranchIcon /></span>

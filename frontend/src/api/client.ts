@@ -155,6 +155,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    discardFile: (spaceId: string, path: string) =>
+      fetchJSON<{ ok: boolean; data: GitSnapshot }>(`/api/spaces/${spaceId}/git/discard-file`, {
+        method: "POST",
+        body: JSON.stringify({ path, confirmation: "DISCARD TRACKED FILE" }),
+      }),
+    discardAll: (spaceId: string) =>
+      fetchJSON<{ ok: boolean; data: GitSnapshot }>(`/api/spaces/${spaceId}/git/discard-all`, {
+        method: "POST",
+        body: JSON.stringify({ confirmation: "DISCARD ALL TRACKED CHANGES" }),
+      }),
     switchBranch: (spaceId: string, body: { branchName: string; mode: "stash" | "carry" | "clean" }) =>
       fetchJSON<{ ok: boolean; data: GitSnapshot }>(`/api/spaces/${spaceId}/git/switch-branch`, {
         method: "POST",

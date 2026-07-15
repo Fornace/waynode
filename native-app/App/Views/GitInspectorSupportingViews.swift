@@ -11,6 +11,7 @@ enum GitDiffState: Equatable {
 struct GitFileRow: View {
     let file: GitFile
     let isSelected: Bool
+    var allowsWrapping = false
 
     var body: some View {
         HStack {
@@ -20,7 +21,7 @@ struct GitFileRow: View {
             Image(systemName: statusIcon).foregroundStyle(statusColor).font(.caption)
             Text(file.path)
                 .font(.caption.monospaced())
-                .lineLimit(1)
+                .lineLimit(allowsWrapping ? 2 : 1)
                 .truncationMode(.middle)
                 .help(file.path)
             Spacer()
@@ -44,8 +45,82 @@ struct GitFileRow: View {
         case "M": .orange
         case "A": .green
         case "D": .red
+        case "U": .red
+        case "R", "C": .blue
         default: .secondary
         }
+    }
+}
+
+struct GitInlineDiffPane: View {
+    let file: GitFile?
+    @Binding var state: GitDiffState
+    var onLoad: (GitFile) async -> Void
+
+    var body: some View {
+        Group {
+            if let file {
+                VStack(spacing: 0) {
+                    ScrollView([.horizontal, .vertical]) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                Text(file.path)
+                                    .font(.headline.monospaced())
+                                    .textSelection(.enabled)
+                            }
+                            .padding(.bottom, 14)
+                            switch state {
+                            case .loaded(let diff):
+                                if diff.isEmpty {
+                                    noTextDiff
+                                } else {
+                                    ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                                        DiffLineView(line: line)
+                                    }
+                                }
+                            case .failed(let message):
+                                ContentUnavailableView {
+                                    Label("Couldn’t Load Diff", systemImage: "exclamationmark.triangle")
+                                } description: {
+                                    Text(message)
+                                } actions: {
+                                    Button("Retry") { Task { await onLoad(file) } }
+                                        .accessibilityIdentifier("git.diff.retry")
+                                }
+                                .accessibilityIdentifier("git.diff.failure")
+                            case .idle, .loading:
+                                ProgressView("Loading diff…").padding()
+                            }
+                        }
+                        .padding(16)
+                        .fixedSize(horizontal: true, vertical: false)
+                    }
+                }
+                .task(id: file.id) {
+                    state = .idle
+                    await onLoad(file)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("git.diff.inline")
+            } else {
+                ContentUnavailableView(
+                    "Choose a File",
+                    systemImage: "doc.text.magnifyingglass",
+                    description: Text("Review a changed file here without leaving the worktree.")
+                )
+                .accessibilityIdentifier("git.diff.inline.empty")
+            }
+        }
+        .background(.background)
+    }
+
+    private var noTextDiff: some View {
+        ContentUnavailableView(
+            "No Text Diff",
+            systemImage: "doc",
+            description: Text("This file has no textual changes to display.")
+        )
     }
 }
 
@@ -68,8 +143,16 @@ struct FileDiffSheet: View {
                         .accessibilitySortPriority(2)
                     switch state {
                     case .loaded(let diff):
-                        ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                            DiffLineView(line: line)
+                        if diff.isEmpty {
+                            ContentUnavailableView(
+                                "No Text Diff",
+                                systemImage: "doc",
+                                description: Text("This file has no textual changes to display.")
+                            )
+                        } else {
+                            ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                                DiffLineView(line: line)
+                            }
                         }
                     case .failed(let message):
                         VStack(alignment: .leading, spacing: 14) {

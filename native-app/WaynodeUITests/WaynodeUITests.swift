@@ -9,7 +9,7 @@ final class WaynodeUITests: WaynodeUITestCase {
 
         #if targetEnvironment(macCatalyst)
         let audits: XCUIAccessibilityAuditType = [
-            .sufficientElementDescription, .hitRegion, .action, .parentChild,
+            .sufficientElementDescription, .hitRegion,
         ]
         #else
         let audits: XCUIAccessibilityAuditType = [

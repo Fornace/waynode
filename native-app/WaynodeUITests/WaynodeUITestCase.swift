@@ -34,11 +34,60 @@ class WaynodeUITestCase: XCTestCase {
     }
 
     func dialogButton(_ app: XCUIApplication, id: String, label: String) -> XCUIElement {
-        let identified = app.buttons[id].firstMatch
-        if identified.waitForExistence(timeout: 4) { return identified }
-        let visible = app.buttons[label].firstMatch
-        XCTAssertTrue(visible.waitForExistence(timeout: 2), "Missing dialog action \(label)")
-        return visible
+        let alert = app.alerts.firstMatch
+        if alert.waitForExistence(timeout: 2) {
+            let identifiedAlertButton = alert.buttons[id].firstMatch
+            if identifiedAlertButton.waitForExistence(timeout: 1) { return identifiedAlertButton }
+            let labelledAlertButton = alert.buttons[label].firstMatch
+            if labelledAlertButton.waitForExistence(timeout: 1) { return labelledAlertButton }
+        }
+        if let identified = visibleWindowButton(app.buttons.matching(identifier: id), in: app, timeout: 4) {
+            return identified
+        }
+        let labelledButtons = app.buttons.matching(NSPredicate(format: "label == %@", label))
+        if let labelled = visibleWindowButton(labelledButtons, in: app, timeout: 2) {
+            return labelled
+        }
+        XCTFail("Missing dialog action \(label)")
+        return app.buttons[label].firstMatch
+    }
+
+    private func visibleWindowButton(
+        _ query: XCUIElementQuery,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> XCUIElement? {
+        guard query.firstMatch.waitForExistence(timeout: timeout) else { return nil }
+        let windowFrame = app.windows.firstMatch.frame
+        return query.allElementsBoundByIndex.first { element in
+            element.exists && element.isHittable && !element.frame.isEmpty
+                && element.frame.intersects(windowFrame)
+        }
+    }
+
+    func activate(_ element: XCUIElement) {
+        #if targetEnvironment(macCatalyst)
+        element.click()
+        #else
+        element.tap()
+        #endif
+    }
+
+    func activateDialogAction(
+        _ app: XCUIApplication,
+        id: String,
+        label: String,
+        cancellation: Bool = false
+    ) {
+        #if targetEnvironment(macCatalyst)
+        // Catalyst mirrors native alert actions into a Touch Bar subtree.
+        // XCTest rejects `click()` there, while `tap()` exercises that action.
+        let action = app.buttons[label].firstMatch
+        XCTAssertTrue(action.waitForExistence(timeout: 4), "Missing dialog action \(label)")
+        action.tap()
+        #else
+        dialogButton(app, id: id, label: label).tap()
+        #endif
     }
 
     func invokeRowDelete(_ app: XCUIApplication, row: XCUIElement, buttonID: String) {

@@ -5,6 +5,7 @@
 //   BASE_URL=http://127.0.0.1:3000 DEV_TOKEN=<DEV_AUTH_TOKEN> node e2e/run.mjs
 //   HEADED=1 KEEP=1 ONLY=auth,open-session,chat-send,model-switch ...
 import { chromium } from "playwright";
+import { spawnSync } from "node:child_process";
 import { randomUUID } from "crypto";
 import { mkdirSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
@@ -39,6 +40,7 @@ const results = [];
 let browser;
 let context;
 let page;
+let isolatedSpaceId;
 let isolatedSessionId;
 let sessionUrl;
 
@@ -93,6 +95,11 @@ function validTimestamp(value) {
   return typeof value === "string" && !Number.isNaN(new Date(value).getTime());
 }
 
+function gitIn(cwd, args) {
+  const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+  if (result.status !== 0) throw new Error(result.stderr || `git ${args.join(" ")} failed`);
+}
+
 try {
   browser = await chromium.launch({ headless: !HEADED, timeout: NAV_TIMEOUT });
   context = await browser.newContext({
@@ -125,6 +132,7 @@ try {
     const spaces = await api("/api/spaces");
     const space = spaces[0];
     if (!space?.id) throw new Error("no worktree available for an isolated session");
+    isolatedSpaceId = space.id;
     const session = await api(`/api/spaces/${space.id}/sessions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -189,6 +197,74 @@ try {
     if (await page.locator("[role='alert']").filter({ hasText: /model/i }).count()) throw new Error("model change surfaced an error");
     await screenshot("04-local-model");
     console.log(`   ${current} → ${targetModel.value}`);
+  });
+
+  await flow("git-review", async () => {
+    if (!isolatedSpaceId || !sessionUrl || !process.env.DATA_DIR) {
+      throw new Error("git-review requires the isolated local worktree");
+    }
+    const repo = join(process.env.DATA_DIR, "repos", isolatedSpaceId);
+    const trackedName = "waynode-review-fixture.txt";
+    const trackedPath = join(repo, trackedName);
+    const untrackedName = "an-untracked-file-with-a-deliberately-long-name-that-must-wrap-without-hiding-review-context.txt";
+    writeFileSync(trackedPath, "review baseline\n");
+    gitIn(repo, ["add", trackedName]);
+    gitIn(repo, ["-c", "user.name=Waynode E2E", "-c", "user.email=e2e@waynode.test", "-c", "commit.gpgsign=false", "commit", "-qm", "review fixture"]);
+    writeFileSync(trackedPath, "review baseline\nchanged in the review fixture\n");
+    writeFileSync(join(repo, untrackedName), "preserve this untracked content\n");
+
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto(sessionUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    await page.getByRole("button", { name: "Review" }).click({ timeout: UI_TIMEOUT });
+    const panel = page.locator(".git-panel.open");
+    await panel.waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    await page.getByText(trackedName, { exact: true }).waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    const initialBox = await panel.boundingBox();
+    if (!initialBox || initialBox.width < 700) throw new Error(`wide review opened at only ${initialBox?.width || 0}px`);
+
+    const separator = page.getByRole("separator", { name: "Resize Git review" });
+    await separator.focus();
+    await separator.press("ArrowLeft");
+    await separator.press("ArrowLeft");
+    const resizedBox = await panel.boundingBox();
+    if (!resizedBox || resizedBox.width < initialBox.width + 50) throw new Error("keyboard resize did not expand the review");
+    const separatorBox = await separator.boundingBox();
+    if (!separatorBox) throw new Error("review resize handle has no pointer target");
+    await page.mouse.move(separatorBox.x + separatorBox.width / 2, separatorBox.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(separatorBox.x + separatorBox.width / 2 + 64, separatorBox.y + 80, { steps: 4 });
+    await page.mouse.up();
+    const pointerResizedBox = await panel.boundingBox();
+    if (!pointerResizedBox || pointerResizedBox.width > resizedBox.width - 50) throw new Error("pointer resize did not contract the review");
+    const persistedWidth = await page.evaluate(() => Number(localStorage.getItem("waynode.git-review.width")));
+    if (Math.abs(persistedWidth - pointerResizedBox.width) > 2) throw new Error("review width was not persisted");
+
+    const longRow = page.locator(".git-file-row").filter({ hasText: untrackedName });
+    await longRow.waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    if (await longRow.locator(".git-file-discard").count()) throw new Error("untracked file exposed a destructive discard action");
+    const longNameStyle = await longRow.locator(".git-file-name").evaluate((node) => ({
+      whiteSpace: getComputedStyle(node).whiteSpace,
+      overflowWrap: getComputedStyle(node).overflowWrap,
+    }));
+    if (longNameStyle.whiteSpace === "nowrap" || longNameStyle.overflowWrap !== "anywhere") {
+      throw new Error("long review paths are still configured to truncate");
+    }
+
+    await page.getByRole("button", { name: `View diff for ${trackedName}` }).click();
+    await page.locator(".git-diff-pane").getByText("changed in the review fixture", { exact: false }).waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    await page.getByRole("button", { name: `Discard tracked changes to ${trackedName}` }).click();
+    const dialog = page.getByRole("alertdialog", { name: "Discard changes to this file?" });
+    await dialog.waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: `Discard tracked changes to ${trackedName}` }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Discard tracked changes" }).click();
+    await page.getByText("Discarded tracked changes", { exact: false }).waitFor({ state: "visible", timeout: UI_TIMEOUT });
+
+    await page.setViewportSize({ width: 700, height: 800 });
+    const compactBox = await panel.boundingBox();
+    if (!compactBox || compactBox.width < 690) throw new Error(`narrow review did not use the available width (${compactBox?.width || 0}px)`);
+    await screenshot("05-local-git-review");
+    console.log(`   ${Math.round(initialBox.width)}px → ${Math.round(resizedBox.width)}px → ${Math.round(pointerResizedBox.width)}px; narrow overlay ${Math.round(compactBox.width)}px`);
   });
 } finally {
   if (isolatedSessionId && context) {

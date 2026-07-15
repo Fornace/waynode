@@ -88,6 +88,29 @@ final class IPadResponsiveUITests: WaynodeUITestCase {
         XCTAssertTrue(any["session.detail"].waitForExistence(timeout: 4))
     }
 
+    func testGitReviewUsesRegularWidthForInlineDiff() {
+        let app = launchFixture(["-ui-test-git"])
+        let any = app.descendants(matching: .any)
+        let wide = any["git.layout.wide"]
+        XCTAssertTrue(wide.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Choose a File"].firstMatch.waitForExistence(timeout: 4))
+
+        let review = any["git.file.Sources/Waynode.swift.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 4))
+        review.tap()
+        let inlineDiff = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Added line in Sources/Waynode.swift")
+        ).firstMatch
+        XCTAssertTrue(inlineDiff.waitForExistence(timeout: 4))
+        XCTAssertFalse(any["git.diff.surface"].exists)
+        assertInsideWindow(inlineDiff, app: app)
+
+        rotate(.landscapeLeft, app: app)
+        XCTAssertTrue(any["git.layout.wide"].exists)
+        XCTAssertTrue(inlineDiff.exists)
+        assertInsideWindow(inlineDiff, app: app)
+    }
+
     private func rotate(_ orientation: UIDeviceOrientation, app: XCUIApplication) {
         XCUIDevice.shared.orientation = orientation
         let landscape = NSPredicate { object, _ in

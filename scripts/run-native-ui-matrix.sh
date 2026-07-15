@@ -56,6 +56,7 @@ tests=(
   "AccountDeletionUITests/testDeletionRequiresTypedConfirmationAndClearsAuthOnSuccess"
   "AccountDeletionUITests/testDeletionFailurePreservesAccountAndCanBeCancelled"
   "GitTerminalUITests/testGitFileDiffCommitAndBranchSwitch"
+  "GitTerminalUITests/testTrackedFileDiscardRequiresConfirmation"
   "GitTerminalUITests/testDiffFailureShowsRetryWithoutInventingDiffLines"
   "GitTerminalUITests/testConflictsBlockPullPushAndCommitWithRecoveryCopy"
   "GitTerminalUITests/testDivergedBranchBlocksUnsafeSynchronization"
@@ -79,7 +80,7 @@ run_bounded 600 xcodebuild \
   -scheme "$SCHEME" \
   -destination "$DESTINATION" \
   -parallel-testing-enabled NO \
-  build-for-testing
+  build-for-testing 2>&1 | tee "$RESULTS/build.log"
 
 passed=0
 failed=0

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import type { Space, GitSnapshot } from "../types";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { STATUS_COLOR, buildAskPrompt, basename, dirname, CheckIcon, CloseIcon, DiffView, FileEditor, Pill, WarnIcon, type GitIssue } from "./GitSidebarShared";
 
 // ───────────────────────────── Changes ─────────────────────────────
@@ -17,6 +18,8 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
   const [committing, setCommitting] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const [discardTarget, setDiscardTarget] = useState<string | "all" | null>(null);
+  const [discarding, setDiscarding] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: "success" | "error" } | null>(null);
   const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,6 +47,8 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
   }, [snap.files]);
 
   const allSelected = snap.files.length > 0 && selected.size === snap.files.length;
+  const discardableFiles = snap.files.filter((file) => file.status === "modified" || file.status === "deleted");
+  const preservedCount = snap.files.length - discardableFiles.length;
   const toggle = (path: string) =>
     setSelected((prev) => {
       const n = new Set(prev);
@@ -135,6 +140,35 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     }
   };
 
+  const handleDiscard = async () => {
+    if (!discardTarget || discarding) return;
+    if (snap.piBusy) {
+      setDiscardTarget(null);
+      showMsg("Wait for the agent to finish before discarding tracked changes.", "error");
+      return;
+    }
+    const target = discardTarget;
+    setDiscarding(true);
+    setMsg(null);
+    try {
+      const result = target === "all"
+        ? await api.git.discardAll(space.id)
+        : await api.git.discardFile(space.id, target);
+      onChange(result.data);
+      setSelected((current) => target === "all"
+        ? new Set([...current].filter((path) => result.data.files.some((file) => file.path === path)))
+        : new Set([...current].filter((path) => path !== target)));
+      if (target === "all" || expanded === target) setExpanded(null);
+      showMsg(target === "all" ? "Discarded modified and deleted tracked files. All other files were kept." : `Discarded tracked changes to ${target}.`, "success");
+      setDiscardTarget(null);
+    } catch {
+      showMsg("Couldn’t discard these tracked changes. The worktree was left unchanged.", "error");
+      setDiscardTarget(null);
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   // ── Issue builders: drop a system msg in chat + show an inline card ──
   const note = (text: string) => store.injectSystem(sessionId, text);
   const askPi = (prompt: string) => { store.send(sessionId, prompt, false); onClose(); onIssue(null); };
@@ -211,6 +245,11 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
       <div className="git-section-head">
         <span className="git-changes-count">Changes · {snap.files.length}</span>
         <div className="git-mini-row">
+          {discardableFiles.length > 0 && (
+            <button className="git-mini-btn git-discard-all" onClick={() => setDiscardTarget("all")} disabled={snap.piBusy || discarding} title={snap.piBusy ? "Wait for the agent to finish editing" : "Restore modified and deleted tracked files; every other file is kept"}>
+              Discard tracked edits
+            </button>
+          )}
           <button className="git-mini-btn" onClick={handlePull} disabled={pulling}>
             ↓ {pulling ? "…" : "Pull"}
           </button>
@@ -263,6 +302,15 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
                         aria-label={`${expanded === f.path ? "Hide" : "View"} diff for ${f.path}`}
                         aria-expanded={expanded === f.path}
                       >›</button>
+                      {(f.status === "modified" || f.status === "deleted") && (
+                        <button
+                          className="git-file-discard"
+                          onClick={() => setDiscardTarget(f.path)}
+                          disabled={snap.piBusy || discarding}
+                          title={snap.piBusy ? "Wait for the agent to finish editing" : `Discard tracked changes to ${f.path}`}
+                          aria-label={`Discard tracked changes to ${f.path}`}
+                        >↶</button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -281,6 +329,19 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
               path={editorPath}
               onClose={() => setEditorPath(null)}
               onSaved={() => { api.git.status(space.id).then(onChange).catch(() => {}); showMsg("Saved — ready to review and commit", "success"); }}
+            />
+          )}
+          {discardTarget && (
+            <ConfirmDialog
+              title={discardTarget === "all" ? "Discard tracked edits?" : "Discard changes to this file?"}
+              description={discardTarget === "all"
+                ? `This permanently restores ${discardableFiles.length} modified or deleted tracked file${discardableFiles.length === 1 ? "" : "s"} to the last commit. ${preservedCount ? `The other ${preservedCount} changed file${preservedCount === 1 ? " is" : "s are"} kept exactly as ${preservedCount === 1 ? "it is" : "they are"}.` : "New and untracked files are kept."} This cannot be undone.`
+                : `This permanently restores “${discardTarget}” to its last committed state. Every other file is kept. This cannot be undone.`}
+              confirmLabel={discarding ? "Discarding…" : "Discard tracked changes"}
+              danger
+              busy={discarding}
+              onCancel={() => setDiscardTarget(null)}
+              onConfirm={handleDiscard}
             />
           )}
         </>

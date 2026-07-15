@@ -135,16 +135,11 @@ struct SessionDetail: View {
             }
             #endif
         }
-        .sheet(isPresented: $showingGitInspector) {
-            #if DEBUG
-            GitInspector(
-                spaceId: spaceId,
-                fixtureSnapshot: appModel.isUITestFixture ? GitUITestFixtures.snapshot : nil
-            )
-            #else
-            GitInspector(spaceId: spaceId)
-            #endif
-        }
+        #if targetEnvironment(macCatalyst) || os(macOS)
+        .sheet(isPresented: $showingGitInspector) { gitInspectorContent }
+        #else
+        .fullScreenCover(isPresented: $showingGitInspector) { gitInspectorContent }
+        #endif
         .onChange(of: showingGitInspector) { _, isShowing in
             if !isShowing { Task { await refreshGitContext() } }
         }
@@ -180,6 +175,18 @@ struct SessionDetail: View {
         .onDisappear {
             store.release()
         }
+    }
+
+    @ViewBuilder
+    private var gitInspectorContent: some View {
+        #if DEBUG
+        GitInspector(
+            spaceId: spaceId,
+            fixtureSnapshot: appModel.isUITestFixture ? GitUITestFixtures.snapshot : nil
+        )
+        #else
+        GitInspector(spaceId: spaceId)
+        #endif
     }
     private func refreshGitContext() async {
         #if DEBUG

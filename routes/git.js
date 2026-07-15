@@ -8,6 +8,8 @@
  *  POST   /api/spaces/:spaceId/git/switch-branch { branchName, mode: 'stash'|'carry'|'clean' }
  *  POST   /api/spaces/:spaceId/git/create-branch { branchName, baseBranch }
  *  POST   /api/spaces/:spaceId/git/pull          fast-forward only
+ *  POST   /api/spaces/:spaceId/git/discard-file  confirmed tracked-file restore
+ *  POST   /api/spaces/:spaceId/git/discard-all   confirmed safe tracked restore
  *
  * The user is the owner of the repo. Self-host uses an informational `piBusy`
  * warning; hosted Git returns 409 while a sandbox can mutate local config.
@@ -18,6 +20,7 @@ import { requireAuth, requireSpaceAccess, queryTokenAuth } from "../lib/auth.mjs
 import { getSpace } from "../lib/spaces.mjs";
 import { isSpaceBusy } from "../lib/agent-manager.mjs";
 import * as git from "../lib/git-ops.mjs";
+import { discardAllTracked, discardTrackedFile } from "../lib/git-discard.mjs";
 import { identityForUser } from "../lib/git-identity.mjs";
 import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
@@ -41,7 +44,14 @@ function refreshSpaceStorage(req) {
 function sendGitError(res, e, fallbackStatus = 500) {
   if (e.spaceDirMissing) return res.status(409).json({ error: e.message, spaceDirMissing: true });
   if (e.gitBusy) return res.status(409).json({ error: e.message, gitBusy: true });
-  return res.status(fallbackStatus).json({ error: e.message });
+  const body = { error: e.message };
+  for (const tag of [
+    "confirmationRequired", "invalidPath", "noTrackedChange",
+    "untrackedPreserved", "unsupportedTrackedState",
+  ]) {
+    if (e[tag]) body[tag] = true;
+  }
+  return res.status(e.status || fallbackStatus).json(body);
 }
 
 // Snapshot (REST)
@@ -137,6 +147,36 @@ router.post("/api/spaces/:spaceId/git/commit", requireAuth, requireSpaceAccess, 
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
+  } catch (e) {
+    sendGitError(res, e, 400);
+  }
+});
+
+router.post("/api/spaces/:spaceId/git/discard-file", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  try {
+    const result = await discardTrackedFile(cwd, req.body || {});
+    refreshSpaceStorage(req);
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, result, data });
+  } catch (e) {
+    sendGitError(res, e, 400);
+  }
+});
+
+router.post("/api/spaces/:spaceId/git/discard-all", requireAuth, requireSpaceAccess, async (req, res) => {
+  const cwd = spacePath(req);
+  if (!cwd) return res.status(404).json({ error: "Space not found" });
+  if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
+  try {
+    const result = await discardAllTracked(cwd, req.body || {});
+    refreshSpaceStorage(req);
+    const data = git.getSnapshot(cwd);
+    data.piBusy = isSpaceBusy(req.params.spaceId);
+    res.json({ ok: true, result, data });
   } catch (e) {
     sendGitError(res, e, 400);
   }
