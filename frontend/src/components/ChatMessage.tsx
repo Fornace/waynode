@@ -11,20 +11,32 @@ interface MessageRowProps {
 }
 
 export function MessageRow({ item, streaming, phase, onQuote }: MessageRowProps) {
-  if (item.role === "system") return <SystemEvent content={item.content} />;
+  if (item.role === "system") return <SystemEvent content={item.content} sentAt={item.sentAt} />;
 
   if (item.role === "user") {
     return (
       <article className="msg msg-user">
-        <div className="msg-bubble msg-bubble-user">
-          {item.isGoal && <span className="msg-tag">Goal</span>}
-          <UserContent content={item.content} />
+        <div className="msg-user-stack">
+          <div className="msg-bubble msg-bubble-user">
+            {item.isGoal && <span className="msg-tag">Goal</span>}
+            {item.submissionStatus && !["completed", "running"].includes(item.submissionStatus) && (
+              <span className={`msg-tag submission-${item.submissionStatus}`}>{submissionLabel(item.submissionStatus)}</span>
+            )}
+            <UserContent content={item.content} />
+          </div>
+          <MessageTime sentAt={item.sentAt} />
         </div>
       </article>
     );
   }
 
   return <AssistantTurn item={item} streaming={streaming} phase={phase} onQuote={onQuote} />;
+}
+
+function submissionLabel(status: NonNullable<Extract<ChatItem, { role: "user" }>["submissionStatus"]>) {
+  return status === "sending" ? "Sending" : status === "queued" ? "Queued"
+    : status === "starting" ? "Starting" : status === "failed" ? "Failed"
+      : status === "cancelled" ? "Cancelled" : status;
 }
 
 function AssistantTurn({
@@ -47,6 +59,7 @@ function AssistantTurn({
       <header className="assistant-turn-head">
         <span className="assistant-mark"><WaynodeMark size={18} /></span>
         <span>Waynode</span>
+        <MessageTime sentAt={item.sentAt} />
         {!streaming && markdown && (
           <TurnActions
             bodyRef={bodyRef}
@@ -59,7 +72,7 @@ function AssistantTurn({
       </header>
       <div className="msg-body" ref={bodyRef}>
         {item.blocks.map((block, index) => (
-          <BlockView key={index} block={block} streaming={streaming} isLastBlock={index === item.blocks.length - 1} />
+          <BlockView key={index} block={block} streaming={streaming} isLastBlock={index === item.blocks.length - 1} onQuote={onQuote} />
         ))}
         {streaming && item.blocks.length === 0 && <StartingAgent phase={phase} />}
         {showRaw && <pre className="raw-markdown" tabIndex={0}>{markdown}</pre>}
@@ -68,7 +81,7 @@ function AssistantTurn({
   );
 }
 
-function BlockView({ block, streaming, isLastBlock }: { block: Block; streaming: boolean; isLastBlock: boolean }) {
+function BlockView({ block, streaming, isLastBlock, onQuote }: { block: Block; streaming: boolean; isLastBlock: boolean; onQuote?: (markdown: string) => void }) {
   if (block.type === "text") {
     return (
       <div className="msg-text">
@@ -87,13 +100,14 @@ function BlockView({ block, streaming, isLastBlock }: { block: Block; streaming:
     );
   }
 
-  return <ToolDisclosure block={block} />;
+  return <ToolDisclosure block={block} onRecover={onQuote} />;
 }
 
-function ToolDisclosure({ block }: { block: Extract<Block, { type: "tool" }> }) {
+function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "tool" }>; onRecover?: (markdown: string) => void }) {
   const [wrapped, setWrapped] = useState(true);
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(block.status === "error");
+  const [now, setNow] = useState(Date.now());
   const output = block.output || "";
   const label = TOOL_LABELS[block.name] || "Tool activity";
   const context = toolContext(block);
@@ -103,6 +117,14 @@ function ToolDisclosure({ block }: { block: Extract<Block, { type: "tool" }> }) 
   useEffect(() => {
     if (block.status === "error") setOpen(true);
   }, [block.status]);
+
+  useEffect(() => {
+    if (block.status !== "running" || !block.startedAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [block.startedAt, block.status]);
+
+  const elapsed = block.startedAt ? formatElapsed((block.endedAt || now) - block.startedAt) : "";
 
   const copy = async () => {
     await navigator.clipboard.writeText(output);
@@ -116,11 +138,11 @@ function ToolDisclosure({ block }: { block: Extract<Block, { type: "tool" }> }) 
         <StatusIcon status={block.status} />
         <span>{statusVerb(block.status)} {label.toLowerCase()}</span>
         {context && <small>{context}</small>}
-        <code>{block.name}</code>
+        {elapsed && <time>{elapsed}</time>}
         <DisclosureChevron />
       </summary>
       <div className="tool-details">
-        {args && <details className="tool-raw"><summary>Arguments</summary><pre>{args}</pre></details>}
+        <details className="tool-raw"><summary>Technical details</summary><pre>{block.name}{args ? `\n${args}` : ""}</pre></details>
         {output && <div className={`tool-output-wrap ${wrapped ? "is-wrapped" : ""}`}>
           <div className="tool-output-actions">
             <span>Output</span>
@@ -129,6 +151,7 @@ function ToolDisclosure({ block }: { block: Extract<Block, { type: "tool" }> }) 
           </div>
           <pre className="tool-output" tabIndex={0}>{output}</pre>
         </div>}
+        {block.status === "error" && onRecover && <button className="tool-recovery" type="button" onClick={() => onRecover(`Recover from the failed ${label.toLowerCase()}.\n\n${output}`)}>Ask agent to recover</button>}
       </div>
     </details>
   );
@@ -142,12 +165,13 @@ function TurnActions({ bodyRef, markdown, onQuote, showRaw, onToggleRaw }: {
   onToggleRaw: () => void;
 }) {
   const [copied, setCopied] = useState("");
+  const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDetailsElement>(null);
   const run = async (label: string, action: () => void | Promise<void>) => {
     await action();
     setCopied(label);
     window.setTimeout(() => setCopied(""), 1400);
-    menuRef.current?.removeAttribute("open");
+    setOpen(false);
   };
   const select = () => {
     if (!bodyRef.current) return;
@@ -157,8 +181,17 @@ function TurnActions({ bodyRef, markdown, onQuote, showRaw, onToggleRaw }: {
     window.getSelection()?.addRange(range);
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: MouseEvent) => { if (!menuRef.current?.contains(event.target as Node)) setOpen(false); };
+    const closeEscape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); setOpen(false); menuRef.current?.querySelector<HTMLElement>("summary")?.focus(); } };
+    document.addEventListener("mousedown", closeOutside);
+    document.addEventListener("keydown", closeEscape);
+    return () => { document.removeEventListener("mousedown", closeOutside); document.removeEventListener("keydown", closeEscape); };
+  }, [open]);
+
   return (
-    <details className="turn-actions" ref={menuRef}>
+    <details className="turn-actions" ref={menuRef} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary aria-label="Answer actions" title="Answer actions">•••</summary>
       <div className="turn-actions-menu">
         <button type="button" onClick={() => run("Copied", () => navigator.clipboard.writeText(bodyRef.current?.innerText || markdown))}>{copied === "Copied" ? "Copied" : "Copy"}</button>
@@ -183,9 +216,23 @@ function UserContent({ content }: { content: string }) {
   return <>{prefix}{files.length > 0 && <div className="msg-attachments">{files.map((file) => <span key={file} className="msg-attachment-pill"><AttachmentIcon />{file}</span>)}</div>}</>;
 }
 
-function SystemEvent({ content }: { content: string }) {
+function SystemEvent({ content, sentAt }: { content: string; sentAt: string | null }) {
   const event = normalizeSystemEvent(content);
-  return <div className={`system-event is-${event.tone}`} role={event.tone === "error" ? "alert" : "status"}><SystemStatusIcon tone={event.tone} /><span>{event.text}</span></div>;
+  return <div className={`system-event is-${event.tone}`} role={event.tone === "error" ? "alert" : "status"}><SystemStatusIcon tone={event.tone} /><span>{event.text}</span><MessageTime sentAt={sentAt} /></div>;
+}
+
+function MessageTime({ sentAt }: { sentAt: string | null }) {
+  if (!sentAt) return <span className="msg-time is-unavailable" title="This saved message predates timestamp support">Time unavailable</span>;
+  const date = new Date(sentAt);
+  if (Number.isNaN(date.getTime())) return <span className="msg-time is-unavailable">Time unavailable</span>;
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  const label = new Intl.DateTimeFormat(undefined, sameDay
+    ? { hour: "2-digit", minute: "2-digit" }
+    : { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+  ).format(date);
+  const full = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "long" }).format(date);
+  return <time className="msg-time" dateTime={date.toISOString()} title={full}>{label}</time>;
 }
 
 function normalizeSystemEvent(content: string) {
@@ -224,6 +271,12 @@ function statusVerb(status: ToolStatus) {
   if (status === "running") return "Running";
   if (status === "error") return "Failed";
   return "Completed";
+}
+
+function formatElapsed(milliseconds: number) {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
 export function StartingAgent({ phase }: { phase?: string | null }) {

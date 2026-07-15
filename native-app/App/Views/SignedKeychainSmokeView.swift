@@ -24,29 +24,9 @@ struct SignedKeychainSmokeView: View {
     }
 
     private func runSmokeTest() {
-        let store = KeychainStore(
-            service: "com.waynode.app.ui-test.keychain",
-            account: "signed-runtime-smoke"
-        )
-        let probe = "wn_signed_keychain_smoke"
-        store.deleteToken()
-        defer { store.deleteToken() }
-
-        do {
-            try store.writeToken(probe)
-            guard store.readToken() == probe else {
-                outcome = .failed("The signed app wrote a keychain item but could not read it back.")
-                return
-            }
-            store.deleteToken()
-            guard store.readToken() == nil else {
-                outcome = .failed("The signed app could not delete its keychain test item.")
-                return
-            }
-            outcome = .passed
-        } catch {
-            outcome = .failed(error.localizedDescription)
-        }
+        let failure = SignedKeychainProbe.run()
+        SignedKeychainProbe.emit(failure: failure)
+        outcome = failure.map(Outcome.failed) ?? .passed
     }
 
     private enum Outcome: Equatable {
@@ -68,6 +48,52 @@ struct SignedKeychainSmokeView: View {
             case .passed: "keychain.smoke.passed"
             case .failed: "keychain.smoke.failed"
             }
+        }
+    }
+}
+
+/// Runs before any window is created for the native-macOS smoke gate, and
+/// from the visible fixture for XCTest. Keeping one probe prevents the two
+/// signed-runtime paths from drifting.
+enum SignedKeychainProbe {
+    static func run() -> String? {
+        let store = KeychainStore(
+            service: "com.waynode.app.ui-test.keychain"
+        )
+        let scope = "https://signed-runtime-smoke.invalid"
+        let probe = "wn_signed_keychain_smoke"
+        let replacement = "wn_signed_keychain_replacement"
+        store.deleteToken(for: scope)
+        defer { store.deleteToken(for: scope) }
+
+        do {
+            try store.writeToken(probe, for: scope)
+            guard store.readToken(for: scope) == probe else {
+                return "The signed app wrote a keychain item but could not read it back."
+            }
+            try store.writeToken(replacement, for: scope)
+            guard store.readToken(for: scope) == replacement else {
+                return "The signed app could not update its keychain item in place."
+            }
+            store.deleteToken(for: scope)
+            guard store.readToken(for: scope) == nil else {
+                return "The signed app could not delete its keychain test item."
+            }
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    static func emit(failure: String?) {
+        let marker = failure == nil
+            ? "WAYNODE_KEYCHAIN_SMOKE=passed\n"
+            : "WAYNODE_KEYCHAIN_SMOKE=failed\n"
+        if let data = marker.data(using: .utf8) {
+            FileHandle.standardOutput.write(data)
+        }
+        if let failure {
+            print("Waynode diagnostics: keychain smoke failure: \(failure)")
         }
     }
 }

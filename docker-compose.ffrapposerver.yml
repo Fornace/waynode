@@ -18,11 +18,17 @@ services:
       context: .
     container_name: waynode
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
     ports:
-      - "3000:3000"
+      # nginx terminates TLS on this same host. Never publish the app's plain
+      # HTTP origin on every interface.
+      - "${WAYNODE_BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
       - DATA_DIR=/data
+      - PORT=3000
+      - WAYNODE_REVISION=${WAYNODE_REVISION:-development}
     env_file:
       - .env
     devices:
@@ -33,6 +39,16 @@ services:
     volumes:
       - waynode-data:/data
       - /root/.microsandbox:/root/.microsandbox   # cached waynode-sandbox image
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
 
 volumes:
   waynode-data:

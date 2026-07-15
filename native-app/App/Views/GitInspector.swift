@@ -1,5 +1,11 @@
 import SwiftUI
 import WaynodeCore
+
+enum GitRetryAction {
+    case pull
+    case push
+}
+
 struct GitInspector: View {
     let spaceId: String
     let fixtureSnapshot: GitSnapshot?
@@ -9,7 +15,7 @@ struct GitInspector: View {
     @State var error: String?
     @State var isLoading: Bool = true
     @State var selectedFile: GitFile?
-    @State var diff: String?
+    @State var diffState: GitDiffState = .idle
     @State var showingCommitSheet = false
     @State var commitMessage = ""
     @State var selectedFiles: Set<String> = []
@@ -22,6 +28,7 @@ struct GitInspector: View {
     @State var isPulling = false
     @State var isPushing = false
     @State var actionError: String?
+    @State var retryAction: GitRetryAction?
     init(spaceId: String, fixtureSnapshot: GitSnapshot? = nil) {
         self.spaceId = spaceId
         self.fixtureSnapshot = fixtureSnapshot
@@ -47,7 +54,7 @@ struct GitInspector: View {
                 }
             }
             .navigationTitle("Git worktree")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -60,7 +67,10 @@ struct GitInspector: View {
                         Label("Commit", systemImage: "checkmark.circle")
                     }
                     .buttonStyle(.glassProminent)
-                    .disabled(selectedFiles.isEmpty || isPulling || isPushing || switchingBranch)
+                    .disabled(
+                        selectedFiles.isEmpty || isPulling || isPushing || switchingBranch
+                            || snapshot?.files.contains(where: { $0.status == "conflict" }) == true
+                    )
                     .keyboardShortcut(.defaultAction).accessibilityIdentifier("git.commit.open").accessibilityHint("Opens commit details for the selected files")
                 }
             }
@@ -80,7 +90,7 @@ struct GitInspector: View {
             .sheet(item: $selectedFile) { file in
                 FileDiffSheet(
                     filePath: file.path,
-                    diff: $diff,
+                    state: $diffState,
                     onLoad: { Task { await loadDiff(for: file.path) } }
                 )
             }
@@ -99,9 +109,30 @@ struct GitInspector: View {
             }
             .alert("Git action failed", isPresented: Binding(
                 get: { actionError != nil },
-                set: { if !$0 { actionError = nil } }
+                set: {
+                    if !$0 {
+                        actionError = nil
+                        retryAction = nil
+                    }
+                }
             )) {
-                Button("OK", role: .cancel) {}.accessibilityIdentifier("git.error.dismiss")
+                if let retryAction {
+                    Button("Retry") {
+                        actionError = nil
+                        Task {
+                            switch retryAction {
+                            case .pull: await pullChanges()
+                            case .push: await pushChanges()
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("git.error.retry")
+                }
+                Button("Close", role: .cancel) {
+                    actionError = nil
+                    retryAction = nil
+                }
+                .accessibilityIdentifier("git.error.dismiss")
             } message: {
                 Text(actionError ?? "").textSelection(.enabled).accessibilityLabel("Git action error: \(actionError ?? "")")
             }
@@ -152,7 +183,9 @@ struct GitInspector: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isPulling || isPushing || switchingBranch || isCommitting).accessibilityIdentifier("git.pull").accessibilityHint("Pulls remote changes into this worktree")
+                    .disabled(syncActionsBusy || pullBlockReason(snap) != nil)
+                    .accessibilityIdentifier("git.pull")
+                    .accessibilityHint(pullBlockReason(snap) ?? "Pulls remote changes into this worktree")
 
                     Button {
                         Task { await pushChanges() }
@@ -162,7 +195,17 @@ struct GitInspector: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(snap.ahead > 0 ? .accentColor : .secondary)
-                    .disabled(isPulling || isPushing || switchingBranch || isCommitting).accessibilityIdentifier("git.push").accessibilityHint("Pushes local commits to the remote repository")
+                    .disabled(syncActionsBusy || sharedSyncBlockReason(snap) != nil)
+                    .accessibilityIdentifier("git.push")
+                    .accessibilityHint(sharedSyncBlockReason(snap) ?? "Pushes local commits to the remote repository")
+                }
+                if let reason = pullBlockReason(snap) ?? sharedSyncBlockReason(snap) {
+                    Label(reason, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("git.sync.blocked")
                 }
             }
             .padding(.vertical, 4)
@@ -202,7 +245,14 @@ struct GitInspector: View {
 
     @ViewBuilder
     private func syncBadge(_ snap: GitSnapshot) -> some View {
-        if snap.ahead == 0 && snap.behind == 0 {
+        if snap.ahead > 0 && snap.behind > 0 {
+            Label("Diverged", systemImage: "arrow.triangle.branch")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(.orange.opacity(0.12), in: Capsule())
+        } else if snap.ahead == 0 && snap.behind == 0 {
             Label("Synced", systemImage: "checkmark.circle.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.green)
@@ -232,9 +282,34 @@ struct GitInspector: View {
                 Text(snap.hasUncommittedChanges ? "\(snap.files.count) uncommitted change\(snap.files.count == 1 ? "" : "s")" : "Working tree clean")
                     .font(.subheadline)
             }
+            if snap.files.contains(where: { $0.status == "conflict" }) {
+                Label("Resolve conflicted files before pulling, pushing, or committing.", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("git.conflicts")
+            }
         } header: {
             Text("Status")
         }
+    }
+
+    private var syncActionsBusy: Bool {
+        isPulling || isPushing || switchingBranch || isCommitting
+    }
+
+    private func sharedSyncBlockReason(_ snap: GitSnapshot) -> String? {
+        if snap.detached { return "Check out a branch before synchronizing." }
+        if snap.files.contains(where: { $0.status == "conflict" }) {
+            return "Resolve conflicted files before synchronizing."
+        }
+        if snap.ahead > 0 && snap.behind > 0 {
+            return "This branch has diverged. Choose a merge or rebase strategy outside this panel, then retry."
+        }
+        return nil
+    }
+
+    private func pullBlockReason(_ snap: GitSnapshot) -> String? {
+        sharedSyncBlockReason(snap) ?? (snap.upstream == nil ? "Set an upstream by pushing this branch first." : nil)
     }
 
     private func filesSection(_ snap: GitSnapshot) -> some View {
@@ -252,7 +327,7 @@ struct GitInspector: View {
                             .accessibilityLabel("\(selectedFiles.contains(file.path) ? "Deselect" : "Select") \(file.path), status \(file.status)").accessibilityIdentifier("git.file.\(file.path).select")
 
                             Button {
-                                diff = nil
+                                diffState = .idle
                                 selectedFile = file
                             } label: {
                                 Label("Review diff", systemImage: "doc.text.magnifyingglass")

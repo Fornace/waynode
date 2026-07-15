@@ -16,7 +16,6 @@ struct CloneSheet: View {
 
     @State private var repoURL = ""
     @State private var branch = ""
-    @State private var orgId: String?
     @State private var phase: Phase = .input
     @State private var progressLines: [String] = []
 
@@ -35,8 +34,10 @@ struct CloneSheet: View {
                 case .error(let message): errorView(message)
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("clone.surface")
             .navigationTitle(navTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .interactiveDismissDisabled(isBusy)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -48,8 +49,6 @@ struct CloneSheet: View {
             }
         }
         .macSheetFrame(minWidth: 540, idealWidth: 660, minHeight: 520, idealHeight: 680)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("clone.surface")
     }
 
     private var navTitle: String {
@@ -65,15 +64,12 @@ struct CloneSheet: View {
         Form {
             Section {
                 TextField("Repository URL", text: $repoURL, prompt: Text("https://github.com/org/repository.git"))
-                    .keyboardType(.URL)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                    .platformURLTextInput()
                     .submitLabel(.done)
                     .accessibilityIdentifier("clone.repository.url")
                     .accessibilityHint("Enter an HTTPS or SSH Git repository address")
                 TextField("Branch", text: $branch, prompt: Text("Optional"))
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                    .platformCodeTextInput()
                     .accessibilityIdentifier("clone.branch")
                     .accessibilityHint("Optional; leave empty for the default branch")
             } header: {
@@ -81,15 +77,28 @@ struct CloneSheet: View {
             } footer: {
                 Text("Leave Branch empty to use the repository's default branch.")
             }
-            if appModel.orgs.count > 1 {
+            if !appModel.orgs.isEmpty {
                 Section("Organization") {
                     Picker("Org", selection: Binding(
-                        get: { orgId ?? appModel.orgs.first?.id ?? "" },
-                        set: { orgId = $0.isEmpty ? nil : $0 }
+                        get: { appModel.activeOrgId ?? "" },
+                        set: { appModel.selectOrganization($0) }
                     )) {
-                        ForEach(appModel.orgs) { org in Text(org.name).tag(org.id) }
+                        ForEach(appModel.orgs) { org in
+                            Text("\(org.name) · \(roleLabel(org.myRole))").tag(org.id)
+                        }
                     }
                     .accessibilityIdentifier("clone.organization")
+                    if let org = appModel.activeOrg {
+                        Text("New worktree: \(org.name) · \(roleLabel(org.myRole))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("clone.organization.summary")
+                    }
+                }
+            } else {
+                Section("Organization") {
+                    Label("No organization membership is available", systemImage: "person.2.slash")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -99,12 +108,12 @@ struct CloneSheet: View {
                     Haptics.light()
                     startClone()
                 }
-                .disabled(repoURL.trimmingCharacters(in: .whitespaces).isEmpty || phase == .creating)
+                .disabled(repoURL.trimmingCharacters(in: .whitespaces).isEmpty || phase == .creating || appModel.activeOrg == nil)
                 .buttonStyle(.glassProminent)
                 .overlay { if phase == .creating { ProgressView() } }
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("clone.start")
-                .accessibilityHint("Creates a worktree from this repository")
+                .accessibilityHint("Creates a worktree in \(appModel.activeOrg?.name ?? "the selected organization")")
             }
         }
     }
@@ -203,7 +212,7 @@ struct CloneSheet: View {
             let space = try await appModel.createSpace(
                 repoUrl: url,
                 branch: branch,
-                orgId: orgId ?? appModel.orgs.first?.id
+                orgId: appModel.activeOrgId
             )
             appModel.selectedSpaceId = space.id
             phase = .cloning
@@ -243,5 +252,9 @@ struct CloneSheet: View {
             phase = .error(error.localizedDescription)
             Haptics.error()
         }
+    }
+
+    private func roleLabel(_ role: String?) -> String {
+        (role ?? "member").replacingOccurrences(of: "_", with: " ").capitalized
     }
 }

@@ -12,6 +12,7 @@ import { ensureGitAskpass } from "./lib/git-creds.mjs";
 import { ensurePiProviderConfig } from "./lib/pi-config.mjs";
 import { bootstrapSelfHostedProviderCredential } from "./lib/pi-provider-bootstrap.mjs";
 import { SQLiteSessionStore } from "./lib/sqlite-session-store.mjs";
+import { publicReadinessReport, readinessReport, versionReport } from "./lib/health.mjs";
 import { attachTerminalWebSocket } from "./routes/terminal.js";
 
 import authRoutes from "./routes/auth.js";
@@ -69,6 +70,16 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 }));
+
+// These routes deliberately avoid auth/session dependencies. Liveness proves
+// only that the Node event loop can answer; readiness covers durable state and
+// hosted execution prerequisites and returns 503 until they are usable.
+app.get("/api/health/live", (req, res) => res.json({ live: true }));
+app.get("/api/health/version", (req, res) => res.json(versionReport()));
+app.get("/api/health/ready", (req, res) => {
+  const report = readinessReport();
+  res.status(report.ready ? 200 : 503).json(publicReadinessReport(report));
+});
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

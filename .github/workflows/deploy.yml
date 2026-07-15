@@ -4,91 +4,88 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: waynode-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Enforce source file length
-        run: node scripts/check-file-lengths.mjs
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+
+      - name: Validate deployment files
+        run: |
+          find scripts -type f -name '*.sh' -exec bash -n {} +
+          cp .env.example .env
+          trap 'rm -f .env' EXIT
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.ffrapposerver.yml config --quiet
+          node e2e/test-deploy-contract.mjs
+
+      - name: Test and build
+        run: |
+          npm test
+          npm run build:frontend
 
       - name: Verify sandbox image credential boundary
         run: node scripts/check-sandbox-image.mjs
 
+      - name: Package exact source revision
+        run: git archive --format=tar.gz --output="${RUNNER_TEMP}/waynode-source.tar.gz" "${GITHUB_SHA}"
+
       - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
 
-      - name: Add server to known_hosts
+      - name: Install pinned server host key
+        env:
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh-keygen -F "${{ secrets.DEPLOY_HOST }}" -f ~/.ssh/known_hosts >/dev/null
 
-      - name: Sync code to server
+      - name: Stage exact source without touching production
         run: |
-          rsync -avz --delete \
-            --exclude='data/' \
-            --exclude='.git/' \
-            --exclude='node_modules/' \
-            --exclude='frontend/node_modules/' \
-            --exclude='frontend/dist/' \
-            --exclude='.env' \
-            ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/waynode/
+          stage="/var/tmp/waynode-deploy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "install -d -m 700 '$stage'"
+          scp "${RUNNER_TEMP}/waynode-source.tar.gz" \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:"$stage/source.tar.gz"
 
-      - name: Build, load sandbox, and restart safely
+      - name: Reconcile, deploy, and publicly verify transaction
         run: |
-          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} 'bash -se' <<'REMOTE'
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "DEPLOY_SHA=${GITHUB_SHA} DEPLOY_ID=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT} bash -se" <<'REMOTE'
           set -Eeuo pipefail
-          cd /opt/waynode
-
-          compose_file=docker-compose.ffrapposerver.yml
-          sandbox_archive=$(mktemp /tmp/waynode-sandbox.XXXXXX.tar)
-          trap 'rm -f "$sandbox_archive"' EXIT
-
-          # Verify the exact synced source before any production image build.
-          node scripts/check-sandbox-image.mjs
-
-          # The current service stays running throughout both builds. Build the
-          # server first because its image supplies the matching msb 0.6.6 CLI.
-          docker compose -f "$compose_file" build waynode
-          waynode_image=$(docker compose -f "$compose_file" config --images | head -n 1)
-          test -n "$waynode_image"
-          docker image inspect "$waynode_image" >/dev/null
-          docker build --file sandbox/Dockerfile --tag waynode-sandbox:latest .
-
-          # Validate the resulting image, not only its Dockerfile. The checker
-          # deliberately reports no matching value if a credential is found.
-          docker run --rm \
-            --volume "$PWD/scripts/check-sandbox-image.mjs:/tmp/check-sandbox-image.mjs:ro" \
-            --entrypoint node waynode-sandbox:latest \
-            /tmp/check-sandbox-image.mjs /root/.pi/agent/models.json
-
-          docker save --output "$sandbox_archive" waynode-sandbox:latest
-
-          # Import through a one-shot server image with no env_file, network,
-          # KVM device, or server credentials. The host cache is the same bind
-          # mount used by the production service. Restart only after inspect
-          # proves the new reference is available to microsandbox.
-          docker run --rm \
-            --network none \
-            --volume /root/.microsandbox:/root/.microsandbox \
-            --volume "$sandbox_archive:/tmp/waynode-sandbox.tar:ro" \
-            "$waynode_image" \
-            msb image load --input /tmp/waynode-sandbox.tar --tag waynode-sandbox:latest --quiet
-          docker run --rm \
-            --network none \
-            --volume /root/.microsandbox:/root/.microsandbox \
-            "$waynode_image" \
-            msb image inspect waynode-sandbox:latest >/dev/null
-
-          docker compose -f "$compose_file" up -d --wait --wait-timeout 120
-          # Keep the just-replaced server image available for an immediate
-          # operator rollback; only stale dangling layers are reclaimed.
-          docker image prune -f --filter until=168h
+          stage="/var/tmp/waynode-deploy-${DEPLOY_ID}"
+          source_dir="$stage/source"
+          install -d -m 700 "$source_dir"
+          tar -xzf "$stage/source.tar.gz" -C "$source_dir"
+          exec env \
+            LIVE_DIR=/opt/waynode \
+            STAGED_ROOT="$stage" \
+            STAGED_SOURCE_DIR="$source_dir" \
+            DEPLOY_SHA="$DEPLOY_SHA" \
+            DEPLOY_ID="$DEPLOY_ID" \
+            ALLOW_LEGACY_SOURCE=1 \
+            bash "$source_dir/scripts/deploy-production.sh"
           REMOTE
-
-      - name: Verify deployment
-        run: |
-          curl -sf -o /dev/null -w "%{http_code}" https://waynode.fornace.net | grep -q "200\|302\|301" && echo "Deploy OK" || (echo "Deploy FAILED" && exit 1)

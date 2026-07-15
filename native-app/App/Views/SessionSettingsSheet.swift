@@ -31,7 +31,7 @@ struct SessionSettingsSheet: View {
             }
             .accessibilityIdentifier("session.settings")
             .navigationTitle("Session Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

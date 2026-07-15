@@ -1,4 +1,5 @@
 import SwiftUI
+import WaynodeCore
 
 struct ServerConfigSheet: View {
     @Binding var url: String
@@ -11,10 +12,7 @@ struct ServerConfigSheet: View {
             Form {
                 Section {
                     TextField("https://your-server.com", text: $url)
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
+                        .platformURLTextInput()
                         .submitLabel(.done)
                         .focused($urlFocused)
                         .onSubmit(save)
@@ -28,7 +26,7 @@ struct ServerConfigSheet: View {
                         .accessibilityIdentifier("server.url.validation")
                 }
                 Section {
-                    Text("Use your self-hosted Waynode address, including http:// or https://. The default is waynode.fornace.net.")
+                    Text("Use HTTPS for hosted or self-hosted servers. Unencrypted HTTP is accepted only for localhost development.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -37,7 +35,7 @@ struct ServerConfigSheet: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("server.url.surface")
             .navigationTitle("Server")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -50,7 +48,7 @@ struct ServerConfigSheet: View {
                         .disabled(validatedURL == nil)
                         .keyboardShortcut(.defaultAction)
                         .accessibilityIdentifier("server.url.save")
-                        .accessibilityHint(validatedURL == nil ? "Enter a complete HTTP or HTTPS server address" : "Saves this server and reconnects")
+                        .accessibilityHint(validatedURL == nil ? "Enter a secure Waynode server address" : "Saves this server and reconnects")
                 }
             }
             .onAppear { urlFocused = true }
@@ -62,17 +60,13 @@ struct ServerConfigSheet: View {
     }
 
     private var validatedURL: URL? {
-        guard let components = URLComponents(string: trimmedURL),
-              let scheme = components.scheme?.lowercased(),
-              scheme == "https" || scheme == "http",
-              let host = components.host, !host.isEmpty else { return nil }
-        return components.url
+        ServerConfig.validatedBaseURL(from: trimmedURL)
     }
 
     private var validationMessage: String {
         if trimmedURL.isEmpty { return "Enter the full address of your Waynode server." }
-        if validatedURL == nil { return "Enter a valid address beginning with http:// or https://." }
-        return "Waynode will reconnect to this server after you save."
+        if validatedURL == nil { return "Use https://, or http://localhost for local development." }
+        return "Saving signs out of the current server before connecting to this one."
     }
 
     private func save() {

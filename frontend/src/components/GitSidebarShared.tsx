@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { Space } from "../types";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 export interface GitIssueAction {
   id: string;
@@ -46,12 +47,12 @@ export function GitIssueCard({ issue }: { issue: GitIssue }) {
     setBusyId(a.id);
     setError("");
     try { await a.run(); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "The Git action could not be completed."); }
+    catch { setError("The Git action could not be completed. Your worktree is preserved; try again."); }
     finally { setBusyId(null); }
   };
   return (
     <div className="git-issue" role="alert">
-      <div className="git-issue-title">🔀 {issue.title}</div>
+      <div className="git-issue-title">{issue.title}</div>
       <div className="git-issue-detail">{issue.detail}</div>
       {issue.files && issue.files.length > 0 && (
         <ul className="git-issue-files">
@@ -133,6 +134,7 @@ export function FileEditor({ space, path, onClose, onSaved }: { space: Space; pa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmClose, setConfirmClose] = useState(false);
   const dirty = !loading && content !== original;
 
   useEffect(() => {
@@ -146,7 +148,7 @@ export function FileEditor({ space, path, onClose, onSaved }: { space: Space; pa
         setOriginal(file.content);
         setRevision(file.revision);
       })
-      .catch((e: Error) => active && setError(e.message))
+      .catch(() => active && setError("Couldn’t open this file. Your worktree is unchanged."))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [space.id, path]);
@@ -170,24 +172,22 @@ export function FileEditor({ space, path, onClose, onSaved }: { space: Space; pa
       setOriginal(content);
       setRevision(result.revision);
       onSaved();
-    } catch (e: any) {
-      setError(e.message || "Could not save this file");
+    } catch {
+      setError("Couldn’t save this file. Your unsaved text remains in the editor.");
     } finally {
       setSaving(false);
     }
   };
 
-  const close = () => {
-    if (!dirty || window.confirm(`Discard unsaved changes to “${path}”?`)) onClose();
-  };
-  useEscapeToClose(close, overlayRef);
+  const requestClose = () => dirty ? setConfirmClose(true) : onClose();
+  useEscapeToClose(requestClose, overlayRef, !confirmClose);
 
   return (
     <div ref={overlayRef} className="file-editor-overlay" role="dialog" aria-modal="true" aria-label={`Edit ${path}`} tabIndex={-1}>
       <section className="file-editor">
         <header className="file-editor-head">
           <div className="file-editor-title"><strong>{basename(path)}</strong><span>{dirname(path)}</span>{dirty && <i title="Unsaved changes" />}</div>
-          <button className="git-icon-btn" onClick={close} title="Close editor" aria-label={`Close editor for ${path}`}><CloseIcon /></button>
+          <button className="git-icon-btn" onClick={requestClose} title="Close editor" aria-label={`Close editor for ${path}`}><CloseIcon /></button>
         </header>
         {loading ? <div className="git-empty" role="status">Opening file…</div> : error && !content ? <div className="file-editor-error" role="alert">{error}</div> : <textarea className="file-editor-text" aria-label={`Contents of ${path}`} value={content} onChange={(e) => setContent(e.target.value)} spellCheck={false} autoFocus />}
         {error && content && <div className="file-editor-error" role="alert">{error}</div>}
@@ -197,6 +197,7 @@ export function FileEditor({ space, path, onClose, onSaved }: { space: Space; pa
           <button className="git-btn-primary" disabled={!dirty || saving || loading} onClick={save}>{saving ? "Saving…" : "Save"}</button>
         </footer>
       </section>
+      {confirmClose && <ConfirmDialog title="Discard unsaved changes?" description={`Changes to “${path}” have not been saved.`} confirmLabel="Discard changes" danger onCancel={() => setConfirmClose(false)} onConfirm={onClose} />}
     </div>
   );
 }

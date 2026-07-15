@@ -178,7 +178,7 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script
 <main>${bodyHtml}</main>
 <footer class="site">
   Waynode: open-source durable worktrees for coding agents.
-  <div><a href="/">Home</a><a href="/learn">Learn</a><a href="/index.md">Home (markdown)</a><a href="/llms-full.txt">llms-full.txt</a></div>
+  <div><a href="/">Home</a><a href="/learn">Learn</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/security">Security</a><a href="/support">Support</a><a href="/status">Status</a></div>
 </footer>
 </body>
 </html>`;
@@ -349,7 +349,7 @@ router.get("/robots.txt", (req, res) => {
 
 router.get("/sitemap.xml", (req, res) => {
   const base = siteUrl();
-  const urls = ["/", "/learn", ...allArticles().map((a) => a.path)];
+  const urls = ["/", "/learn", "/privacy", "/terms", "/security", "/support", "/status", ...allArticles().map((a) => a.path)];
   const body = urls.map((u) => `  <url><loc>${base}${u}</loc></url>`).join("\n");
   res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>`);
 });

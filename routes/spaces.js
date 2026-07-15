@@ -70,7 +70,7 @@ router.get("/api/spaces", requireAuth, (req, res) => {
   if (orgId) {
     const member = isOrgMember(orgId, req.user.id);
     if (!member) return res.status(403).json({ err: "Not an org member" });
-    return res.json(listSpacesByOrg(orgId));
+    return res.json(listSpacesByOrg(orgId, req.user.id));
   }
   return res.json(listSpaces(req.user.id));
 });
@@ -158,6 +158,7 @@ router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, requir
     return res.json({ output });
   } catch (e) {
     if (e.spaceDirMissing) return res.status(409).json({ error: e.message, spaceDirMissing: true });
+    if (e.gitBusy) return res.status(409).json({ error: e.message, gitBusy: true });
     return res.status(400).json({ error: e.message });
   }
 });

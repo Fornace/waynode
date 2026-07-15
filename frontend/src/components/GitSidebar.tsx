@@ -28,7 +28,15 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
   const [issue, setIssue] = useState<GitIssue | null>(null);
   const esRef = useRef<EventSource | null>(null);
   const panelRef = useRef<HTMLElement>(null);
-  useEscapeToClose(onClose, panelRef, open);
+  const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 768px)").matches);
+  useEscapeToClose(onClose, panelRef, open && compact);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 768px)");
+    const update = () => setCompact(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   // ── Live data: only poll while open ──
   useEffect(() => {
@@ -63,12 +71,10 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
 
   return (
     <>
-      {open && <div className="git-overlay" onClick={onClose} />}
       <aside
         ref={panelRef}
         className={`git-panel ${open ? "open" : ""}`}
-        role="dialog"
-        aria-modal="true"
+        role="complementary"
         aria-labelledby="git-review-title"
         aria-hidden={!open}
         inert={!open}
@@ -100,10 +106,10 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
 
         {snap?.piBusy && (
           <div className="git-pi-busy" role="status">
-            <span className="pulse">⚡</span> pi is working — changes may be in progress
+            <span className="pulse" aria-hidden="true" /> Agent is editing files. Review may change until this run finishes.
           </div>
         )}
-        {error && <div className="git-error" role="alert">{error}</div>}
+        {error && <div className="git-error" role="alert"><span>Couldn’t refresh this worktree. Existing review data is unchanged.</span><button type="button" onClick={refresh}>Retry</button></div>}
 
         {issue && <GitIssueCard issue={issue} />}
 
@@ -118,9 +124,9 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
 
         <div className="git-body" id="git-review-panel" role="tabpanel" aria-labelledby={tab === "changes" ? "git-changes-tab" : "git-branches-tab"}>
           {loading && !snap ? (
-            <div className="git-empty" role="status">Loading Git…</div>
+            <div className="git-empty" role="status">Checking worktree…</div>
           ) : !snap ? (
-            <div className="git-empty">No data</div>
+            <div className="git-empty">Worktree status is unavailable. Retry above.</div>
           ) : tab === "changes" ? (
             <ChangesPanel space={space} sessionId={sessionId} snap={snap} onChange={setSnap} onClose={onClose} onIssue={setIssue} />
           ) : (

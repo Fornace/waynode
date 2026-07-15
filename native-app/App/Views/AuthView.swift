@@ -43,14 +43,14 @@ struct AuthView: View {
                     set: { customServerURL = $0 }
                 )
             ) { newURL in
-                if let url = URL(string: newURL) {
-                    appModel.auth.setServerURL(url)
-                    appModel.reconfigureAPI()
-                    Task { await fetchProviders() }
+                if let url = ServerConfig.validatedBaseURL(from: newURL) {
+                    Task {
+                        await appModel.changeServer(to: url)
+                        if !appModel.auth.isAuthenticated { await fetchProviders() }
+                    }
                 }
             }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .platformAdaptiveSheet()
             .macSheetFrame(minWidth: 480, idealWidth: 540, maxWidth: 620, minHeight: 360, idealHeight: 420, maxHeight: 560)
         }
         .task { await fetchProviders() }
@@ -75,9 +75,10 @@ struct AuthView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                Text("Your coding agent workspace")
+                Text("Durable worktrees and agent sessions, ready on every device.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
 
             Spacer()
@@ -131,6 +132,23 @@ struct AuthView: View {
                     .buttonStyle(.glass)
                     .controlSize(.large).accessibilityIdentifier("auth.gitlab")
                     .disabled(session != nil)
+                }
+
+                if !appModel.auth.hasRecoverableVerificationFailure,
+                   let providers = appModel.auth.providers,
+                   providers.github != true,
+                   providers.gitlab != true {
+                    VStack(spacing: 8) {
+                        Label("No sign-in provider configured", systemImage: "person.crop.circle.badge.exclamationmark")
+                            .font(.headline)
+                        Text("This server has not enabled GitHub or GitLab sign-in. Choose another server, or ask its administrator to configure OAuth.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.vertical, 8)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("auth.providers.unavailable")
                 }
 
                 // If we don't know providers yet, show loading or retry.
@@ -236,7 +254,7 @@ struct AuthView: View {
         for attempt in 1...maxAttempts {
             do {
                 let resp = try await api.authMe()
-                appModel.auth.setProviders(resp.providers)
+                appModel.auth.setProviders(resp.providers, capabilities: resp.capabilities)
                 isFetchingProviders = false
                 providersFetchFailed = false
                 return
@@ -249,6 +267,7 @@ struct AuthView: View {
                     // All retries exhausted — show error state with retry button.
                     isFetchingProviders = false
                     providersFetchFailed = true
+                    appModel.auth.markServerCapabilitiesUnavailable()
                 }
             }
         }

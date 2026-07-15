@@ -1,6 +1,13 @@
 import SwiftUI
 import WaynodeCore
 
+enum GitDiffState: Equatable {
+    case idle
+    case loading
+    case loaded(String)
+    case failed(String)
+}
+
 struct GitFileRow: View {
     let file: GitFile
     let isSelected: Bool
@@ -44,7 +51,7 @@ struct GitFileRow: View {
 
 struct FileDiffSheet: View {
     let filePath: String
-    @Binding var diff: String?
+    @Binding var state: GitDiffState
     var onLoad: () async -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -59,11 +66,30 @@ struct FileDiffSheet: View {
                         .padding(.bottom, 8)
                         .accessibilityLabel("File: \(filePath)")
                         .accessibilitySortPriority(2)
-                    if let diff {
+                    switch state {
+                    case .loaded(let diff):
                         ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
                             DiffLineView(line: line)
                         }
-                    } else {
+                    case .failed(let message):
+                        VStack(alignment: .leading, spacing: 14) {
+                            Label("Couldn’t Load Diff", systemImage: "doc.text.magnifyingglass")
+                                .font(.headline)
+                            Text(message)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
+                            Button {
+                                Task { await onLoad() }
+                            } label: {
+                                Label("Retry", systemImage: "arrow.clockwise")
+                            }
+                            .buttonStyle(.borderedProminent)
+                                .accessibilityIdentifier("git.diff.retry")
+                        }
+                        .frame(minWidth: 280, alignment: .leading)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("git.diff.failure")
+                    case .idle, .loading:
                         ProgressView("Loading diff…").padding()
                     }
                 }
@@ -71,7 +97,7 @@ struct FileDiffSheet: View {
                 .fixedSize(horizontal: true, vertical: false)
             }
             .navigationTitle("File Diff")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -80,8 +106,10 @@ struct FileDiffSheet: View {
                         .accessibilityHint("Closes the file diff")
                 }
             }
-            .task { if diff == nil { await onLoad() } }
-            .onDisappear { diff = nil }
+            .task {
+                if state == .idle { await onLoad() }
+            }
+            .onDisappear { state = .idle }
         }
         .macSheetFrame(minWidth: 640, idealWidth: 820, maxWidth: 1_100, minHeight: 520, idealHeight: 720)
         .accessibilityElement(children: .contain)
@@ -166,7 +194,7 @@ struct CommitSheet: View {
                 }
             }
             .navigationTitle("Commit")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

@@ -50,7 +50,7 @@ struct NewTokenSheet: View {
             }
             .padding(.top, 40)
             .navigationTitle("New Token")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {

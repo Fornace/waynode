@@ -1,0 +1,51 @@
+.app-layout {
+  --bg: #0c0c0d;
+  --bg-surface: #131315;
+  --bg-elevated: #1a1a1d;
+  --bg-hover: #252528;
+  --border: rgba(255,255,255,.09);
+  --text: rgba(255,255,255,.92);
+  --text-dim: rgba(255,255,255,.60);
+  --text-faint: rgba(255,255,255,.38);
+  --green: #22c55e;
+  height: 100dvh;
+}
+.workspace-chrome { background: rgba(19,19,21,.94); }
+.workspace-chrome .top-bar { min-height: 58px; padding-inline: 14px; }
+.session-identity { gap: 3px; }
+.session-worktree-line { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-dim); font-size: 12px; }
+.session-worktree-line b,.session-worktree-line code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-worktree-line b { max-width: 22ch; color: var(--text); font-weight: 650; }
+.session-worktree-line i { color: var(--text-faint); font-style: normal; }
+.session-worktree-line code { color: var(--text-dim); font: 11px var(--mono); }
+.session-title-name { color: var(--text-dim); font-size: 11.5px; font-weight: 500; }
+.session-run-state { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-faint); font-size: 11.5px; }
+.session-run-state::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
+.session-run-state.is-active { color: #93b7ff; }.session-run-state.is-attention { color: var(--amber); }.session-run-state.is-error { color: var(--red); }
+.review-button { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: transparent; font-size: 12px; font-weight: 650; }
+.review-button:hover,.review-button.active { color: var(--text); background: var(--bg-hover); }.review-button.active { border-color: rgba(59,130,246,.48); }
+.review-button b { display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; color: white; background: var(--accent); font-size: 10px; }
+.review-button i { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; color: #fff; background: var(--red); font-style: normal; font-size: 10px; }
+.session-menu-wrap { position: relative; }
+.session-command-menu { position: absolute; z-index: 30; top: calc(100% + 7px); right: 0; width: 240px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); box-shadow: var(--shadow-lg); }
+.session-command-menu label { display: grid; gap: 5px; padding: 7px 8px 9px; color: var(--text-faint); font-size: 11px; }
+.session-command-menu select { width: 100%; min-height: 34px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--bg-surface); }
+.session-command-menu button { display: flex; align-items: center; width: 100%; min-height: 36px; padding: 7px 8px; border-radius: 6px; color: var(--text-dim); text-align: left; font-size: 12px; }
+.session-command-menu button:hover { color: var(--text); background: var(--bg-hover); }.session-command-menu kbd { margin-left: auto; color: var(--text-faint); font: 10px var(--mono); }
+.session-mode-bar { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 6px 14px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11.5px; }
+.session-mode-bar strong { color: var(--text); font-size: 12px; }.session-mode-bar button { margin-left: auto; min-height: 28px; padding: 4px 8px; border-radius: 6px; color: var(--text); background: var(--bg-elevated); }
+
+@media (max-width: 768px) {
+  .workspace-chrome .top-bar { min-height: calc(58px + var(--safe-top)); padding-inline: calc(10px + var(--safe-left)) calc(10px + var(--safe-right)); }
+  .session-worktree-line b { max-width: 13ch; }.session-worktree-line code { max-width: 10ch; }.session-title-name { max-width: 32ch; }
+  .session-run-state { max-width: 82px; font-size: 10.5px; }.review-button { min-width: 44px; min-height: 44px; padding: 7px; }.review-button > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .session-command-menu { position: fixed; top: auto; right: calc(10px + var(--safe-right)); bottom: calc(10px + var(--safe-bottom)); left: calc(10px + var(--safe-left)); width: auto; }
+}
+
+@media (max-width: 420px) {
+  .session-run-state { display: none; }.session-worktree-line b { max-width: 11ch; }.session-title-name { max-width: 24ch; }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .app-layout:has(.git-panel.open) > .sidebar { display: none; }
+}

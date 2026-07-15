@@ -1,6 +1,7 @@
 /** Content hub regression test: articles, markdown twins, llms.txt, negotiation. */
 import assert from "node:assert/strict";
 import express from "express";
+import { existsSync, readFileSync, statSync } from "node:fs";
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || "content-test";
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -11,6 +12,26 @@ const app = express();
 app.use(contentRoutes);
 const server = app.listen(0);
 const base = `http://localhost:${server.address().port}`;
+const root = new URL("../", import.meta.url);
+
+const captureAssets = [
+  "frontend/public/marketing/worktree-session-desktop.png",
+  "frontend/public/marketing/worktree-session-phone.png",
+  "frontend/public/marketing/worktree-review-tablet.png",
+];
+
+for (const asset of captureAssets) {
+  const url = new URL(asset, root);
+  assert.ok(existsSync(url), `missing public product capture: ${asset}`);
+  assert.ok(statSync(url).size > 10_000, `public product capture is unexpectedly small: ${asset}`);
+}
+
+const landingSource = readFileSync(new URL("frontend/src/pages/LandingPage.tsx", root), "utf8");
+for (const asset of captureAssets) {
+  assert.ok(landingSource.includes(`/${asset.replace("frontend/public/", "")}`), `landing does not use ${asset}`);
+}
+assert.ok(!landingSource.includes("product-pricing"), "public plan cards must stay out of the landing page");
+assert.ok(!landingSource.includes("Most popular"), "landing must not invent a preferred hosted plan");
 
 async function get(path, headers = {}) {
   const res = await fetch(base + path, { headers });
@@ -58,7 +79,7 @@ try {
     checked++;
   }
 
-  console.log(`content hub: core endpoints ok, ${checked} article(s) round-tripped`);
+  console.log(`content hub: captures present, core endpoints ok, ${checked} article(s) round-tripped`);
 } finally {
   server.close();
 }

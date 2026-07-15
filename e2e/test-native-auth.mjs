@@ -87,6 +87,7 @@ console.log("[1] Unauthenticated /api/auth/me returns configured providers");
   assert(body?.user === null, "user is null when unauthenticated");
   assert(body?.providers?.github === true, "providers.github reflects GITHUB_CLIENT_ID config");
   assert(body?.availableProviders?.github === true, "availableProviders exposes configured GitHub capability");
+  assert(body?.capabilities?.terminal === true, "public auth discovery advertises self-host terminal capability");
 }
 
 // === 1b. Native OAuth state is signed, bound, and rejected if tampered ===
@@ -194,6 +195,7 @@ console.log("\n[3] Bearer token authenticates and returns user");
   assert(body?.user?.id === "test-user", "returns the token's user");
   assert(body?.providers?.github === true, "providers.github true (user has github_id)");
   assert(body?.availableProviders?.gitlab === false, "availableProviders hides unconfigured GitLab capability");
+  assert(body?.capabilities?.terminal === true, "authenticated response preserves terminal capability");
 }
 
 // === 4. Escalation guard: bearer token cannot create another token ===

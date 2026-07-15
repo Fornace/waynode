@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { requireAuth, requireSpaceAccess, queryTokenAuth } from "../lib/auth.mjs";
 import {
   createSession,
@@ -17,7 +18,13 @@ import { config } from "../lib/config.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { getOrgSetting } from "../lib/orgs.mjs";
 import { billingEnabled } from "../lib/config.mjs";
-import { checkQuota } from "../lib/billing.mjs";
+import {
+  checkQuota,
+  finishTokenReservation,
+  releaseTokenReservation,
+  reserveTokenQuota,
+} from "../lib/billing.mjs";
+import { refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
 import { configuredModelCatalog, resolvePiModel } from "../lib/pi-model.mjs";
 
 const router = Router();
@@ -97,17 +104,42 @@ function canUseHostedWorkspace(session, res) {
   return true;
 }
 
-function canStartHostedTurn(session, res) {
-  if (!canUseHostedWorkspace(session, res)) return false;
-  if (!billingEnabled) return true;
+function reserveHostedTurn(session, res) {
+  if (!canUseHostedWorkspace(session, res)) return { allowed: false };
+  if (!billingEnabled) return { allowed: true, orgId: null, reservation: null };
   const space = getSpace(session.space_id);
-  if (!space?.org_id) return true;
-  const quota = checkQuota(space.org_id);
-  if (quota.tokens.exceeded) {
-    res.status(402).json({ error: 'Your organization has reached its monthly included usage. Update billing to continue.' });
-    return false;
+  if (!space?.org_id) return { allowed: true, orgId: null, reservation: null };
+  try {
+    const reservation = reserveTokenQuota(space.org_id, `turn:${randomUUID()}`);
+    return { allowed: true, orgId: space.org_id, reservation };
+  } catch (error) {
+    res.status(error.status || 500).json({
+      error: error.status === 402
+        ? error.message
+        : "Agent usage could not be reserved. Try again.",
+    });
+    return { allowed: false };
   }
-  return true;
+}
+
+function reconcileHostedTurn(admission) {
+  if (!admission?.reservation) return;
+  finishTokenReservation(admission.reservation.id);
+  refreshOrgStorageUsage(admission.orgId).catch((error) => {
+    console.error("[agent storage] refresh failed:", error.message);
+  });
+}
+
+function requestSubmission(req) {
+  const supplied = req.body?.submissionId;
+  const id = typeof supplied === "string" && supplied.length > 0 && supplied.length <= 128
+    ? supplied
+    : randomUUID();
+  return { id, prompt: req.body?.prompt, isGoal: !!req.body?.isGoal };
+}
+
+function existingSubmission(handle, id) {
+  return handle?.getSubmission?.(id) || null;
 }
 
 router.get("/api/sessions/:sessionId", requireAuth, (req, res) => {
@@ -209,6 +241,10 @@ router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
   }
 
   sseSetup(res);
+  // Send a body frame immediately. Some reverse tunnels do not expose an
+  // EventSource as open when they have only received response headers, which
+  // leaves clients visually stuck on “Connecting…” while pi starts normally.
+  writeSSE(res, { type: "connecting" });
 
   let handle;
   try {
@@ -233,11 +269,14 @@ router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
 router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
-  const { prompt, isGoal = false } = req.body;
+  const { id: submissionId, prompt, isGoal } = requestSubmission(req);
   if (!prompt) return res.status(400).json({ error: "prompt required" });
-  if (!canStartHostedTurn(session, res)) return;
 
   if (!isPiAvailable()) return res.status(503).json({ error: "pi is not installed" });
+  const duplicate = existingSubmission(getAgentIfActive(session.id), submissionId);
+  if (duplicate) return res.json({ ok: true, submission: duplicate, duplicate: true });
+  const admission = reserveHostedTurn(session, res);
+  if (!admission.allowed) return;
 
   touchSession(session.id);
 
@@ -245,17 +284,23 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
   try {
     handle = await getAgent(session);
   } catch (err) {
+    releaseTokenReservation(admission.reservation?.id);
     return res.status(503).json({ error: "Failed to start agent: " + err.message });
   }
 
   // Busy: client should queue a follow-up instead.
-  if (handle.streaming) return res.status(409).json({ error: "busy" });
+  if (handle.streaming) {
+    releaseTokenReservation(admission.reservation?.id);
+    return res.status(409).json({ error: "busy" });
+  }
 
-  handle
-    .sendPrompt(prompt, isGoal)
-    .catch((err) => handle.broadcast({ type: "error", message: err.message }));
+  const completion = handle
+    .sendPrompt(prompt, isGoal, submissionId)
+    .catch((err) => handle.broadcast({ type: "error", message: err.message }))
+    .finally(() => reconcileHostedTurn(admission));
 
-  res.json({ ok: true });
+  void completion;
+  res.json({ ok: true, submission: handle.getSubmission(submissionId) });
 });
 
 // ── Queue a follow-up while a turn is running ──
@@ -263,22 +308,39 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
 router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
-  const { prompt } = req.body;
+  const { id: submissionId, prompt, isGoal } = requestSubmission(req);
   if (!prompt) return res.status(400).json({ error: "prompt required" });
-  if (!canStartHostedTurn(session, res)) return;
+  const activeHandle = getAgentIfActive(session.id);
+  const duplicate = existingSubmission(activeHandle, submissionId);
+  if (duplicate) return res.json({ ok: true, submission: duplicate, duplicate: true });
+  const admission = reserveHostedTurn(session, res);
+  if (!admission.allowed) return;
 
-  const handle = getAgentIfActive(session.id);
+  const handle = activeHandle;
   if (handle?.streaming) {
-    handle.queueFollowUp(prompt);
-    return res.json({ ok: true, queued: true });
+    try {
+      handle.queueFollowUp(prompt, isGoal, submissionId)
+        .catch((error) => handle.broadcast({ type: "error", message: error.message }))
+        .finally(() => reconcileHostedTurn(admission));
+    } catch (error) {
+      releaseTokenReservation(admission.reservation?.id);
+      return res.status(error.status || 409).json({
+        error: error.message,
+        submission: { id: submissionId, prompt, isGoal, status: "failed", error: error.message },
+      });
+    }
+    return res.json({ ok: true, queued: true, submission: handle.getSubmission(submissionId) });
   }
 
   // Not currently streaming — send directly.
   try {
     const h = handle || (await getAgent(session));
-    h.sendPrompt(prompt, false).catch((err) => h.broadcast({ type: "error", message: err.message }));
-    res.json({ ok: true });
+    h.sendPrompt(prompt, isGoal, submissionId)
+      .catch((err) => h.broadcast({ type: "error", message: err.message }))
+      .finally(() => reconcileHostedTurn(admission));
+    res.json({ ok: true, submission: h.getSubmission(submissionId) });
   } catch (err) {
+    releaseTokenReservation(admission.reservation?.id);
     res.status(503).json({ error: err.message });
   }
 });
@@ -289,8 +351,8 @@ router.post("/api/sessions/:sessionId/abort", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
   const handle = getAgentIfActive(session.id);
-  if (handle) await handle.abort();
-  res.json({ ok: true });
+  const result = handle ? await handle.abort() : { cancelled: false };
+  res.json({ ok: true, ...result });
 });
 
 // ── Live state (is something running?) ──
@@ -299,7 +361,11 @@ router.get("/api/sessions/:sessionId/state", requireAuth, (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
   const handle = getAgentIfActive(session.id);
-  res.json({ active: !!(handle && handle.streaming), done: !(handle && handle.streaming) });
+  res.json({
+    active: !!(handle && handle.streaming),
+    done: !(handle && handle.streaming),
+    submissions: handle?.getSubmissionSnapshot?.() || [],
+  });
 });
 
 // ── Goal status (pi-codex-goal plugin) ──

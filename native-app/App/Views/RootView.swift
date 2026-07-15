@@ -14,6 +14,9 @@ struct RootView: View {
         ZStack {
             routedContent
         }
+        #if DEBUG
+        .modifier(UITestDynamicTypeModifier())
+        #endif
         // Respect the system appearance. A workbench must remain legible with
         // the user's contrast, transparency, and light/dark preferences.
         .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: appModel.auth.isAuthenticated)
@@ -39,6 +42,10 @@ struct RootView: View {
         #if DEBUG
         if showAccountFixture {
             AccountSheetContainer().transition(.opacity)
+        } else if showChatFixture {
+            ChatUITestFixtureView(
+                historyFailure: CommandLine.arguments.contains("-ui-test-chat-history-failure")
+            ).transition(.opacity)
         } else if showGitFixture {
             GitInspector(spaceId: "ui-space", fixtureSnapshot: GitUITestFixtures.snapshot).transition(.opacity)
         } else if showSettingsFixture {
@@ -93,6 +100,17 @@ struct RootView: View {
     private var showGitFixture: Bool {
         #if DEBUG
         return fixtureIsAuthenticated && CommandLine.arguments.contains("-ui-test-git")
+        #else
+        return false
+        #endif
+    }
+
+    private var showChatFixture: Bool {
+        #if DEBUG
+        return fixtureIsAuthenticated && (
+            CommandLine.arguments.contains("-ui-test-chat-active")
+                || CommandLine.arguments.contains("-ui-test-chat-history-failure")
+        )
         #else
         return false
         #endif
@@ -162,6 +180,19 @@ struct RootView: View {
         }
     }
 }
+
+#if DEBUG
+private struct UITestDynamicTypeModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if ProcessInfo.processInfo.environment["WAYNODE_UI_TEST_DYNAMIC_TYPE"] == "accessibility3" {
+            content.dynamicTypeSize(.accessibility3)
+        } else {
+            content
+        }
+    }
+}
+#endif
 
 // MARK: - Launch splash
 //

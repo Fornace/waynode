@@ -61,8 +61,8 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     try {
       const { diff } = await api.git.diff(space.id, path);
       setDiff(diff || "(no textual diff — binary or untracked)");
-    } catch (e: any) {
-      setDiff(`Error: ${e.message}`);
+    } catch {
+      setDiff("Couldn’t load this diff. Your worktree is unchanged.");
     } finally {
       setLoadingDiff(false);
     }
@@ -92,8 +92,8 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
       setSelected(new Set());
       setExpanded(null);
       showMsg(`Committed ${selected.size} file${selected.size > 1 ? "s" : ""} to ${snap.currentBranch}`, "success");
-    } catch (e: any) {
-      showMsg(e.message, "error");
+    } catch {
+      showMsg("Couldn’t commit these files. Your worktree is unchanged; review the selection and try again.", "error");
     } finally {
       setCommitting(false);
     }
@@ -112,7 +112,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
       }
     } catch (e: any) {
       if (e.body?.diverged) raiseDiverged();
-      else showMsg(e.message, "error");
+      else showMsg("Couldn’t pull from the remote. Your local changes are preserved; try again.", "error");
     } finally {
       setPulling(false);
     }
@@ -129,7 +129,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
       const b = e.body || {};
       if (b.pushRejected) raisePushRejected();
       else if (b.noUpstream) raiseNoUpstream();
-      else showMsg(e.message, "error");
+      else showMsg("Couldn’t push this branch. Your local commit is preserved; try again.", "error");
     } finally {
       setPushing(false);
     }
@@ -144,10 +144,10 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     note(`🔀 Pull rebased with conflicts in ${files.length} file(s): ${files.join(", ")}. The rebase was aborted; the repo is clean.`);
     onIssue({
       title: "Pull — rebase conflicts",
-      detail: `Rebasing ${cur} conflicted. The rebase was aborted so the repo is clean. Let pi resolve and finish the pull?`,
+      detail: `Rebasing ${cur} conflicted. The rebase was aborted so the repo is clean. Let the agent resolve and finish the pull?`,
       files,
       actions: [
-        { id: "pi", label: "Ask pi to resolve", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur, files })) },
+        { id: "pi", label: "Ask agent to resolve", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur, files })) },
         { id: "ignore", label: "Ignore", run: async () => onIssue(null) },
       ],
     });
@@ -157,11 +157,11 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     note(`🔀 Pull diverged — ${cur} and its remote have diverged (fast-forward not possible).`);
     onIssue({
       title: "Pull — branches diverged",
-      detail: `${cur} and its remote have diverged. Merge, rebase, or let pi handle it?`,
+      detail: `${cur} and its remote have diverged. Merge, rebase, or let the agent handle it?`,
       actions: [
         { id: "merge", label: "Merge", run: async () => doPullMode("merge") },
         { id: "rebase", label: "Rebase", run: async () => doPullMode("rebase") },
-        { id: "pi", label: "Ask pi", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur })) },
+        { id: "pi", label: "Ask agent", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur })) },
         { id: "ignore", label: "Cancel", run: async () => onIssue(null) },
       ],
     });
@@ -171,10 +171,10 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     note(`🔀 Push rejected — the remote has commits you don't have yet. Pull first.`);
     onIssue({
       title: "Push — rejected",
-      detail: `The remote has new commits on ${cur}. Pull first, or let pi pull + push?`,
+      detail: `The remote has new commits on ${cur}. Pull first, or let the agent pull and push?`,
       actions: [
         { id: "pull", label: "Pull first", run: async () => { onIssue(null); await handlePull(); } },
-        { id: "pi", label: "Ask pi", primary: true, run: async () => askPi(buildAskPrompt("push", { cur })) },
+        { id: "pi", label: "Ask agent", primary: true, run: async () => askPi(buildAskPrompt("push", { cur })) },
         { id: "ignore", label: "Cancel", run: async () => onIssue(null) },
       ],
     });
@@ -199,8 +199,8 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
       onChange(r.data);
       if (r.conflicts && r.conflicts.length) raiseRebaseConflict(r.conflicts, r.output);
       else { onIssue(null); showMsg(mode === "merge" ? "Merged & pulled" : "Rebased & pulled", "success"); }
-    } catch (e: any) {
-      showMsg(e.message, "error");
+    } catch {
+      showMsg("Couldn’t update from the remote. Your local work is preserved; try again.", "error");
     } finally {
       setPulling(false);
     }
@@ -300,7 +300,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
 
       <div className="git-commit-form">
         {snap.piBusy && (
-          <div className="git-commit-warn">⚠ pi is editing — committing now may capture a partial state.</div>
+          <div className="git-commit-warn">Agent is editing files. A commit now may capture partial work.</div>
         )}
         <input
           className="git-input"

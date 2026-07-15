@@ -26,7 +26,7 @@ import Observation
 public final class SessionStore {
     public let sessionId: String
     public let spaceId: String
-    private let api: APIClient
+    let api: any SessionTransport
     private let offlineFixture: Bool
     private var sse: SSEClient?
     private var listenerTask: Task<Void, Never>?
@@ -41,13 +41,24 @@ public final class SessionStore {
     // Status (separate from reducer so we can show live updates).
     public var connectionState: SSEClient.ConnectionState = .disconnected
     public var isLoadingHistory: Bool = false
+    public var didLoadHistory: Bool = false
+    public var historyError: String?
     public var isSending: Bool = false
     public var sendError: String?
     public var goalStatus: GoalStatus = GoalStatus()
     public var sessionMeta: Session?
     public var isPollingGoal: Bool = false
 
-    public init(sessionId: String, spaceId: String, api: APIClient, offlineFixture: Bool = false) {
+    public var failedDraft: SubmissionDraft? { reducer.submissionState.failedDraft }
+    public var isRunActive: Bool {
+        reducer.isStreaming || reducer.submissionState.activeStatus == .starting
+            || reducer.submissionState.activeStatus == .running
+    }
+
+    public init(
+        sessionId: String, spaceId: String,
+        api: any SessionTransport, offlineFixture: Bool = false
+    ) {
         self.sessionId = sessionId
         self.spaceId = spaceId
         self.api = api
@@ -87,24 +98,12 @@ public final class SessionStore {
     // MARK: - Open / close SSE
 
     private func openStream() async {
-        // Load history first.
-        isLoadingHistory = true
-        do {
-            let history = try await api.getMessages(sessionId)
-            reducer.loadHistory(history.map(ChatReducer.HistoryItem.init))
-            if let session = try? await api.getSession(sessionId) {
-                sessionMeta = session
-            }
-        } catch {
-            // Non-fatal — we'll still connect to the stream.
-            sendError = "Could not load history: \(error.localizedDescription)"
-        }
-        isLoadingHistory = false
+        await loadHistory()
 
         // Check live state — if the agent is mid-turn, we'll get a sync event.
-        if let state = try? await api.getSessionState(sessionId), state.active {
-            // Kick goal polling.
-            startGoalPolling()
+        if let state = try? await api.getSessionState(sessionId) {
+            for submission in state.submissions { reducer.reconcileSubmission(submission) }
+            if state.active { startGoalPolling() }
         }
 
         await connectStream()
@@ -193,9 +192,16 @@ public final class SessionStore {
             // Start goal polling if not already.
             if !isPollingGoal { startGoalPolling() }
             return
+        case .submission(let submission):
+            _ = reducer.reduce(event)
+            if submission.isGoal,
+               ![.completed, .failed, .cancelled].contains(submission.status) {
+                startGoalPolling()
+            }
+            return
         case .end, .turnEnd:
             _ = reducer.reduce(event)
-            stopGoalPolling()
+            if !isRunActive { stopGoalPolling() }
             // Final fetch of goal status.
             Task { await self.refreshGoalStatus() }
             return
@@ -206,42 +212,6 @@ public final class SessionStore {
 
     private func handle(_ state: SSEClient.ConnectionState) {
         connectionState = state
-    }
-
-    // MARK: - Send message
-
-    public func sendMessage(_ prompt: String, isGoal: Bool = false) async {
-        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        isSending = true
-        sendError = nil
-
-        // Optimistic append — mirrors sessionStore.ts.
-        reducer.appendUser(trimmed, isGoal: isGoal)
-
-        do {
-            let resp = try await api.sendMessage(sessionId, prompt: trimmed, isGoal: isGoal)
-            if !resp.ok {
-                sendError = "Server rejected message"
-            } else if isGoal {
-                startGoalPolling()
-            }
-        } catch let err as APIClient.APIError where err.statusCode == 409 {
-            // Busy — queue instead.
-            do {
-                _ = try await api.queueMessage(sessionId, prompt: trimmed)
-            } catch {
-                sendError = "Could not queue: \(error.localizedDescription)"
-            }
-        } catch {
-            sendError = error.localizedDescription
-        }
-        isSending = false
-    }
-
-    public func abortTurn() async {
-        do { try await api.abortTurn(sessionId) } catch { sendError = error.localizedDescription }
     }
 
     // MARK: - Goal polling
@@ -285,6 +255,8 @@ public final class SessionStore {
         reducer.reset()
         goalStatus = GoalStatus()
         sendError = nil
+        historyError = nil
+        didLoadHistory = false
     }
 }
 
@@ -299,7 +271,8 @@ extension ChatReducer.HistoryItem {
             isGoal: msg.isGoal ?? false,
             text: msg.text,
             thinking: msg.thinking,
-            key: msg.key
+            key: msg.key,
+            sentAt: msg.timestamp.flatMap { ISO8601DateFormatter().date(from: $0) }
         )
     }
 }

@@ -25,6 +25,26 @@ struct EmptyChatState: View {
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("chat.empty")
+    }
+}
+
+struct HistoryFailureState: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Conversation unavailable", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+        } description: {
+            Text(message)
+        } actions: {
+            Button("Retry", action: onRetry)
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("chat.history.retry")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("chat.history.failure")
     }
 }
 

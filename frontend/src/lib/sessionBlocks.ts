@@ -19,7 +19,7 @@ export function appendThinking(blocks: Block[], text: string): Block[] {
 export function appendTool(blocks: Block[], tool: { id: string; name: string; args: any }): Block[] {
   const out = blocks.slice();
   if (!out.some((block) => block.type === "tool" && block.id === tool.id)) {
-    out.push({ type: "tool", id: tool.id, name: tool.name, args: tool.args, output: "", status: "running" });
+    out.push({ type: "tool", id: tool.id, name: tool.name, args: tool.args, output: "", status: "running", startedAt: Date.now() });
   }
   return out;
 }
@@ -31,6 +31,8 @@ export function setToolOutput(
   status: "running" | "done" | "error",
 ): Block[] {
   return blocks.map((block) =>
-    block.type === "tool" && block.id === id ? { ...block, output, status } : block,
+    block.type === "tool" && block.id === id
+      ? { ...block, output, status, endedAt: status === "running" ? undefined : Date.now() }
+      : block,
   );
 }

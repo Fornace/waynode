@@ -22,12 +22,14 @@ struct SessionDetail: View {
     }
     var body: some View {
         @Bindable var store = appModel.store(for: sessionId, spaceId: spaceId)
+        let terminalCapability = appModel.auth.terminalCapability
 
         VStack(spacing: 0) {
             SessionContextBar(
                 worktree: appModel.spaces.first { $0.id == spaceId },
                 state: gitContext,
                 connectionState: store.connectionState,
+                terminalCapability: terminalCapability,
                 selectedTab: $detailTab,
                 onOpenGit: { showingGitInspector = true }
             )
@@ -35,14 +37,19 @@ struct SessionDetail: View {
             case .chat:
                 ChatView(store: store)
             case .terminal:
-                TerminalView(sessionId: sessionId, spaceId: spaceId)
+                if terminalCapability == .supported {
+                    TerminalView(sessionId: sessionId, spaceId: spaceId)
+                } else {
+                    ChatView(store: store)
+                }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("session.detail")
         .navigationTitle(store.sessionMeta?.title ?? "Session")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformInlineNavigationTitle()
         .toolbar {
-            #if targetEnvironment(macCatalyst)
+            #if targetEnvironment(macCatalyst) || os(macOS)
             ToolbarItem(placement: .principal) {
                 Text(store.sessionMeta?.title ?? "Session")
                     .font(.headline)
@@ -67,7 +74,7 @@ struct SessionDetail: View {
                 }
                 .help("Model, connection, and session settings")
                 .accessibilityIdentifier("session.settings.open")
-                .keyboardShortcut(",", modifiers: .command)
+                .platformSessionSettingsShortcut()
                 Button(role: .destructive) {
                     Task { await store.abortTurn() }
                 } label: {
@@ -76,7 +83,7 @@ struct SessionDetail: View {
                 .help("Stop the current agent turn")
                 .accessibilityIdentifier("agent.stop")
                 .keyboardShortcut(".", modifiers: .command)
-                .disabled(store.goalStatus.status != .active && !store.isSending)
+                .disabled(store.goalStatus.status != .active && !store.isRunActive)
             }
             #else
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -88,12 +95,17 @@ struct SessionDetail: View {
                                 Label("Chat", systemImage: DetailTab.chat.systemImage)
                             }
                             .accessibilityIdentifier("session.mode.chat")
-                            Button {
-                                detailTab = .terminal
-                            } label: {
-                                Label("Terminal", systemImage: DetailTab.terminal.systemImage)
+                            if terminalCapability == .supported {
+                                Button {
+                                    detailTab = .terminal
+                                } label: {
+                                    Label("Terminal", systemImage: DetailTab.terminal.systemImage)
+                                }
+                                .accessibilityIdentifier("session.mode.terminal")
+                            } else if terminalCapability == .checking || terminalCapability == .unavailable {
+                                Button(terminalCapability == .checking ? "Checking terminal availability…" : "Terminal availability unavailable") {}
+                                    .disabled(true)
                             }
-                            .accessibilityIdentifier("session.mode.terminal")
                         }
                         Divider()
                         Button {
@@ -114,7 +126,7 @@ struct SessionDetail: View {
                         } label: {
                             Label("Abort Agent", systemImage: "stop.fill")
                         }
-                        .disabled(store.goalStatus.status != .active)
+                        .disabled(store.goalStatus.status != .active && !store.isRunActive)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -139,18 +151,32 @@ struct SessionDetail: View {
         .onChange(of: store.isSending) { _, isSending in
             if !isSending { Task { await refreshGitContext() } }
         }
+        .onChange(of: store.isRunActive) { _, isActive in
+            if !isActive { Task { await refreshGitContext() } }
+        }
+        .onChange(of: terminalCapability) { _, capability in
+            if capability != .supported { detailTab = .chat }
+        }
         .sheet(isPresented: $showingSessionSettings) {
             SessionSettingsSheet(store: store)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .platformAdaptiveSheet()
         }
         .task {
             #if DEBUG
-            if CommandLine.arguments.contains("-ui-test-terminal") { detailTab = .terminal }
+            if CommandLine.arguments.contains("-ui-test-terminal"), terminalCapability == .supported { detailTab = .terminal }
             #endif
             await store.acquire()
             await refreshGitContext()
         }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: .waynodeToggleReview)) { _ in
+            showingGitInspector.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .waynodeToggleTerminal)) { _ in
+            guard terminalCapability == .supported else { return }
+            detailTab = detailTab == .terminal ? .chat : .terminal
+        }
+        #endif
         .onDisappear {
             store.release()
         }
@@ -178,6 +204,7 @@ private struct SessionContextBar: View {
     let worktree: Space?
     let state: GitContextState
     let connectionState: SSEClient.ConnectionState
+    let terminalCapability: TerminalCapabilityState
     @Binding var selectedTab: SessionDetail.DetailTab
     let onOpenGit: () -> Void
     var body: some View {
@@ -211,6 +238,7 @@ private struct SessionContextBar: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                 }
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -219,20 +247,26 @@ private struct SessionContextBar: View {
             .accessibilityIdentifier("git.context.open")
             .accessibilityHint("Review changed files, commits, branches, and sync status")
             .help(gitHelp)
-            #if targetEnvironment(macCatalyst)
+            #if targetEnvironment(macCatalyst) || os(macOS)
             Divider().frame(height: 20)
             ConnectionStateBadge(state: connectionState)
                 .accessibilityIdentifier("session.connection")
                 .help(connectionHelp)
-            Picker("Session view", selection: $selectedTab) {
-                ForEach(SessionDetail.DetailTab.allCases, id: \.self) { tab in
-                    Label(tab.label, systemImage: tab.systemImage).tag(tab)
+            if terminalCapability == .supported {
+                Picker("Session view", selection: $selectedTab) {
+                    ForEach(SessionDetail.DetailTab.allCases, id: \.self) { tab in
+                        Label(tab.label, systemImage: tab.systemImage).tag(tab)
+                    }
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("session.mode")
+                .frame(width: 190)
+            } else if terminalCapability == .checking || terminalCapability == .unavailable {
+                Label(terminalCapability == .checking ? "Checking terminal…" : "Terminal status unavailable", systemImage: "terminal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("session.mode")
-            .frame(width: 190)
             #endif
         }
         .padding(.horizontal, 12)

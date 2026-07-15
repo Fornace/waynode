@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams, useNavigate, useLocation, Routes, Route } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
 import { LandingPage } from "./pages/LandingPage";
-import { InvitePage } from "./pages/InvitePage";
 import { Sidebar } from "./components/Sidebar";
 import { SessionView } from "./components/SessionView";
 import { SpaceSettings } from "./components/SpaceSettings";
@@ -24,8 +23,8 @@ function getAuthHeaders(): Record<string, string> {
   return devToken ? { "x-dev-token": devToken } : {};
 }
 
-function AppContent() {
-  const { user, availableProviders, loading, error: authError, retry: retryAuth, logout } = useAuth();
+export function AppContent() {
+  const { user, availableProviders, terminalCapability, loading, error: authError, retry: retryAuth, logout } = useAuth();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -345,6 +344,7 @@ function AppContent() {
             onToggleSidebar={handleToggleSidebar}
             onOpenSettings={() => setSettingsOpen(true)}
             isAdmin={isAdmin}
+            terminalCapability={terminalCapability}
             gitOpen={gitSidebarOpen}
             onToggleGit={() => setGitSidebarOpen((v) => !v)}
           />
@@ -376,18 +376,4 @@ function AppContent() {
 
 function MenuIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>;
-}
-
-export default function App() {
-  return (
-    <AuthProvider>
-      <Routes>
-        <Route path="/invite/:token" element={<InvitePage />} />
-        <Route path="/login" element={<AppContent />} />
-        <Route path="/" element={<AppContent />} />
-        <Route path="/:spaceSeg" element={<AppContent />} />
-        <Route path="/:spaceSeg/:sessionSeg" element={<AppContent />} />
-      </Routes>
-    </AuthProvider>
-  );
 }

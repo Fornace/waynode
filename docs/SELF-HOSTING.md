@@ -33,8 +33,8 @@ The setup command:
 3. prints the exact OAuth callbacks before asking for the client credentials;
 4. records a pi provider, provider-local model ID, and one-time bootstrap key;
 5. writes `.env` with mode `0600` and refuses to replace an existing file;
-6. validates Compose, builds the service, and waits for its auth endpoint to
-   report healthy.
+6. validates Compose, builds the service, and waits for its readiness endpoint
+   to confirm SQLite and data-volume access.
 
 Re-run the non-destructive validation at any time:
 
@@ -91,6 +91,7 @@ the bootstrap variable.
 
 | Provider | `PI_DEFAULT_PROVIDER` | Encrypted secret name |
 |---|---|---|
+| Fornace gateway | `fornace` | `FORNACE_API_KEY` |
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` |
 | OpenAI | `openai` | `OPENAI_API_KEY` |
 | Google Gemini | `google` | `GEMINI_API_KEY` |

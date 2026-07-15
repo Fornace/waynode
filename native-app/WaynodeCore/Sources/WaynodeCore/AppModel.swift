@@ -23,6 +23,7 @@ public final class AppModel {
     public private(set) var spaces: [Space] = []
     public private(set) var sessionsBySpace: [String: [Session]] = [:]
     public private(set) var models: [ModelOption] = []
+    public private(set) var activeOrgId: String?
     public private(set) var isLoadingSpaces: Bool = false
     public private(set) var isLoadingSessions: Bool = false
     public private(set) var spacesError: String?
@@ -44,21 +45,37 @@ public final class AppModel {
 
     private var api: APIClient?
     private var unauthorizedTask: Task<Void, Never>?
+    private let preferences: UserDefaults
 
-    public init(auth: AuthStore) {
+    public init(auth: AuthStore, preferences: UserDefaults = .standard) {
         self.auth = auth
+        self.preferences = preferences
         reconfigureAPI()
     }
+
+    public var activeOrg: Org? { orgs.first { $0.id == activeOrgId } }
+    public var activeOrgCanManageBilling: Bool { activeOrg?.myRole == "admin" }
 
     #if DEBUG
     /// Seeds realistic workbench state without requiring a network or token.
     public func installUITestFixture() {
         isUITestFixture = true
         let now = "2026-07-14T12:00:00Z"
-        let space = Space(id: "ui-space", ownerId: "ui-user", repoUrl: "https://github.com/example/waynode", repoName: "waynode", repoFullName: "example/waynode", branch: "main", localPath: "/tmp/waynode", createdAt: now, sessionCount: 2, myRole: "owner", latestSessionTitle: "Polish the workbench", latestSessionAt: now)
-        orgs = [Org(id: "ui-org", name: "Waynode Studio", slug: "waynode-studio", createdAt: now, myRole: "owner", spaceCount: 1)]
+        let usesLongContent = CommandLine.arguments.contains("-ui-test-long-content")
+        let repoName = usesLongContent
+            ? "waynode-accessibility-validation-with-an-intentionally-long-repository-name"
+            : "waynode"
+        let sessionTitle = usesLongContent
+            ? "Review every reconnecting, queued, interrupted, and recovery state before the production release"
+            : "Polish the workbench"
+        let space = Space(id: "ui-space", ownerId: "ui-user", repoUrl: "https://github.com/example/waynode", repoName: repoName, repoFullName: "example/\(repoName)", branch: "main", localPath: "/tmp/waynode", createdAt: now, orgId: "ui-org", sessionCount: 2, myRole: "owner", latestSessionTitle: sessionTitle, latestSessionAt: now)
+        applyOrganizations([
+            Org(id: "ui-org", name: "Waynode Studio", slug: "waynode-studio", createdAt: now, myRole: "admin", spaceCount: 1),
+            Org(id: "ui-viewer-org", name: "Research Collective", slug: "research-collective", createdAt: now, myRole: "viewer", spaceCount: 0),
+        ])
+        selectOrganization(CommandLine.arguments.contains("-ui-test-org-viewer") ? "ui-viewer-org" : "ui-org")
         let sessions = [
-            Session(id: "ui-session", spaceId: space.id, ownerId: "ui-user", title: "Polish the workbench", piSessionDir: "/tmp/waynode/.pi", model: "claude-sonnet", provider: "anthropic", createdAt: now, updatedAt: now),
+            Session(id: "ui-session", spaceId: space.id, ownerId: "ui-user", title: sessionTitle, piSessionDir: "/tmp/waynode/.pi", model: "claude-sonnet", provider: "anthropic", createdAt: now, updatedAt: now),
             Session(id: "ui-archived", spaceId: space.id, ownerId: "ui-user", title: "Archived exploration", piSessionDir: "/tmp/waynode/.pi-old", archived: true, createdAt: now, updatedAt: now)
         ]
         spaces = [space]
@@ -88,6 +105,22 @@ public final class AppModel {
 
     public func currentAPI() -> APIClient? { api }
 
+    /// Tears down every client tied to the old origin before authentication
+    /// moves to a different server. AuthStore revokes the old token first.
+    public func changeServer(to url: URL) async {
+        for store in sessionStores.values { store.close() }
+        sessionStores.removeAll()
+        orgs = []
+        spaces = []
+        sessionsBySpace.removeAll()
+        activeOrgId = nil
+        selectedSpaceId = nil
+        selectedSessionId = nil
+        await auth.changeServerURL(url)
+        reconfigureAPI()
+        if auth.isAuthenticated { await refreshAll() }
+    }
+
     // MARK: - Bootstrap (called after auth)
 
     public func bootstrap() async {
@@ -105,7 +138,31 @@ public final class AppModel {
 
     public func refreshOrgs() async {
         guard let api else { return }
-        orgs = (try? await api.listOrgs()) ?? []
+        guard let memberships = try? await api.listOrgs() else { return }
+        applyOrganizations(memberships)
+    }
+
+    public func selectOrganization(_ id: String) {
+        guard orgs.contains(where: { $0.id == id }) else { return }
+        activeOrgId = id
+        preferences.set(id, forKey: activeOrgPreferenceKey)
+    }
+
+    /// Central membership replacement used after refresh and by deterministic tests.
+    func applyOrganizations(_ memberships: [Org]) {
+        orgs = memberships
+        let stored = preferences.string(forKey: activeOrgPreferenceKey)
+        let candidate = activeOrgId.flatMap { current in memberships.first { $0.id == current }?.id }
+            ?? stored.flatMap { saved in memberships.first { $0.id == saved }?.id }
+            ?? memberships.first?.id
+        activeOrgId = candidate
+        if let candidate { preferences.set(candidate, forKey: activeOrgPreferenceKey) }
+        else { preferences.removeObject(forKey: activeOrgPreferenceKey) }
+    }
+
+    private var activeOrgPreferenceKey: String {
+        let user = auth.user?.id ?? "anonymous"
+        return "waynode.activeOrg.\(auth.serverConfig.credentialScope).\(user)"
     }
 
     // MARK: - Models
@@ -140,19 +197,20 @@ public final class AppModel {
     }
 
     public func createSpace(repoUrl: String, branch: String? = nil, orgId: String? = nil) async throws -> Space {
+        let targetOrgId = orgId ?? activeOrgId
         #if DEBUG
         if isUITestFixture {
             let now = "2026-07-14T12:00:00Z"
             let id = "ui-clone-\(spaces.count)"
             let name = repoUrl.split(separator: "/").last.map(String.init) ?? "repository"
-            let space = Space(id: id, ownerId: "ui-user", repoUrl: repoUrl, repoName: name, repoFullName: nil, branch: branch ?? "main", localPath: "/tmp/\(name)", createdAt: now, sessionCount: 0, myRole: "owner", latestSessionTitle: nil, latestSessionAt: nil)
+            let space = Space(id: id, ownerId: "ui-user", repoUrl: repoUrl, repoName: name, repoFullName: nil, branch: branch ?? "main", localPath: "/tmp/\(name)", createdAt: now, orgId: targetOrgId, sessionCount: 0, myRole: "owner", latestSessionTitle: nil, latestSessionAt: nil)
             spaces.insert(space, at: 0)
             sessionsBySpace[id] = []
             return space
         }
         #endif
         guard let api else { throw AuthStoreError.notAuthenticated }
-        let space = try await api.createSpace(.init(repoUrl: repoUrl, branch: branch, orgId: orgId))
+        let space = try await api.createSpace(.init(repoUrl: repoUrl, branch: branch, orgId: targetOrgId))
         spaces.insert(space, at: 0)
         return space
     }
@@ -299,10 +357,17 @@ public final class AppModel {
         }
         sessionStores.removeAll()
         orgs = []
+        activeOrgId = nil
         spaces = []
         sessionsBySpace.removeAll()
         selectedSpaceId = nil
         selectedSessionId = nil
+    }
+
+    /// Clears credentials and every in-memory workspace after the server has
+    /// confirmed permanent account deletion.
+    public func clearAfterAccountDeletion() {
+        handleUnauthorized()
     }
 }
 

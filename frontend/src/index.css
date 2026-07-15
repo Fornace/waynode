@@ -1,5 +1,6 @@
 @import "./styles/base-shell.css";
 @import "./styles/workspace-controls.css";
+@import "./styles/session-workbench.css";
 @import "./styles/sidebar-dialogs.css";
 @import "./styles/repo-picker.css";
 @import "./styles/admin-model.css";
@@ -7,5 +8,5 @@
 @import "./styles/chat-composer.css";
 @import "./styles/authenticated-states.css";
 @import "./styles/settings.css";
-@import "./styles/landing.css";
 @import "./styles/launch.css";
+@import "./styles/public-trust.css";

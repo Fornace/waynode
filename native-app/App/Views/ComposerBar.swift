@@ -11,16 +11,19 @@ import WaynodeCore
 //     classic SwiftUI TextEditor greedy-height bug where the editor
 //     expands to fill all available vertical space.
 //   • Rounded capsule shape, .thinMaterial background.
-//   • Goal-mode toggle on the left, Send/Abort on the right, both
-//     inside the capsule so it reads as one coherent input unit.
+//   • Attachment on the left; Goal mode sits beside Send because it modifies
+//     what Send does. Both remain inside one calm input surface.
 //   • Pinned to the bottom via safeAreaInset — stays above the keyboard.
 
 struct ComposerBar: View {
     @Binding var text: String
     let isSending: Bool
+    let isRunActive: Bool
+    let isAttaching: Bool
     let error: String?
     let isGoalActive: Bool
     var isFocused: FocusState<Bool>.Binding
+    var onAttach: () -> Void
     var onSend: (String, Bool) -> Void
     var onAbort: () -> Void
 
@@ -49,11 +52,11 @@ struct ComposerBar: View {
             }
 
             // Goal-mode hint strip
-            if isGoalMode && !isGoalActive {
+            if isGoalMode {
                 HStack(spacing: 6) {
-                    Image(systemName: "target")
-                        .font(.caption2)
-                    Text("Goal mode — agent runs autonomously until done")
+                    GoalTensionGlyph(active: true, reduceMotion: reduceMotion)
+                        .frame(width: 16, height: 16)
+                    Text("Goal mode · Waynode keeps working until done")
                         .font(.caption2)
                     Spacer()
                 }
@@ -68,20 +71,23 @@ struct ComposerBar: View {
             // send button on a shared baseline when single-line (the common
             // case); the field still grows vertically for multiline input.
             HStack(alignment: .center, spacing: 4) {
-                // Goal toggle
-                Button {
-                    Haptics.light()
-                    withAnimation(reduceMotion ? nil : .smooth) { isGoalMode.toggle() }
-                } label: {
-                    Image(systemName: isGoalMode ? "target" : "scope")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(isGoalMode ? Color.accentColor : Color.secondary)
-                        .frame(width: 32, height: 32)
+                Button(action: onAttach) {
+                    Group {
+                        if isAttaching {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "paperclip")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(Color.secondary)
+                        }
+                    }
+                    .frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
-                .disabled(isGoalActive)
-                .accessibilityLabel(isGoalMode ? "Disable goal mode" : "Enable goal mode")
-                .accessibilityIdentifier("composer.goal")
+                .disabled(isAttaching)
+                .accessibilityLabel("Attach files")
+                .accessibilityHint("Adds files to this workspace")
+                .accessibilityIdentifier("composer.attachment")
                 .frame(minWidth: 44, minHeight: 44)
 
                 // Auto-growing text field — the key fix.
@@ -97,6 +103,24 @@ struct ComposerBar: View {
                     .accessibilityLabel("Message")
                     .accessibilityHint("Type a message for the coding agent")
                     .accessibilityIdentifier("composer.input")
+
+                Button {
+                    Haptics.light()
+                    withAnimation(reduceMotion ? nil : .smooth) { isGoalMode.toggle() }
+                } label: {
+                    GoalTensionGlyph(active: isGoalMode, reduceMotion: reduceMotion)
+                        .frame(width: 24, height: 24)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            isGoalMode ? Color.accentColor.opacity(0.12) : Color.clear,
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isGoalMode ? "Disable goal mode" : "Enable goal mode")
+                .accessibilityHint("Goal mode keeps working until the goal is complete")
+                .accessibilityIdentifier("composer.goal")
+                .frame(minWidth: 44, minHeight: 44)
 
                 // Send / Abort
                 sendOrAbortButton
@@ -124,6 +148,7 @@ struct ComposerBar: View {
         .background(.bar)
         .animation(reduceMotion ? nil : .smooth, value: error != nil)
         .animation(reduceMotion ? nil : .smooth, value: isSending)
+        .animation(reduceMotion ? nil : .smooth, value: isRunActive)
         .animation(reduceMotion ? nil : .smooth, value: isGoalActive)
         .animation(reduceMotion ? nil : .smooth, value: isGoalMode)
     }
@@ -132,7 +157,22 @@ struct ComposerBar: View {
 
     @ViewBuilder
     private var sendOrAbortButton: some View {
-        if isSending || isGoalActive {
+        if isRunActive || isGoalActive {
+            HStack(spacing: 0) {
+                if canSend {
+                    Button { send() } label: {
+                        Image(systemName: "text.badge.plus")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSending)
+                    .accessibilityLabel(isGoalMode ? "Queue goal" : "Queue message")
+                    .accessibilityIdentifier("composer.queue")
+                    .accessibilityHint("Adds this draft after the active run")
+                    .frame(minWidth: 44, minHeight: 44)
+                }
             Button(action: onAbort) {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 14, weight: .bold))
@@ -145,6 +185,7 @@ struct ComposerBar: View {
             .accessibilityLabel(isGoalActive ? "Abort goal" : "Stop generation")
             .accessibilityIdentifier("composer.stop")
             .frame(minWidth: 44, minHeight: 44)
+            }
         } else {
             Button {
                 send()
@@ -159,7 +200,7 @@ struct ComposerBar: View {
                     )
             }
             .buttonStyle(.plain)
-            .disabled(!canSend)
+            .disabled(!canSend || isSending)
             .transition(.scale.combined(with: .opacity))
             .accessibilityLabel("Send message")
             .accessibilityIdentifier("composer.send")
@@ -174,8 +215,8 @@ struct ComposerBar: View {
     }
 
     private var placeholder: String {
-        if isSending { return "Agent is responding…" }
-        if isGoalActive { return "Agent is working on goal…" }
+        if isRunActive || isGoalActive { return "Add a follow-up…" }
+        if isSending { return "Sending…" }
         if isGoalMode { return "Describe the goal…" }
         return "Message"
     }
@@ -195,5 +236,38 @@ struct ComposerBar: View {
     private func errorAccessibilityLabel(_ error: String) -> String {
         guard !text.isEmpty else { return error }
         return "Message not sent. \(error). Your draft is still available. Send again to retry."
+    }
+}
+
+private struct GoalTensionGlyph: View {
+    let active: Bool
+    let reduceMotion: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 24, paused: reduceMotion || !active)) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+            let pull: CGFloat = reduceMotion || !active ? 0 : CGFloat(sin(seconds * 2.2)) * 1.15
+            Canvas { context, size in
+                let sx = size.width / 24
+                let sy = size.height / 24
+                let points = [
+                    CGPoint(x: 3 * sx, y: (5 + pull) * sy),
+                    CGPoint(x: 7 * sx, y: (18 - pull * 0.35) * sy),
+                    CGPoint(x: 12 * sx, y: (10 - pull) * sy),
+                    CGPoint(x: 17 * sx, y: (18 + pull * 0.35) * sy),
+                    CGPoint(x: 21 * sx, y: (4 - pull) * sy)
+                ]
+                var tension = Path()
+                tension.move(to: points[0])
+                points.dropFirst().forEach { tension.addLine(to: $0) }
+                let color = active ? Color.accentColor : Color.secondary
+                context.stroke(tension, with: .color(color), lineWidth: active ? 1.8 : 1.4)
+                for point in points {
+                    let node = CGRect(x: point.x - 1.8, y: point.y - 1.8, width: 3.6, height: 3.6)
+                    context.fill(Path(ellipseIn: node), with: .color(color))
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

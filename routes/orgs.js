@@ -6,7 +6,7 @@ import {
   listOrgMembers, updateMemberRole, removeMember, isOrgMember, ensureDefaultOrg,
   createInvite, getInviteByToken, acceptInvite, deleteOrg,
 } from "../lib/orgs.mjs";
-import { listSpacesByOrg, deleteSpace } from "../lib/spaces.mjs";
+import { listAllSpacesByOrg, deleteSpace } from "../lib/spaces.mjs";
 import { getSubscription, cancelSubscription, billingEnabled } from "../lib/billing.mjs";
 
 const router = Router();
@@ -90,7 +90,7 @@ router.delete("/api/orgs/:orgId", requireAuth, async (req, res) => {
   // Remove on-disk repo directories before dropping the DB rows (once the
   // org row is gone, ON DELETE CASCADE removes the space rows themselves,
   // and we'd lose local_path to clean up after).
-  for (const space of listSpacesByOrg(orgId)) {
+  for (const space of listAllSpacesByOrg(orgId)) {
     try { deleteSpace(space.id); } catch (e) { console.error(`[orgs] failed to delete space ${space.id} during org deletion:`, e.message); }
   }
 

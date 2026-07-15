@@ -2,19 +2,20 @@ import { Router } from "express";
 import { requireAuth } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
+import { oauthConnectionStatus, oauthTokenForUser } from "../lib/oauth-tokens.mjs";
 
 const router = Router();
 
 router.get("/api/repos/github", requireAuth, async (req, res) => {
-  const user = db.prepare("SELECT github_token FROM users WHERE id = ?").get(req.user.id);
-  if (!user?.github_token) {
+  const token = oauthTokenForUser(db, req.user.id, "github");
+  if (!token) {
     return res.json({ connected: false, groups: [] });
   }
 
   try {
     const resp = await fetch("https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member", {
       headers: {
-        Authorization: `Bearer ${user.github_token}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github.v3+json",
         "User-Agent": "Waynode-AI",
       },
@@ -67,15 +68,15 @@ router.get("/api/repos/github", requireAuth, async (req, res) => {
 });
 
 router.get("/api/repos/gitlab", requireAuth, async (req, res) => {
-  const user = db.prepare("SELECT gitlab_token FROM users WHERE id = ?").get(req.user.id);
-  if (!user?.gitlab_token) {
+  const token = oauthTokenForUser(db, req.user.id, "gitlab");
+  if (!token) {
     return res.json({ connected: false, groups: [] });
   }
 
   try {
     const baseUrl = config.gitlab.baseUrl;
     const resp = await fetch(`${baseUrl}/api/v4/projects?membership=true&per_page=100&order_by=updated_at`, {
-      headers: { Authorization: `Bearer ${user.gitlab_token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!resp.ok) {
@@ -119,11 +120,7 @@ router.get("/api/repos/gitlab", requireAuth, async (req, res) => {
 });
 
 router.get("/api/repos/status", requireAuth, (req, res) => {
-  const user = db.prepare("SELECT github_token, gitlab_token FROM users WHERE id = ?").get(req.user.id);
-  res.json({
-    github: !!user?.github_token,
-    gitlab: !!user?.gitlab_token,
-  });
+  res.json(oauthConnectionStatus(db, req.user.id));
 });
 
 export default router;

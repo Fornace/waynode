@@ -1,7 +1,8 @@
 # Waynode E2E
 
-The standard way to test waynode in prod, as the user (authenticated), through a
-real browser — **no local browser install required**.
+The standard automated browser suite runs against an isolated non-production
+deployment. Production never enables `DEV_AUTH_TOKEN`; production auth smoke
+uses a real OAuth browser session and a dedicated test organization.
 
 ## The driver: browser.fornace.net (REST action API)
 
@@ -12,6 +13,17 @@ HTTPS POST API — no MCP client, no CDP, no local Playwright.
 
 `run-rest.mjs` is the canonical harness. `run.mjs` (local Playwright) is kept
 only as an offline fallback.
+
+To provision the same isolated local server/worktree fixture but drive it with
+the locally installed Playwright browser, select the local driver explicitly:
+
+```bash
+WAYNODE_E2E_DRIVER=local ./scripts/run-local-rest-e2e.sh
+```
+
+The default remains `WAYNODE_E2E_DRIVER=rest`. The local fallback covers the
+same auth, disposable session, exact chat persistence/reload/timestamp, and
+model-switch contract without creating a public tunnel.
 
 ### Why this over CDP / local Playwright
 
@@ -26,40 +38,44 @@ only as an offline fallback.
   never collide. **Always pass your `sessionId` to every call; the shared
   default session is a multi-tenant free-for-all and will get hijacked.**
 
-## Auth model
+## Automated auth model (non-production only)
 
 - **`BROWSER_TOKEN`** = the `browser.fornace.net` api-key (`fnc_…`), from
   `~/.agent_credentials/tokens/browser-mcp-tomasipromo.env` (`BROWSER_MCP_TOKEN`).
-- **`DEV_TOKEN`** = waynode's `DEV_AUTH_TOKEN` (read from the prod container:
-  `ssh root@95.216.37.30 'docker exec $(docker ps -q --filter name=waynode)
-  printenv DEV_AUTH_TOKEN'`). The harness injects it into the page's
+- **`DEV_TOKEN`** = an isolated staging/local deployment's `DEV_AUTH_TOKEN`.
+  The harness injects it into the page's
   `localStorage` as `waynode-dev-token`, so REST, SSE, **and the terminal
   WebSocket** all run authenticated as the dev user — no OAuth login step.
 
-⚠️ `DEV_AUTH_TOKEN` being set in prod is itself security finding #9. It's what
-makes fully-automated E2E possible here, but it should be rotated/gated.
+The wrapper refuses `https://waynode.fornace.net`. A bypass token grants broad
+test-user access and must never be configured in production.
 
 ## Usage
 
 ```bash
-cd e2e
-npm install                       # one-time (installs nothing browser-side)
-DEV=$(ssh root@95.216.37.30 'docker exec $(docker ps -q --filter name=waynode) printenv DEV_AUTH_TOKEN')
-BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs
+BASE_URL=https://waynode-staging.example.com \
+DEV_TOKEN="<staging-only token>" \
+WAYNODE_NONPROD_CONFIRMED=1 \
+./scripts/run-rest-e2e-nonprod.sh
 
 # flags:
 #   KEEP=1            leave the browser session alive for manual inspection
 #   ONLY=auth,chat    run a subset of flows
 ```
 
+For production, first require `GET /api/health/ready` to return 200. Then use a
+real GitHub/GitLab OAuth session to verify login, one isolated chat turn,
+reload hydration, billing visibility, and logout. Do not reintroduce a server
+bypass to make this unattended.
+
 ## Flows covered
 
 | Flow | What it asserts |
 |------|-----------------|
 | `auth` | dev-token authenticates → sidebar lists spaces |
-| `open-session` | expanding a space + new session renders the chat/tabs |
-| `chat-send` | "Reply with exactly: E2E-OK" → assistant replies with it |
-| `model-switch` | dropdown → Fornace Reasoning, no error |
+| `open-session` | API-created disposable session deep-links into a ready composer |
+| `chat-send` | unique exact reply streams, persists beside its user turn, reloads, and renders source timestamps |
+| `model-switch` | session-menu selection persists to the session API without an error |
 | `hosted-terminal-disabled` | authenticated hosted production rejects interactive terminal, shows the capability explanation, and removes the Terminal control |
 | `chat-after-terminal-gate` | returning to Chat keeps the composer usable and the unsupported Terminal control hidden |
 
@@ -98,7 +114,6 @@ self-host terminal contract is covered without weakening that boundary:
 - `test-sandbox-security.mjs` asserts hosted denial and self-host allowance.
 - `test-terminal-billing.mjs` covers the typed availability error and detached
   terminal metering.
-- `run.mjs` remains the local/offline browser fallback for a trusted self-host.
 
 ## Reliability
 

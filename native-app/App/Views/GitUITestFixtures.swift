@@ -17,7 +17,22 @@ enum GitUITestFixtures {
           "defaultBranch":"main"
         }
         """#.data(using: .utf8)!
-        return try! JSONDecoder().decode(GitSnapshot.self, from: json)
+        var snapshot = try! JSONDecoder().decode(GitSnapshot.self, from: json)
+        let arguments = CommandLine.arguments
+        if arguments.contains("-ui-test-git-conflicted") {
+            snapshot.files[0].status = "conflict"
+            snapshot.files[0].staged = true
+        } else if arguments.contains("-ui-test-git-diverged") {
+            snapshot.ahead = 2
+            snapshot.behind = 3
+        } else if arguments.contains("-ui-test-git-detached") {
+            snapshot.currentBranch = "abc1234"
+            snapshot.detached = true
+            snapshot.upstream = nil
+        } else if arguments.contains("-ui-test-git-no-upstream") {
+            snapshot.upstream = nil
+        }
+        return snapshot
     }
 }
 #endif

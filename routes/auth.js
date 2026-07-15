@@ -3,6 +3,15 @@ import { Router } from "express";
 import { passport, resolveApiToken, requireAuth, prepareAccountDeletion, deletePreparedAccount } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
 import { createToken, countTokens, listTokens, revokeRawToken, revokeToken } from "../lib/api-tokens.mjs";
+import { deploymentCapabilities } from "../lib/capabilities.mjs";
+import {
+  consumeDeletionGrant,
+  createDeletionChallenge,
+  exchangeDeletionChallenge,
+  hasDeletionChallenge,
+  isDeletionNonce,
+  isDeletionProvider,
+} from "../lib/account-deletion-grants.mjs";
 
 const NATIVE_MAX_TOKENS = 10;
 import db from "../lib/db.mjs";
@@ -47,9 +56,9 @@ function freshNonce() {
 
 // Format: base64url(payload).base64url(HMAC). Native state is cookie-free;
 // browser state is additionally bound to the initiating server session.
-function signOAuthState({ native, nonce, provider }) {
+function signOAuthState({ native, nonce, provider, purpose = "login" }) {
   const iat = Date.now();
-  const payload = JSON.stringify({ native, nonce, provider, iat, exp: iat + OAUTH_STATE_TTL_MS });
+  const payload = JSON.stringify({ native, nonce, provider, purpose, iat, exp: iat + OAUTH_STATE_TTL_MS });
   const b64 = Buffer.from(payload).toString("base64url");
   const sig = createHmac("sha256", config.sessionSecret).update(b64).digest("base64url");
   return `${b64}.${sig}`;
@@ -71,6 +80,8 @@ function verifyOAuthState(state) {
     if (typeof payload.native !== "boolean") return null;
     if (!NATIVE_NONCE_PATTERN.test(payload.nonce)) return null;
     if (!["github", "gitlab"].includes(payload.provider)) return null;
+    if (!["login", "delete-account"].includes(payload.purpose)) return null;
+    if (payload.purpose === "delete-account" && !payload.native) return null;
     if (!Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)) return null;
     if (payload.exp - payload.iat !== OAUTH_STATE_TTL_MS) return null;
     if (payload.iat > now + 5_000 || payload.exp <= now) return null;
@@ -89,9 +100,10 @@ function safeEqualText(expected, provided) {
 
 function oauthOptions(req, provider) {
   const native = req.query.native === "1";
+  const purpose = req.query.purpose === "delete-account" ? "delete-account" : "login";
   const requestedNonce = typeof req.query.native_nonce === "string" ? req.query.native_nonce : "";
   const nonce = native && NATIVE_NONCE_PATTERN.test(requestedNonce) ? requestedNonce : freshNonce();
-  const state = signOAuthState({ native, nonce, provider });
+  const state = signOAuthState({ native, nonce, provider, purpose });
   if (!native) {
     req.session.oauthState = { nonce, provider, expiresAt: Date.now() + OAUTH_STATE_TTL_MS };
   }
@@ -122,21 +134,47 @@ function requireOAuthState(provider) {
 // After successful OAuth, either redirect to web `/` or, if the request
 // originated from the native app, create an API token and redirect to the
 // custom URL scheme `waynode://auth?token=wn_...`.
-function authRedirect(req, res) {
+function deletionCallback(res, nonce, values) {
+  const params = new URLSearchParams({ ...values, nonce });
+  return res.redirect(`${NATIVE_SCHEME}://delete-account?${params}`);
+}
+
+function authRedirect(req, res, authenticatedUser = req.user) {
   const nativeState = req.oauthState?.native ? req.oauthState : null;
 
-  if (nativeState && req.user) {
+  if (nativeState?.purpose === "delete-account" && authenticatedUser) {
+    const exchanged = exchangeDeletionChallenge(
+      authenticatedUser.id,
+      nativeState.provider,
+      nativeState.nonce,
+    );
+    return deletionCallback(res, nativeState.nonce, exchanged);
+  }
+
+  if (nativeState && authenticatedUser) {
     // Enforce the same MAX_TOKENS limit as /api/tokens, but evict the oldest
     // token first so native re-login never hits a wall (rolling replacement).
-    if (countTokens(req.user.id) >= NATIVE_MAX_TOKENS) {
-      const oldest = listTokens(req.user.id).pop(); // listTokens orders DESC by created_at
-      if (oldest) revokeToken(req.user.id, oldest.id);
+    if (countTokens(authenticatedUser.id) >= NATIVE_MAX_TOKENS) {
+      const oldest = listTokens(authenticatedUser.id).pop(); // listTokens orders DESC by created_at
+      if (oldest) revokeToken(authenticatedUser.id, oldest.id);
     }
-    const { token } = createToken(req.user.id, "iOS / Mac App");
+    const { token } = createToken(authenticatedUser.id, "iOS / Mac App");
     const params = new URLSearchParams({ token, nonce: nativeState.nonce });
     return res.redirect(`${NATIVE_SCHEME}://auth?${params}`);
   }
   res.redirect("/");
+}
+
+function finishOAuth(req, res, user) {
+  if (req.oauthState?.purpose === "delete-account") return authRedirect(req, res, user);
+  rotateAndLogin(req, res, user);
+}
+
+function rejectDeletionOAuth(req, res, fallback) {
+  if (req.oauthState?.purpose === "delete-account") {
+    return deletionCallback(res, req.oauthState.nonce, { error: "oauth_failed" });
+  }
+  return res.redirect(fallback);
 }
 
 function rotateAndLogin(req, res, user) {
@@ -152,34 +190,42 @@ function rotateAndLogin(req, res, user) {
 }
 
 router.get("/auth/github", (req, res, next) => {
+  if (req.query.purpose === "delete-account"
+      && !hasDeletionChallenge("github", req.query.native_nonce)) {
+    return deletionCallback(res, String(req.query.native_nonce || ""), { error: "invalid_or_expired_challenge" });
+  }
   passport.authenticate("github", oauthOptions(req, "github"))(req, res, next);
 });
 
 router.get("/auth/github/callback", requireOAuthState("github"), (req, res, next) => {
   passport.authenticate("github", { failureRedirect: "/" }, (err, user) => {
-    if (err || !user) return res.redirect("/login?auth_error=github_failed");
-    rotateAndLogin(req, res, user);
+    if (err || !user) return rejectDeletionOAuth(req, res, "/login?auth_error=github_failed");
+    finishOAuth(req, res, user);
   })(req, res, next);
 });
 
 router.get("/auth/gitlab", (req, res, next) => {
+  if (req.query.purpose === "delete-account"
+      && !hasDeletionChallenge("gitlab", req.query.native_nonce)) {
+    return deletionCallback(res, String(req.query.native_nonce || ""), { error: "invalid_or_expired_challenge" });
+  }
   passport.authenticate("gitlab", oauthOptions(req, "gitlab"))(req, res, next);
 });
 
 router.get("/auth/gitlab/callback", requireOAuthState("gitlab"), (req, res, next) => {
   passport.authenticate("gitlab", async (err, user, info, status) => {
-    if (err) return res.redirect("/login?auth_error=" + encodeURIComponent(err.message));
-    if (!user) return res.redirect("/login?auth_error=gitlab_failed");
+    if (err || !user) return rejectDeletionOAuth(req, res, "/login?auth_error=gitlab_failed");
 
     // Provider linking must be an explicit, state-bound flow. Do not silently
     // merge an OAuth identity into whichever browser account happens to have a
     // session: that is an account-confusion vulnerability and the verifier only
     // returns a user ID, not safely linkable provider credentials.
-    rotateAndLogin(req, res, user);
+    finishOAuth(req, res, user);
   })(req, res, next);
 });
 
 router.get("/api/auth/me", (req, res) => {
+  const capabilities = deploymentCapabilities();
   // Native app: Bearer API token.
   const authHeader = req.headers["authorization"];
   const hasBearer = authHeader?.startsWith("Bearer ");
@@ -187,7 +233,7 @@ router.get("/api/auth/me", (req, res) => {
     ? resolveApiToken(authHeader.slice(7).trim())
     : null;
   if (bearerUser) {
-    return res.json({ user: bearerUser, providers: { github: !!bearerUser.github_id, gitlab: !!bearerUser.gitlab_id, dev: false }, availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId } });
+    return res.json({ user: bearerUser, providers: { github: !!bearerUser.github_id, gitlab: !!bearerUser.gitlab_id, dev: false }, availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId }, capabilities });
   }
   // If a Bearer header was sent but no user resolved, the token is
   // invalid/revoked. Return 401 so the native client can detect this
@@ -197,7 +243,7 @@ router.get("/api/auth/me", (req, res) => {
   }
   const devUser = resolveDevToken(req);
   if (devUser) {
-    return res.json({ user: devUser, providers: { github: false, gitlab: false, dev: true }, availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId } });
+    return res.json({ user: devUser, providers: { github: false, gitlab: false, dev: true }, availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId }, capabilities });
   }
   if (!req.isAuthenticated()) {
     // Return which OAuth providers are configured on the server so the
@@ -206,12 +252,14 @@ router.get("/api/auth/me", (req, res) => {
       user: null,
       providers: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId },
       availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId },
+      capabilities,
     });
   }
   res.json({
     user: req.user,
     providers: getLinkedProviders(req.user.id),
     availableProviders: { github: !!config.github.clientId, gitlab: !!config.gitlab.clientId },
+    capabilities,
   });
 });
 
@@ -224,6 +272,27 @@ router.delete("/api/auth/native-token", requireAuth, (req, res) => {
     return res.status(404).json({ error: "Token not found" });
   }
   res.json({ ok: true });
+});
+
+router.post("/api/auth/account/deletion-reauth", requireAuth, (req, res) => {
+  if (req.authMethod !== "bearer") {
+    return res.status(403).json({ error: "Native account deletion reauthentication requires the current app credential." });
+  }
+  const { provider, nonce } = req.body || {};
+  if (!isDeletionProvider(provider) || !isDeletionNonce(nonce)) {
+    return res.status(400).json({ error: "A supported linked provider and valid native nonce are required." });
+  }
+  if (!getLinkedProviders(req.user.id)[provider]) {
+    return res.status(403).json({ error: `This account is not linked to ${provider}.` });
+  }
+  if (!createDeletionChallenge(req.user.id, provider, nonce)) {
+    return res.status(409).json({ error: "This deletion reauthentication request is already in use. Start again." });
+  }
+  const authorizationURL = new URL(`/auth/${provider}`, config.appUrl);
+  authorizationURL.searchParams.set("native", "1");
+  authorizationURL.searchParams.set("native_nonce", nonce);
+  authorizationURL.searchParams.set("purpose", "delete-account");
+  res.json({ authorization_url: authorizationURL.toString() });
 });
 
 router.post("/auth/logout", (req, res) => {
@@ -241,21 +310,19 @@ router.post("/auth/logout", (req, res) => {
 // to resolve the only safe blocker: appoint another administrator for every
 // org they are the final admin of (especially important for paid orgs).
 router.get("/api/auth/account/deletion-check", requireAuth, (req, res) => {
-  if (req.authMethod === "bearer") {
-    return res.status(403).json({ error: "For account safety, delete your account from a web sign-in session." });
-  }
   const prepared = prepareAccountDeletion(req.user.id);
   res.json({ can_delete: prepared.blockers.length === 0, blockers: prepared.blockers });
 });
 
 router.delete("/api/auth/account", requireAuth, (req, res) => {
-  // A long-lived bearer token must not be enough to erase an account. Native
-  // users can complete this from the web session created by OAuth instead.
-  if (req.authMethod === "bearer") {
-    return res.status(403).json({ error: "For account safety, delete your account from a web sign-in session." });
-  }
   if (req.body?.confirmation !== "DELETE") {
     return res.status(400).json({ error: 'Type DELETE to permanently delete your account.' });
+  }
+  if (req.authMethod === "bearer") {
+    const { deletion_grant: grant, native_nonce: nonce } = req.body || {};
+    if (!consumeDeletionGrant(req.user.id, grant, nonce)) {
+      return res.status(403).json({ error: "Fresh account reauthentication is required. Start deletion again." });
+    }
   }
 
   const prepared = prepareAccountDeletion(req.user.id);

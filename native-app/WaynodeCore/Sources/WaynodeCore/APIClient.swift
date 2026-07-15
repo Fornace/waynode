@@ -308,66 +308,6 @@ public actor APIClient {
         try await requestVoid("/api/sessions/\(id)/model", method: "POST", body: Body(model: model))
     }
 
-    // MARK: - Messages (history + send)
-
-    /// History response — the server returns a JSON array of message objects.
-    public struct HistoryMessage: Decodable, Sendable {
-        public var role: String
-        public var id: String?
-        public var content: String?
-        public var isGoal: Bool?
-        public var text: String?
-        public var thinking: String?
-        public var key: String?
-    }
-
-    public func getMessages(_ sessionId: String) async throws -> [HistoryMessage] {
-        try await request("/api/sessions/\(sessionId)/messages")
-    }
-
-    public struct SendMessageBody: Encodable, Sendable {
-        public var prompt: String
-        public var isGoal: Bool
-        public init(prompt: String, isGoal: Bool = false) {
-            self.prompt = prompt; self.isGoal = isGoal
-        }
-    }
-
-    public struct OkResponse: Decodable, Sendable {
-        public var ok: Bool
-        public var queued: Bool?
-    }
-
-    public func sendMessage(_ sessionId: String, prompt: String, isGoal: Bool = false) async throws -> OkResponse {
-        try await request("/api/sessions/\(sessionId)/message", method: "POST",
-                          body: SendMessageBody(prompt: prompt, isGoal: isGoal))
-    }
-
-    /// Queue a follow-up while a turn is running (409 → queue).
-    public func queueMessage(_ sessionId: String, prompt: String) async throws -> OkResponse {
-        try await request("/api/sessions/\(sessionId)/queue", method: "POST",
-                          body: SendMessageBody(prompt: prompt, isGoal: false))
-    }
-
-    public func abortTurn(_ sessionId: String) async throws {
-        try await requestVoid("/api/sessions/\(sessionId)/abort", method: "POST")
-    }
-
-    public struct StateResponse: Decodable, Sendable {
-        public var active: Bool
-        public var done: Bool
-    }
-
-    public func getSessionState(_ sessionId: String) async throws -> StateResponse {
-        try await request("/api/sessions/\(sessionId)/state")
-    }
-
-    public func getGoalStatus(_ sessionId: String) async throws -> GoalStatus {
-        struct Wrapper: Decodable { let goal: GoalStatus? }
-        let w: Wrapper = try await request("/api/sessions/\(sessionId)/goal")
-        return w.goal ?? GoalStatus()
-    }
-
 }
 // MARK: - JSON helpers
 

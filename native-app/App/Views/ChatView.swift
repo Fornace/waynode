@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import WaynodeCore
 
 // MARK: - Edit-message environment (#9)
@@ -45,7 +46,14 @@ struct ChatView: View {
     @FocusState private var composerFocused: Bool
     @State private var autoScroll: Bool = true
     @State private var showingAccount: Bool = false
+    @State private var showingAttachmentPicker = false
+    @State private var isUploadingAttachments = false
+    @State private var attachmentError: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if os(macOS)
+    @State private var transcriptSearch = ""
+    @State private var isTranscriptSearchPresented = false
+    #endif
 
     // Auto-scroll anchor: track the last item id for scroll-to-bottom.
     private let bottomID = "chat-bottom"
@@ -84,9 +92,12 @@ struct ChatView: View {
                 ComposerBar(
                     text: $composerText,
                     isSending: store.isSending,
-                    error: store.sendError,
+                    isRunActive: store.isRunActive,
+                    isAttaching: isUploadingAttachments,
+                    error: attachmentError ?? store.sendError,
                     isGoalActive: store.goalStatus.status == .active,
                     isFocused: $composerFocused,
+                    onAttach: { showingAttachmentPicker = true },
                     onSend: { prompt, isGoal in
                         Task {
                             await store.sendMessage(prompt, isGoal: isGoal)
@@ -109,14 +120,71 @@ struct ChatView: View {
         // When opening a session with history, don't steal focus — let the
         // user read first, tap to type when ready.
         .onAppear {
-            if store.reducer.items.isEmpty && !store.isLoadingHistory {
+            if store.reducer.items.isEmpty && store.didLoadHistory {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     composerFocused = true
                 }
             }
         }
+        .onChange(of: store.failedDraft) { _, draft in
+            guard let draft, composerText.isEmpty else { return }
+            composerText = draft.prompt
+            composerFocused = true
+        }
         .sheet(isPresented: $showingAccount) {
             NavigationStack { AccountScene() }
+        }
+        .fileImporter(
+            isPresented: $showingAttachmentPicker,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: true
+        ) { result in
+            guard case .success(let urls) = result else { return }
+            Task { await uploadAttachments(urls) }
+        }
+        #if os(macOS)
+        .searchable(
+            text: $transcriptSearch,
+            isPresented: $isTranscriptSearchPresented,
+            placement: .toolbar,
+            prompt: "Search transcript"
+        )
+        .onReceive(NotificationCenter.default.publisher(for: .waynodeFindTranscript)) { _ in
+            isTranscriptSearchPresented = true
+        }
+        #endif
+    }
+
+    private func uploadAttachments(_ urls: [URL]) async {
+        isUploadingAttachments = true
+        attachmentError = nil
+        defer { isUploadingAttachments = false }
+
+        do {
+            var files: [APIClient.UploadFile] = []
+            var totalBytes = 0
+            for url in urls.prefix(20) {
+                let hasAccess = url.startAccessingSecurityScopedResource()
+                defer { if hasAccess { url.stopAccessingSecurityScopedResource() } }
+                let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                totalBytes += data.count
+                guard totalBytes <= 100 * 1_024 * 1_024 else {
+                    throw APIClient.APIError(
+                        statusCode: 413,
+                        message: "Choose files totaling less than 100 MB"
+                    )
+                }
+                files.append(.init(filename: url.lastPathComponent, data: data))
+            }
+            let uploaded = try await store.uploadFiles(files)
+            guard !uploaded.isEmpty else { return }
+            let names = uploaded.map { "`\($0)`" }.joined(separator: ", ")
+            let separator = composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "" : "\n\n"
+            composerText += "\(separator)Attached workspace files: \(names)"
+            composerFocused = true
+        } catch {
+            attachmentError = "Couldn’t attach files. \(error.localizedDescription)"
         }
     }
 
@@ -126,7 +194,13 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    if store.reducer.items.isEmpty && !store.isLoadingHistory {
+                    if let historyError = store.historyError {
+                        HistoryFailureState(message: historyError) {
+                            Task { await store.retryHistory() }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
+                    } else if store.reducer.items.isEmpty && store.didLoadHistory {
                         EmptyChatState { suggestion in
                             composerText = suggestion
                             composerFocused = true
@@ -148,7 +222,7 @@ struct ChatView: View {
                     }
 
                     ForEach(transcriptItems) { item in
-                        ChatItemView(item: item)
+                        ChatTranscriptRow(item: item)
                             .id(item.id)
                     }
 
@@ -173,7 +247,7 @@ struct ChatView: View {
             .accessibilityIdentifier("chat.transcript")
             .accessibilityLabel("Conversation transcript")
             // Interactively dismiss the keyboard as the user scrolls down.
-            .scrollDismissesKeyboard(.interactively)
+            .platformInteractiveKeyboardDismissal()
             .defaultScrollAnchor(.bottom)
             // Tap anywhere on the message list (that isn't a link/button)
             // to bring the keyboard back.

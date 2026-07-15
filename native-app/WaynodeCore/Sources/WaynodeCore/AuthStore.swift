@@ -13,6 +13,52 @@ public struct ServerConfig: Codable, Sendable, Equatable {
     public var baseURL: URL
     public init(baseURL: URL) { self.baseURL = baseURL }
 
+    public var credentialScope: String {
+        Self.canonicalOrigin(for: baseURL) ?? baseURL.absoluteString
+    }
+
+    public static func validatedBaseURL(from value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var components = URLComponents(string: trimmed),
+              let scheme = components.scheme?.lowercased(),
+              let host = components.host?.lowercased(),
+              !host.isEmpty,
+              components.user == nil,
+              components.password == nil,
+              components.query == nil,
+              components.fragment == nil,
+              scheme == "https" || (scheme == "http" && isLoopback(host)) else { return nil }
+        components.scheme = scheme
+        components.host = host
+        if (scheme == "https" && components.port == 443)
+            || (scheme == "http" && components.port == 80) {
+            components.port = nil
+        }
+        if components.path == "/" { components.path = "" }
+        while components.path.count > 1 && components.path.hasSuffix("/") {
+            components.path.removeLast()
+        }
+        return components.url
+    }
+
+    public static func canonicalOrigin(for url: URL) -> String? {
+        guard let source = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let scheme = source.scheme?.lowercased(),
+              let host = source.host?.lowercased(),
+              !host.isEmpty else { return nil }
+        var origin = URLComponents()
+        origin.scheme = scheme
+        origin.host = host
+        if !((scheme == "https" && source.port == 443) || (scheme == "http" && source.port == 80)) {
+            origin.port = source.port
+        }
+        return origin.string
+    }
+
+    private static func isLoopback(_ host: String) -> Bool {
+        host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
+    }
+
     public static let `default` = ServerConfig(
         baseURL: URL(string: "https://waynode.fornace.net")!
     )
@@ -31,6 +77,7 @@ public final class AuthStore {
     public private(set) var token: String?
     public private(set) var user: User?
     public private(set) var providers: AuthMeResponse.Providers?
+    public private(set) var terminalCapability: TerminalCapabilityState = .checking
     public private(set) var isLoading: Bool = false
     public private(set) var hasRecoverableVerificationFailure = false
     public var error: String?
@@ -56,15 +103,15 @@ public final class AuthStore {
         self.keychain = keychain
         self.authAPIOverride = authAPI
         // Load persisted config.
-        if let config = Self.loadServerConfig() {
+        if let config = serverConfig {
             self.serverConfig = config
-        } else if let config = serverConfig {
+        } else if let config = Self.loadServerConfig() {
             self.serverConfig = config
         } else {
             self.serverConfig = .default
         }
         // Load persisted token.
-        self.token = keychain.readToken()
+        self.token = keychain.readToken(for: self.serverConfig.credentialScope)
     }
 
     // MARK: - Properties
@@ -73,7 +120,7 @@ public final class AuthStore {
     public var apiBaseURL: URL { serverConfig.baseURL.appendingPathComponent("api") }
 
     /// Auth callback URL scheme for ASWebAuthenticationSession.
-    public static let callbackScheme = "waynode"
+    public nonisolated static let callbackScheme = "waynode"
 
     /// Starts a one-shot native OAuth attempt. The nonce is persisted briefly
     /// so a signed callback can still finish after scene reconstruction.
@@ -137,10 +184,12 @@ public final class AuthStore {
             }
             self.user = user
             self.providers = resp.providers
+            terminalCapability = .init(serverValue: resp.capabilities?.terminal)
         } catch let apiError as APIClient.APIError where apiError.statusCode == 401 {
             clearLocalAuthentication(message: "Session expired. Please log in again.")
         } catch {
             user = nil
+            terminalCapability = .unavailable
             hasRecoverableVerificationFailure = true
             self.error = "Couldn't verify your saved session. Check the connection and retry."
         }
@@ -162,10 +211,11 @@ public final class AuthStore {
                 throw APIClient.APIError(statusCode: -1, message: "Server returned no user")
             }
             // Token is valid — persist it.
-            try keychain.writeToken(token)
+            try keychain.writeToken(token, for: serverConfig.credentialScope)
             self.token = token
             self.user = user
             self.providers = resp.providers
+            terminalCapability = .init(serverValue: resp.capabilities?.terminal)
             hasRecoverableVerificationFailure = false
             isLoading = false
         } catch {
@@ -177,8 +227,13 @@ public final class AuthStore {
     // MARK: - Logout
 
     /// Update discovered providers (used by login screen before auth).
-    public func setProviders(_ newProviders: AuthMeResponse.Providers?) {
+    public func setProviders(_ newProviders: AuthMeResponse.Providers?, capabilities: AuthMeResponse.Capabilities? = nil) {
         providers = newProviders
+        terminalCapability = .init(serverValue: capabilities?.terminal)
+    }
+
+    public func markServerCapabilitiesUnavailable() {
+        terminalCapability = .unavailable
     }
 
     public func logout() {
@@ -206,12 +261,13 @@ public final class AuthStore {
         token = nil
         user = nil
         providers = nil
+        terminalCapability = .checking
         error = message
         pendingToken = nil
         isLoading = false
         hasRecoverableVerificationFailure = false
         hasCompletedLaunchCheck = true
-        keychain.deleteToken()
+        keychain.deleteToken(for: serverConfig.credentialScope)
     }
 
     /// DEBUG: synchronously mark as authenticated with a pre-validated token.
@@ -234,6 +290,7 @@ public final class AuthStore {
         token = "ui-test-token"
         user = User(id: "ui-user", name: "Waynode Tester", email: "tester@example.test", role: "owner")
         providers = .init(github: true, gitlab: true, dev: true)
+        terminalCapability = .supported
         error = nil
         isLoading = false
         hasRecoverableVerificationFailure = false
@@ -243,9 +300,36 @@ public final class AuthStore {
 
     // MARK: - Change server
 
+    /// Changes the persisted server during launch/setup. Interactive changes
+    /// must use `changeServerURL` so a live token is revoked against its old
+    /// origin before any client is configured for the new one.
     public func setServerURL(_ url: URL) {
-        serverConfig = ServerConfig(baseURL: url)
+        let nextConfig = ServerConfig(baseURL: url)
+        if nextConfig.credentialScope != serverConfig.credentialScope {
+            token = nil
+            user = nil
+            providers = nil
+            terminalCapability = .checking
+            pendingToken = nil
+            error = nil
+        }
+        serverConfig = nextConfig
         Self.saveServerConfig(serverConfig)
+        token = keychain.readToken(for: serverConfig.credentialScope)
+        hasRecoverableVerificationFailure = false
+        hasCompletedLaunchCheck = token == nil
+    }
+
+    public func changeServerURL(_ url: URL) async {
+        let nextConfig = ServerConfig(baseURL: url)
+        guard nextConfig != serverConfig else { return }
+        if token != nil {
+            await logoutRevokingCurrentToken()
+        } else {
+            clearLocalAuthentication()
+        }
+        setServerURL(url)
+        if token != nil { await verifyToken() }
     }
 
     // MARK: - Persistence (UserDefaults for config, Keychain for token)

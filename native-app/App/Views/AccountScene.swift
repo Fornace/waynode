@@ -1,5 +1,6 @@
 import SwiftUI
 import WaynodeCore
+import AuthenticationServices
 
 struct NewTokenPresentation: Identifiable {
     let id = UUID()
@@ -20,22 +21,28 @@ struct AccountScene: View {
     @State var serverURL = ""
     @State var tokenToRevoke: APIClient.TokenInfo?
     @State var showingLogoutConfirm = false
-    @State var hostedBillingEnabled = false
+    @State var billingCapability: BillingCapabilityState = .checking
     @State var billing: APIClient.BillingInfo?
     @State var isLoadingBilling = false
     @State var billingBusy = false
     @State var billingError: String?
-    @State var areTokensExpanded = false
+    @State var showingDeleteAccount = false
+    @State var isDeletingAccount = false
+    @State var accountDeletionError: String?
+    @State var deletionSession: ASWebAuthenticationSession?
+    @State var deletionPresentationProvider: AuthPresentationProvider?
 
     var body: some View {
         List {
             profileSection
             providersSection
+            organizationSection
             tokensSection
             billingSection
             serverSection
             aboutSection
             logoutSection
+            deleteAccountSection
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account.surface")
@@ -44,7 +51,7 @@ struct AccountScene: View {
             await loadBilling()
         }
         .navigationTitle("Account")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformInlineNavigationTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }
@@ -60,7 +67,7 @@ struct AccountScene: View {
             await loadBilling()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, hostedBillingEnabled else { return }
+            guard phase == .active, billingCapability == .hosted else { return }
             Task { await loadBilling() }
         }
         .alert(
@@ -102,22 +109,31 @@ struct AccountScene: View {
                 Text("This action cannot be undone.")
             }
         }
-        .sheet(item: $newToken) { presentation in
+        .platformSensitiveCover(item: $newToken) { presentation in
             NewTokenSheet(token: presentation.value) {
                 newToken = nil
             }
         }
         .sheet(isPresented: $showingServerSheet) {
             ServerConfigSheet(url: $serverURL) { newURL in
-                if let url = URL(string: newURL) {
-                    appModel.auth.setServerURL(url)
-                    appModel.reconfigureAPI()
-                    Task { await appModel.bootstrap() }
+                if let url = ServerConfig.validatedBaseURL(from: newURL) {
+                    Task { await appModel.changeServer(to: url) }
                 }
             }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .platformAdaptiveSheet()
             .macSheetFrame(minWidth: 480, idealWidth: 540, maxWidth: 620, minHeight: 360, idealHeight: 420, maxHeight: 560)
+        }
+        .sheet(isPresented: $showingDeleteAccount, onDismiss: cancelAccountDeletion) {
+            AccountDeletionSheet(
+                accountName: appModel.auth.user?.name ?? "this account",
+                providers: linkedDeletionProviders,
+                isDeleting: isDeletingAccount,
+                error: accountDeletionError,
+                onCancel: { showingDeleteAccount = false },
+                onDelete: { provider in Task { await beginAccountDeletion(provider: provider) } }
+            )
+            .platformAdaptiveSheet()
+            .macSheetFrame(minWidth: 480, idealWidth: 540, maxWidth: 620, minHeight: 520, idealHeight: 600, maxHeight: 760)
         }
     }
 
@@ -209,51 +225,8 @@ struct AccountScene: View {
 
     private var tokensSection: some View {
         Section {
-            if isLoadingTokens {
-                HStack { Spacer(); ProgressView(); Spacer() }
-            } else if tokens.isEmpty {
-                Text("No API tokens")
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("account.tokens.empty")
-            } else {
-                DisclosureGroup(isExpanded: $areTokensExpanded) {
-                    ForEach(tokens) { token in
-                        HStack(alignment: .top, spacing: 10) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(token.label)
-                                    .font(.subheadline)
-                                    .lineLimit(2)
-                                ViewThatFits(in: .horizontal) {
-                                    tokenMetadata(token)
-                                    tokenMetadata(token, stacked: true)
-                                }
-                            }
-                            Spacer(minLength: 4)
-                            Button(role: .destructive) { tokenToRevoke = token } label: {
-                                Label("Revoke Token", systemImage: "trash")
-                                    .labelStyle(.iconOnly)
-                            }
-                            .accessibilityLabel("Revoke \(token.label)")
-                            .accessibilityIdentifier("account.token.\(token.id).revoke")
-                            .accessibilityHint("Asks before permanently revoking this token")
-                        }
-                        .swipeActions {
-                            Button(role: .destructive) {
-                                tokenToRevoke = token
-                            } label: {
-                                Label("Revoke", systemImage: "trash")
-                            }
-                            .accessibilityIdentifier("account.token.\(token.id).revoke.swipe")
-                        }
-                    }
-                } label: {
-                    Text("\(tokens.count) active token\(tokens.count == 1 ? "" : "s")")
-                        .accessibilityIdentifier("account.tokens.disclosure")
-                }
-            }
-
             Button {
-                Task { await createToken() }
+                requestTokenCreation()
             } label: {
                 HStack {
                     if isCreatingToken {
@@ -267,6 +240,48 @@ struct AccountScene: View {
             .accessibilityIdentifier("account.token.create")
             .accessibilityHint(tokens.count >= 10 ? "Token limit reached; revoke a token first" : "Creates a token that is shown only once")
 
+            if isLoadingTokens {
+                HStack { Spacer(); ProgressView(); Spacer() }
+            } else if tokens.isEmpty {
+                Text("No API tokens")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("account.tokens.empty")
+            } else {
+                Text("\(tokens.count) active token\(tokens.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("account.tokens.summary")
+                ForEach(tokens) { token in
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(token.label)
+                                .font(.subheadline)
+                                .lineLimit(2)
+                            ViewThatFits(in: .horizontal) {
+                                tokenMetadata(token)
+                                tokenMetadata(token, stacked: true)
+                            }
+                        }
+                        Spacer(minLength: 4)
+                        Button(role: .destructive) { tokenToRevoke = token } label: {
+                            Label("Revoke Token", systemImage: "trash")
+                                .labelStyle(.iconOnly)
+                        }
+                        .accessibilityLabel("Revoke \(token.label)")
+                        .accessibilityIdentifier("account.token.\(token.id).revoke")
+                        .accessibilityHint("Asks before permanently revoking this token")
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            tokenToRevoke = token
+                        } label: {
+                            Label("Revoke", systemImage: "trash")
+                        }
+                        .accessibilityIdentifier("account.token.\(token.id).revoke.swipe")
+                    }
+                }
+            }
+
             if let error {
                 Text(error)
                     .font(.caption)
@@ -278,67 +293,6 @@ struct AccountScene: View {
             Text("API Tokens")
         } footer: {
             Text("Tokens let the native app authenticate with the server. Max 10 per account.")
-        }
-    }
-
-    // MARK: - Billing
-
-    private var billingSection: some View {
-        Section {
-            if isLoadingBilling {
-                HStack { Spacer(); ProgressView(); Spacer() }
-            } else if !hostedBillingEnabled {
-                Label("This server is self-hosted", systemImage: "server.rack")
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("account.billing.selfhosted")
-            } else if let billing, let org = appModel.orgs.first {
-                LabeledContent("Plan", value: billingLabel(billing.plan))
-                LabeledContent("Status", value: billingLabel(billing.status))
-                if billing.status != "active" && billing.status != "trialing" {
-                    Text("Agent work is paused until this workspace has an active plan.")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-
-                if billing.plan == "free" || billing.status == "expired" {
-                    Menu {
-                        Button("Starter · $39/month") { Task { await beginCheckout(org.id, plan: "starter") } }.accessibilityIdentifier("account.billing.plan.starter")
-                        Button("Pro · $99/month") { Task { await beginCheckout(org.id, plan: "pro") } }.accessibilityIdentifier("account.billing.plan.pro")
-                        Button("Team · $249/month") { Task { await beginCheckout(org.id, plan: "team") } }.accessibilityIdentifier("account.billing.plan.team")
-                    } label: {
-                        Label(billingBusy ? "Opening checkout…" : "Choose a plan", systemImage: "creditcard")
-                    }
-                    .disabled(billingBusy)
-                    .accessibilityIdentifier("account.billing.plan.menu")
-                    .accessibilityHint("Choose a workspace plan and open secure checkout")
-                } else {
-                    Button {
-                        Task { await manageBilling(org.id) }
-                    } label: {
-                        Label(billingBusy ? "Opening billing…" : "Manage billing", systemImage: "creditcard")
-                    }
-                    .disabled(billingBusy)
-                    .accessibilityIdentifier("account.billing.manage")
-                    .accessibilityHint("Opens the secure billing portal")
-                }
-            } else {
-                Text("No organization is available for billing.")
-                    .foregroundStyle(.secondary)
-            }
-
-            if let billingError {
-                Text(billingError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .accessibilityLabel("Billing error: \(billingError)")
-                    .accessibilitySortPriority(2)
-            }
-        } header: {
-            Text("Hosted Billing")
-        } footer: {
-            Text("Plans apply to the whole workspace. App Store subscriptions remain separate until server verification is available.")
         }
     }
 

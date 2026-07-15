@@ -9,8 +9,8 @@
  *  POST   /api/spaces/:spaceId/git/create-branch { branchName, baseBranch }
  *  POST   /api/spaces/:spaceId/git/pull          fast-forward only
  *
- * The user is the owner of the repo; pi being busy is surfaced as `piBusy`
- * (informational) and never hard-blocks writes here — the UI soft-warns.
+ * The user is the owner of the repo. Self-host uses an informational `piBusy`
+ * warning; hosted Git returns 409 while a sandbox can mutate local config.
  */
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
@@ -21,6 +21,7 @@ import * as git from "../lib/git-ops.mjs";
 import { identityForUser } from "../lib/git-identity.mjs";
 import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
+import { refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
 
 const router = Router();
 
@@ -29,12 +30,17 @@ function spacePath(req) {
   return space?.local_path || null;
 }
 
+function refreshSpaceStorage(req) {
+  refreshOrgStorageUsage(getSpace(req.params.spaceId)?.org_id);
+}
+
 // Shared error mapper: a space row can outlive its on-disk directory (deleted
 // outside the app, or a stale/orphaned row). git-ops throws a tagged
 // SpaceDirMissingError for this case (see lib/git-ops.mjs) instead of letting
 // git's raw "fatal: cannot change to '...'" stderr propagate as a 500.
 function sendGitError(res, e, fallbackStatus = 500) {
   if (e.spaceDirMissing) return res.status(409).json({ error: e.message, spaceDirMissing: true });
+  if (e.gitBusy) return res.status(409).json({ error: e.message, gitBusy: true });
   return res.status(fallbackStatus).json({ error: e.message });
 }
 
@@ -127,6 +133,7 @@ router.post("/api/spaces/:spaceId/git/commit", requireAuth, requireSpaceAccess, 
   if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
   try {
     await git.commitSelected(cwd, { ...req.body || {}, identity: identityForUser(req.user) });
+    refreshSpaceStorage(req);
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
@@ -141,6 +148,7 @@ router.post("/api/spaces/:spaceId/git/switch-branch", requireAuth, requireSpaceA
   if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
   try {
     await git.switchBranch(cwd, req.body || {});
+    refreshSpaceStorage(req);
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
@@ -155,6 +163,7 @@ router.post("/api/spaces/:spaceId/git/create-branch", requireAuth, requireSpaceA
   if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only role" });
   try {
     await git.createBranch(cwd, req.body || {});
+    refreshSpaceStorage(req);
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, data });
@@ -170,6 +179,7 @@ router.post("/api/spaces/:spaceId/git/pull", requireAuth, requireSpaceAccess, as
   const mode = req.body?.mode || "ff-only";
   try {
     const result = await git.pull(cwd, { mode, identity: identityForUser(req.user) });
+    refreshSpaceStorage(req);
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, mode: result.mode, output: result.output, aborted: result.aborted, conflicts: result.conflicts, data });
@@ -189,13 +199,14 @@ router.post("/api/spaces/:spaceId/git/push", requireAuth, requireSpaceAccess, as
   console.info(`[git:push:${operationId}] start space=${req.params.spaceId} user=${req.user.id} upstream=${!!req.body?.setUpstream}`);
   try {
     const result = await git.push(cwd, { setUpstream: !!req.body?.setUpstream });
+    refreshSpaceStorage(req);
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     console.info(`[git:push:${operationId}] success space=${req.params.spaceId}`);
     res.json({ ok: true, pushed: result.pushed, data, operationId });
   } catch (e) {
     console.warn(`[git:push:${operationId}] failed space=${req.params.spaceId} reason=${e.message}`);
-    if (e.spaceDirMissing) return sendGitError(res, e);
+    if (e.spaceDirMissing || e.gitBusy) return sendGitError(res, e);
     res.status(400).json({ error: e.message, pushRejected: !!e.pushRejected, noUpstream: !!e.noUpstream, operationId });
   }
 });
@@ -208,6 +219,7 @@ router.post("/api/spaces/:spaceId/git/merge", requireAuth, requireSpaceAccess, a
   if (!branchName) return res.status(400).json({ error: "branchName required" });
   try {
     const result = await git.mergeBranch(cwd, { branchName, identity: identityForUser(req.user) });
+    refreshSpaceStorage(req);
     const data = git.getSnapshot(cwd);
     data.piBusy = isSpaceBusy(req.params.spaceId);
     res.json({ ok: true, merged: result.merged, aborted: result.aborted, conflicts: result.conflicts, data });

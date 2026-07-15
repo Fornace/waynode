@@ -25,6 +25,19 @@ schemes:
     build:
       targets:
         Waynode: all
+  WaynodeMac:
+    build:
+      targets:
+        WaynodeMac: all
+  WaynodeMacUITests:
+    build:
+      targets:
+        WaynodeMac: all
+        WaynodeMacUITests: [test]
+    test:
+      targets:
+        - WaynodeMacUITests
+      gatherCoverageData: false
   WaynodeUITests:
     build:
       targets:
@@ -42,14 +55,18 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: App
+        excludes:
+          - MacInfo.plist
     dependencies:
       - package: WaynodeCore
       - package: SwiftTerm
         product: SwiftTerm
     settings:
       base:
+        PRODUCT_NAME: Waynode
         PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app
         INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/Waynode.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
         # One universal target: iPhone, iPad, and Mac share the same bundle
         # identifier, signing team, StoreKit products, and SwiftUI code.
@@ -72,4 +89,42 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app.uitests
         TEST_TARGET_NAME: Waynode
         SUPPORTS_MACCATALYST: YES
+        GENERATE_INFOPLIST_FILE: YES
+
+  WaynodeMac:
+    type: application
+    platform: macOS
+    productName: Waynode
+    deploymentTarget: "26.0"
+    sources:
+      - path: App
+        excludes:
+          - Info.plist
+    dependencies:
+      - package: WaynodeCore
+      - package: SwiftTerm
+        product: SwiftTerm
+    settings:
+      base:
+        PRODUCT_NAME: Waynode
+        PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app
+        INFOPLIST_FILE: App/MacInfo.plist
+        CODE_SIGN_ENTITLEMENTS: App/Waynode.entitlements
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ENABLE_PREVIEWS: YES
+        GENERATE_INFOPLIST_FILE: NO
+
+  WaynodeMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: WaynodeMacUITests
+    dependencies:
+      - target: WaynodeMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.waynode.app.mac-uitests
+        TEST_TARGET_NAME: WaynodeMac
         GENERATE_INFOPLIST_FILE: YES

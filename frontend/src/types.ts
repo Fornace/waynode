@@ -37,6 +37,22 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   thinking?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  timestamp?: string | null;
+}
+
+export type SubmissionStatus = "sending" | "queued" | "starting" | "running" | "completed" | "failed" | "cancelled";
+
+export interface Submission {
+  id: string;
+  prompt: string;
+  isGoal: boolean;
+  status: SubmissionStatus;
+  error?: string;
+  createdAt?: string;
+  created_at?: string;
+  timestamp?: string;
 }
 
 // ── Rich streaming message model (sessionStore) ──
@@ -46,12 +62,12 @@ export type ToolStatus = "running" | "done" | "error";
 export type Block =
   | { type: "text"; text: string }
   | { type: "thinking"; text: string }
-  | { type: "tool"; id: string; name: string; args: any; output: string; status: ToolStatus };
+  | { type: "tool"; id: string; name: string; args: any; output: string; status: ToolStatus; startedAt?: number; endedAt?: number };
 
 export type ChatItem =
-  | { id: string; role: "user"; content: string; isGoal?: boolean }
-  | { id: string; role: "assistant"; blocks: Block[]; done: boolean }
-  | { id: string; role: "system"; content: string; key?: string };
+  | { id: string; role: "user"; content: string; sentAt: string | null; isGoal?: boolean; submissionStatus?: SubmissionStatus }
+  | { id: string; role: "assistant"; blocks: Block[]; done: boolean; sentAt: string | null }
+  | { id: string; role: "system"; content: string; sentAt: string | null; key?: string };
 
 export interface GoalStatus {
   status: "active" | "paused" | "complete" | "budgetLimited" | null;

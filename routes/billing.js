@@ -1,12 +1,10 @@
 import { Router } from "express";
-import { existsSync } from "fs";
-import { spawnSync } from "child_process";
 import { requireAuth } from "../lib/auth.mjs";
 import { config, billingEnabled } from "../lib/config.mjs";
 import { isOrgMember, getOrg } from "../lib/orgs.mjs";
-import { listSpacesByOrg } from "../lib/spaces.mjs";
+import { refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
 import {
-  PLANS, getSubscription, getUsage, checkQuota, recordStorageBytes,
+  PLANS, getSubscription, getUsage, checkQuota,
   createCheckoutSession, createPortalSession,
   constructWebhookEvent, handleWebhookEvent, BillingNotConfiguredError,
 } from "../lib/billing.mjs";
@@ -19,27 +17,10 @@ function requireOrgAdmin(req, res, next) {
   next();
 }
 
-// Best-effort on-disk size of every space in the org, in bytes. `du` is not
-// exact for sparse/hardlinked files but is good enough for a usage display;
-// this is not used for hard-limit enforcement of storage today.
-function measureOrgStorageBytes(orgId) {
-  const spaces = listSpacesByOrg(orgId);
-  let total = 0;
-  for (const space of spaces) {
-    if (!space.local_path || !existsSync(space.local_path)) continue;
-    try {
-      const result = spawnSync("du", ["-sk", space.local_path], { encoding: "utf8" });
-      const kb = parseInt((result.stdout || "0").split(/\s+/)[0], 10);
-      if (Number.isFinite(kb)) total += kb * 1024;
-    } catch {}
-  }
-  return total;
-}
-
 // Unauthenticated: lets the frontend decide whether to render billing UI at
 // all on self-host installs (where STRIPE_SECRET_KEY is never set).
 router.get("/api/billing/enabled", (req, res) => {
-  res.json({ enabled: billingEnabled });
+  res.json({ enabled: billingEnabled, deployment: config.deployment });
 });
 
 // Keep every hosted-billing read and write inert on self-host installs. The
@@ -55,10 +36,15 @@ router.use((req, res, next) => {
   next();
 });
 
-router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, (req, res) => {
+router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, async (req, res) => {
   const orgId = req.params.orgId;
-  const storageBytes = measureOrgStorageBytes(orgId);
-  recordStorageBytes(orgId, storageBytes);
+  let storageBytes;
+  try {
+    storageBytes = await refreshOrgStorageUsage(orgId, { strict: true });
+  } catch (error) {
+    console.error("[billing storage]", error.message);
+    return res.status(503).json({ error: "Storage usage is temporarily unavailable. Try again." });
+  }
 
   const subscription = getSubscription(orgId);
   const usage = getUsage(orgId);
@@ -68,6 +54,7 @@ router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, (req, res) 
     enabled: billingEnabled,
     plan: subscription.plan,
     status: subscription.status,
+    current_period_start: subscription.current_period_start,
     current_period_end: subscription.current_period_end,
     can_manage_billing: !!subscription.stripe_customer_id,
     usage: {
@@ -127,6 +114,6 @@ webhookRouter.post("/api/billing/webhook", async (req, res) => {
     res.json({ received: true });
   } catch (err) {
     console.error("[billing webhook]", err.message);
-    res.status(400).json({ error: `Webhook error: ${err.message}` });
+    res.status(400).json({ error: "Webhook rejected. Verify its signature and retry." });
   }
 });

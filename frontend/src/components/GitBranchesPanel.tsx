@@ -42,8 +42,8 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
       const { data } = await api.git.switchBranch(space.id, { branchName: name, mode: m });
       onChange(data);
       setSwitchTo(null);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch {
+      setErr("Couldn’t switch branches. Your current branch and changes are preserved.");
     } finally {
       setBusy(false);
     }
@@ -58,7 +58,7 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
       if (r.conflicts && r.conflicts.length) raiseRebaseConflict(r.conflicts);
     } catch (e: any) {
       if (e.body?.diverged) raiseDiverged();
-      else setErr(e.message);
+      else setErr("Couldn’t pull from the remote. Your local work is preserved; try again.");
     } finally {
       setPulling(false);
     }
@@ -73,8 +73,8 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
       onChange(r.data);
       if (r.aborted && r.conflicts?.length) raiseMergeConflict(target, r.conflicts);
       else setErr(`Merged ${target}`);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch {
+      setErr("Couldn’t merge that branch. Your current branch is preserved.");
     } finally {
       setBusy(false);
     }
@@ -88,10 +88,10 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
     note(`🔀 Merge conflict — merging \`${target}\` into \`${cur}\` conflicted in ${files.length} file(s): ${files.join(", ")}. The merge was aborted; the repo is clean.`);
     onIssue({
       title: "Merge — conflicts",
-      detail: `Merging ${target} into ${cur} conflicted. The merge was aborted so the repo is clean. Let pi merge and resolve?`,
+      detail: `Merging ${target} into ${cur} conflicted. The merge was aborted so the repo is clean. Let the agent merge and resolve?`,
       files,
       actions: [
-        { id: "pi", label: "Ask pi to resolve", primary: true, run: async () => askPi(buildAskPrompt("merge", { cur, target, files })) },
+        { id: "pi", label: "Ask agent to resolve", primary: true, run: async () => askPi(buildAskPrompt("merge", { cur, target, files })) },
         { id: "retry", label: "Retry merge", run: async () => { onIssue(null); await handleMerge(target); } },
         { id: "ignore", label: "Ignore", run: async () => onIssue(null) },
       ],
@@ -101,10 +101,10 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
     note(`🔀 Pull rebased with conflicts in ${files.length} file(s): ${files.join(", ")}. The rebase was aborted; the repo is clean.`);
     onIssue({
       title: "Pull — rebase conflicts",
-      detail: `Rebasing ${cur} conflicted. The rebase was aborted so the repo is clean. Let pi resolve and finish the pull?`,
+      detail: `Rebasing ${cur} conflicted. The rebase was aborted so the repo is clean. Let the agent resolve and finish the pull?`,
       files,
       actions: [
-        { id: "pi", label: "Ask pi to resolve", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur, files })) },
+        { id: "pi", label: "Ask agent to resolve", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur, files })) },
         { id: "ignore", label: "Ignore", run: async () => onIssue(null) },
       ],
     });
@@ -113,11 +113,11 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
     note(`🔀 Pull diverged — ${cur} and its remote have diverged (fast-forward not possible).`);
     onIssue({
       title: "Pull — branches diverged",
-      detail: `${cur} and its remote have diverged. Merge, rebase, or let pi handle it?`,
+      detail: `${cur} and its remote have diverged. Merge, rebase, or let the agent handle it?`,
       actions: [
         { id: "merge", label: "Merge", run: async () => doPullMode("merge") },
         { id: "rebase", label: "Rebase", run: async () => doPullMode("rebase") },
-        { id: "pi", label: "Ask pi", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur })) },
+        { id: "pi", label: "Ask agent", primary: true, run: async () => askPi(buildAskPrompt("rebase", { cur })) },
         { id: "ignore", label: "Cancel", run: async () => onIssue(null) },
       ],
     });
@@ -129,8 +129,8 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
       onChange(r.data);
       if (r.conflicts && r.conflicts.length) raiseRebaseConflict(r.conflicts);
       else onIssue(null);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch {
+      setErr("Couldn’t update from the remote. Your local work is preserved; try again.");
     } finally {
       setPulling(false);
     }
@@ -223,8 +223,8 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
               const { data } = await api.git.createBranch(space.id, { branchName: name, baseBranch: cur || undefined });
               onChange(data);
               setShowCreate(false);
-            } catch (e: any) {
-              setErr(e.message);
+            } catch {
+              setErr("Couldn’t create that branch. Your current branch is unchanged.");
             } finally {
               setBusy(false);
             }

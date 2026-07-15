@@ -2,9 +2,9 @@ import Foundation
 import Security
 
 public protocol CredentialStore: Sendable {
-    func readToken() -> String?
-    func writeToken(_ token: String) throws
-    func deleteToken()
+    func readToken(for serverOrigin: String) -> String?
+    func writeToken(_ token: String, for serverOrigin: String) throws
+    func deleteToken(for serverOrigin: String)
 }
 
 // MARK: - KeychainStore
@@ -17,34 +17,45 @@ public protocol CredentialStore: Sendable {
 
 public struct KeychainStore: CredentialStore {
     public let service: String
-    public let account: String
 
-    public init(service: String = "com.waynode.app", account: String = "default") {
+    public init(service: String = "com.waynode.app") {
         self.service = service
-        self.account = account
     }
 
     // MARK: - Read
 
-    public func readToken() -> String? {
-        read()
+    public func readToken(for serverOrigin: String) -> String? {
+        if let token = read(account: serverOrigin) { return token }
+        guard serverOrigin == Self.productionOrigin,
+              let legacyToken = read(account: Self.legacyAccount) else { return nil }
+        // The pre-scoping app stored one token under "default". It is safe to
+        // migrate that item only to the historical production origin.
+        if (try? write(legacyToken, account: serverOrigin)) != nil {
+            delete(account: Self.legacyAccount)
+        }
+        return legacyToken
     }
 
     // MARK: - Write
 
-    public func writeToken(_ token: String) throws {
-        try write(token)
+    public func writeToken(_ token: String, for serverOrigin: String) throws {
+        try write(token, account: serverOrigin)
+        if serverOrigin == Self.productionOrigin { delete(account: Self.legacyAccount) }
     }
 
     // MARK: - Delete
 
-    public func deleteToken() {
-        delete()
+    public func deleteToken(for serverOrigin: String) {
+        delete(account: serverOrigin)
+        if serverOrigin == Self.productionOrigin { delete(account: Self.legacyAccount) }
     }
 
     // MARK: - Core operations
 
-    private func read() -> String? {
+    private static let productionOrigin = "https://waynode.fornace.net"
+    private static let legacyAccount = "default"
+
+    private func read(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -65,27 +76,36 @@ public struct KeychainStore: CredentialStore {
         return token
     }
 
-    private func write(_ token: String) throws {
+    private func write(_ token: String, account: String) throws {
         let data = Data(token.utf8)
-        delete() // Always overwrite
-
-        let attributes: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+        ]
+        let status = SecItemUpdate(
+            query as CFDictionary,
+            [kSecValueData as String: data] as CFDictionary
+        )
+        if status == errSecSuccess { return }
+        guard status == errSecItemNotFound else {
+            throw KeychainError.unhandledStatus(status)
+        }
+
+        let attributes: [String: Any] = query.merging([
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-        ]
-        let status = SecItemAdd(attributes as CFDictionary, nil)
+        ]) { _, new in new }
+        let addStatus = SecItemAdd(attributes as CFDictionary, nil)
         #if DEBUG
-        print("Waynode diagnostics: keychain write status \(status)")
+        print("Waynode diagnostics: keychain write status \(addStatus)")
         #endif
-        guard status == errSecSuccess else {
-            throw KeychainError.unhandledStatus(status)
+        guard addStatus == errSecSuccess else {
+            throw KeychainError.unhandledStatus(addStatus)
         }
     }
 
-    private func delete() {
+    private func delete(account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

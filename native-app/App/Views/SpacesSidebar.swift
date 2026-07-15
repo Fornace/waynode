@@ -74,18 +74,26 @@ struct SpacesScene: View {
                         }
                         .accessibilityIdentifier("worktree.\(space.id).delete")
                     }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            spaceToDelete = space
+                        } label: {
+                            Label("Delete Worktree", systemImage: "trash")
+                        }
+                        .accessibilityIdentifier("worktree.\(space.id).delete")
+                    }
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("worktrees.list")
         .navigationTitle("Worktrees")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformInlineNavigationTitle()
         // Force search into a drawer below the title so it doesn't collide
         // with the Clone button in the navigation bar on iOS 26+.
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search worktrees")
+        .platformNavigationSearch(text: $searchText, prompt: "Search worktrees")
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: actionPlacement) {
                 Button {
                     Haptics.light()
                     showingCloneSheet = true
@@ -126,7 +134,9 @@ struct SpacesScene: View {
                 .accessibilityIdentifier("worktree.delete.cancel")
         } message: {
             if let space = spaceToDelete {
-                Text("This will remove \"\(space.repoName)\" and all its sessions. This cannot be undone.")
+                let org = appModel.orgs.first { $0.id == space.orgId }
+                let context = org.map { " from \($0.name) (your role: \(($0.myRole ?? "member").capitalized))" } ?? ""
+                Text("This will remove \"\(space.repoName)\"\(context) and all its sessions. This cannot be undone.")
             } else {
                 Text("This action cannot be undone.")
             }
@@ -139,6 +149,14 @@ struct SpacesScene: View {
                 await appModel.refreshSpaces()
             }
         }
+    }
+
+    private var actionPlacement: ToolbarItemPlacement {
+        #if os(macOS)
+        .primaryAction
+        #else
+        .topBarTrailing
+        #endif
     }
 }
 

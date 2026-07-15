@@ -13,14 +13,14 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 6px 8px 6px 12px;
+  padding: 6px 8px;
   transition: border-color 0.2s, box-shadow 0.2s;
   align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 .composer-inner:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: rgba(113, 151, 224, .58);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, .11);
 }
 .attach-btn {
   display: flex;
@@ -50,6 +50,7 @@
 }
 .composer-input {
   flex: 1;
+  min-width: 0;
   resize: none;
   background: transparent;
   border: none;
@@ -81,43 +82,57 @@
   position: relative;
   height: 40px;
 }
-.send-btn, .send-caret, .newline-btn {
+.send-btn, .goal-send-btn, .newline-btn, .queue-btn {
   display: inline-flex; align-items: center; justify-content: center;
   border: none;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.send-btn, .send-caret {
+.send-btn {
+  gap: 7px;
   background: var(--accent); color: #fff;
   min-height: 40px;
   padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 680;
 }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.send-btn:hover:not(:disabled) { background: var(--accent-hover); }
 .send-stop { border-radius: 8px; background: var(--red); }
 .send-stop:hover { background: #dc2626; }
-
-/* Split-button: .send-btn (main action) + .send-caret (dropdown handle) share
-   one visual pill. The container clips to a shared rounded rect and each
-   button rounds only its own outer corner, so together they read as a single
-   iOS/macOS-style split button (e.g. Safari's share button, "Save ▾"). */
-.send-split {
-  display: flex;
-  align-items: stretch;
+.goal-send-btn {
+  gap: 6px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid rgba(113, 151, 224, .28);
   border-radius: 8px;
-  overflow: hidden;
+  color: #b9cff8;
+  background: rgba(81, 111, 166, .09);
+  font-size: 12px;
+  font-weight: 650;
 }
-.send-split .send-btn,
-.send-split .send-caret {
-  border-radius: 0;
+.goal-send-btn:hover:not(:disabled) { border-color: rgba(113, 151, 224, .48); color: #d3e1fb; background: rgba(81, 111, 166, .16); }
+.goal-send-btn:disabled { opacity: .38; cursor: not-allowed; }
+.goal-tension-icon { width: 22px; height: 17px; overflow: visible; color: #8ab2ff; }
+.goal-tension-links { fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; animation: goal-link-tension 4.6s ease-in-out infinite; }
+.goal-tension-nodes circle { fill: var(--bg-surface); stroke: currentColor; stroke-width: 1.45; transform-box: fill-box; transform-origin: center; animation: goal-node-tension 4.6s ease-in-out infinite; }
+.goal-tension-nodes circle:nth-child(2) { animation-delay: -1.5s; }
+.goal-tension-nodes circle:nth-child(3) { animation-delay: -3s; }
+@keyframes goal-link-tension { 0%,100% { opacity: .68; stroke-width: 1.25; } 50% { opacity: 1; stroke-width: 1.55; } }
+@keyframes goal-node-tension { 0%,100% { transform: scale(.94); } 50% { transform: scale(1.08); } }
+.queue-btn {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  font-size: 12px;
+  font-weight: 650;
 }
-.send-split .send-caret {
-  padding: 8px 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-}
-.send-split .send-btn:hover,
-.send-split .send-caret:hover {
-  background: var(--accent-hover);
-}
+.queue-btn:hover:not(:disabled) { background: var(--bg-hover); }
+.queue-btn:disabled { color: var(--text-faint); cursor: not-allowed; opacity: .55; }
 
 /* Newline/return button — a secondary, muted affordance (touch devices only)
    that must read as distinct from the primary send action, not a second
@@ -136,54 +151,23 @@
   color: var(--text);
 }
 
-.send-menu {
-  position: absolute;
-  bottom: calc(100% + 8px); right: 0;
-  background: var(--bg-surface);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  padding: 6px;
-  min-width: 240px;
-  z-index: 20;
-  animation: menu-enter 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes menu-enter {
-  0% { opacity: 0; transform: scale(0.96) translateY(5px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-.send-menu-item {
-  display: flex; flex-direction: column; gap: 4px;
-  width: 100%; text-align: left;
-  background: none; border: none;
-  color: var(--text);
-  padding: 10px 12px; border-radius: 8px;
-  cursor: pointer; font-family: var(--font);
-  transition: all 0.2s ease;
-}
-.send-menu-item:hover { background: rgba(255, 255, 255, 0.05); }
-.send-menu-item:focus-visible,
 .attach-btn:focus-visible,
 .send-btn:focus-visible,
-.send-caret:focus-visible,
-.newline-btn:focus-visible {
+.goal-send-btn:focus-visible,
+.newline-btn:focus-visible,
+.queue-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.send-menu-item.goal .send-menu-label { color: var(--accent); }
-.send-menu-label { font-size: 13.5px; font-weight: 600; }
-.send-menu-desc { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
-
 /* mobile: fill width, larger tap targets */
 @media (max-width: 768px) {
   .composer { padding: 10px 12px; padding-bottom: calc(12px + var(--safe-bottom)); }
   .composer-inner { border-radius: 10px; }
-  .attach-btn, .send-group, .send-btn, .send-caret, .newline-btn { min-height: 44px; }
+  .attach-btn, .send-group, .send-btn, .goal-send-btn, .newline-btn, .queue-btn { min-height: 44px; }
   .attach-btn { width: 44px; height: 44px; }
   .send-group { height: 44px; }
-  .send-split { flex: 1; }
-  .send-split .send-btn { flex: 1; justify-content: center; padding: 10px; }
-  .send-menu { right: 0; left: 0; min-width: 0; }
+  .goal-send-btn { padding-inline: 9px; }
+  .send-btn { padding-inline: 11px; }
 }
 
 .composer-notice {
@@ -211,7 +195,8 @@
   50% { opacity: 1; transform: translateY(-.65px) scale(1.04); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .wn-tension .wn-links, .wn-tension .wn-nodes circle { animation: none; }
+  .wn-tension .wn-links, .wn-tension .wn-nodes circle,
+  .goal-tension-links, .goal-tension-nodes circle { animation: none; }
 }
 
 /* login card: give the brand mark breathing room */

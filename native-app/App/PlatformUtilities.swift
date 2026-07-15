@@ -114,6 +114,116 @@ extension View {
         self
         #endif
     }
+
+    /// Keep navigation-title styling native on macOS, where there is no
+    /// UIKit navigation bar to force into an inline mode.
+    @ViewBuilder
+    func platformInlineNavigationTitle() -> some View {
+        #if os(macOS)
+        self
+        #else
+        navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    /// iPhone and iPad use detents; native macOS sheets size from their
+    /// content and `macSheetFrame` instead of emulating a mobile drawer.
+    @ViewBuilder
+    func platformAdaptiveSheet() -> some View {
+        #if os(macOS)
+        self
+        #else
+        presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        #endif
+    }
+
+    @ViewBuilder
+    func platformSensitiveCover<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        #if os(macOS)
+        sheet(item: item, content: content)
+        #else
+        fullScreenCover(item: item, content: content)
+        #endif
+    }
+
+    @ViewBuilder
+    func platformInteractiveKeyboardDismissal() -> some View {
+        #if os(macOS)
+        self
+        #else
+        scrollDismissesKeyboard(.interactively)
+        #endif
+    }
+
+    /// UIKit offers keyboard/content hints that AppKit text fields do not.
+    /// Keep the call sites shared without asking macOS to compile UIKit-only
+    /// modifiers such as `keyboardType` and `textInputAutocapitalization`.
+    @ViewBuilder
+    func platformURLTextInput() -> some View {
+        #if os(macOS)
+        self
+        #else
+        keyboardType(.URL)
+            .textContentType(.URL)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+        #endif
+    }
+
+    @ViewBuilder
+    func platformCodeTextInput() -> some View {
+        #if os(macOS)
+        self
+        #else
+        autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+        #endif
+    }
+
+    @ViewBuilder
+    func platformConfirmationTextInput() -> some View {
+        #if os(macOS)
+        self
+        #else
+        autocorrectionDisabled()
+            .textInputAutocapitalization(.characters)
+        #endif
+    }
+
+    @ViewBuilder
+    func platformSessionSettingsShortcut() -> some View {
+        #if os(macOS)
+        keyboardShortcut(",", modifiers: [.command, .option])
+        #else
+        keyboardShortcut(",", modifiers: .command)
+        #endif
+    }
+
+    @ViewBuilder
+    func platformNavigationSearch(text: Binding<String>, prompt: String) -> some View {
+        #if os(macOS)
+        searchable(text: text, placement: .toolbar, prompt: prompt)
+        #else
+        searchable(
+            text: text,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: prompt
+        )
+        #endif
+    }
+
+    @ViewBuilder
+    func platformNewSessionShortcut() -> some View {
+        #if os(macOS)
+        keyboardShortcut("n", modifiers: [.command, .shift])
+        #else
+        keyboardShortcut("n", modifiers: .command)
+        #endif
+    }
 }
 
 // MARK: - Confirma­ble Destructive Action

@@ -27,16 +27,25 @@ extension GitInspector {
     }
 
     func loadDiff(for path: String) async {
+        diffState = .loading
         if fixtureSnapshot != nil {
-            diff = "+ Added line in \(path)\n- Previous line\n context stays stable"
+            if CommandLine.arguments.contains("-ui-test-git-diff-error") {
+                diffState = .failed("The diff could not be loaded. Check the worktree connection and try again.")
+            } else {
+                diffState = .loaded("+ Added line in \(path)\n- Previous line\n context stays stable")
+            }
             return
         }
         guard let api = appModel.currentAPI() else {
-            diff = "Diff unavailable because the server is not configured."
+            diffState = .failed("The diff is unavailable because the server is not configured.")
             return
         }
-        if let response = try? await api.getGitDiff(spaceId, file: path) { diff = response.diff }
-        else { diff = "Diff unavailable. Close this window and try again." }
+        do {
+            let response = try await api.getGitDiff(spaceId, file: path)
+            diffState = .loaded(response.diff)
+        } catch {
+            diffState = .failed(error.localizedDescription)
+        }
     }
 
     func commitSelected() async {
@@ -109,6 +118,7 @@ extension GitInspector {
         if fixtureSnapshot != nil {
             if CommandLine.arguments.contains("-ui-test-git-error") {
                 actionError = "The remote could not be reached. Check your connection and try again."
+                retryAction = push ? .push : .pull
             } else if push { snapshot?.ahead = 0 }
             return
         }
@@ -120,10 +130,12 @@ extension GitInspector {
         do {
             if push { try await api.pushBranch(spaceId) }
             else { try await api.pullBranch(spaceId) }
+            retryAction = nil
             Haptics.success()
             await loadSnapshot()
         } catch {
             actionError = error.localizedDescription
+            retryAction = push ? .push : .pull
             Haptics.error()
         }
         if push { isPushing = false } else { isPulling = false }

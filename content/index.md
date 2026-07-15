@@ -31,15 +31,12 @@ Your repositories, database, credentials, provider accounts, and billing stay wi
 
 ### Waynode Cloud: managed hosting
 
-The same open-source product, managed: server operation, updates, encrypted secrets, and Stripe billing. Every new organization gets a 15-day free trial with one seat, 5M agent tokens, and 2 GB storage. Hosted worktrees include isolated chat and goals plus Git review, commit, and push. Interactive terminal access remains self-hosted while its hosted credential broker is completed.
-
-| Plan | Price | Seats | Agent tokens / month | Storage |
-|------|-------|-------|----------------------|---------|
-| Starter | $39/mo | 3 | 3M | 10 GB |
-| Pro | $99/mo | 10 | 8M | 50 GB |
-| Team | $249/mo | 25 | 20M | 200 GB |
-
-Web checkout is powered by Stripe.
+The same open-source product, managed: server operation, updates, encrypted
+secrets, hardware-isolated agent runs, and Stripe billing. Every new
+organization gets a 15-day trial. Hosted worktrees include chat and goals plus
+Git review, commit, and push. Interactive terminal access is deliberately
+self-hosted only. Hosted plan, quota, and subscription details appear inside
+the organization billing settings rather than as public plan cards.
 
 ## For AI assistants
 

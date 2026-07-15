@@ -1,38 +1,24 @@
 import { useSyncExternalStore } from "react";
-import type { ChatItem, Block } from "../types";
+import type { ChatItem, Block, Submission, SubmissionStatus } from "../types";
 import { appendText, appendThinking, appendTool, setToolOutput } from "./sessionBlocks";
-
-/**
- * sessionStore
- * ------------
- * Module-scoped singleton that owns per-session chat state AND the live SSE
- * connection. Because it lives here (not inside a React component), navigating
- * between sessions does NOT tear down the stream — a turn keeps streaming in the
- * background, and returning to the session shows the full, up-to-date state
- * instantly from cache.
- *
- * Lifecycle:
- *  - `acquire(sessionId)`  → load disk history + open the SSE stream (refcount++)
- *  - `release(sessionId)`  → refcount--; close the stream when idle & unviewed
- *  - `send/queue/abort`    → drive the server-side agent
- */
-
-const DEV_TOKEN = localStorage.getItem("waynode-dev-token") || "";
-const authQ = DEV_TOKEN ? `?t=${encodeURIComponent(DEV_TOKEN)}` : "";
-const jsonHeaders: Record<string, string> = {
-  "Content-Type": "application/json",
-  ...(DEV_TOKEN ? { "x-dev-token": DEV_TOKEN } : {}),
-};
-
+import { abortSession, loadHistoryItems, openSessionStream, SubmissionError, submitDraft } from "./sessionTransport";
+import {
+  newDraft, optimisticSubmission, reconcileSubmission,
+  type SubmissionDraft, type SubmissionView,
+} from "./sessionSubmissions";
 let _idSeq = 0;
 const uid = () => `c${Date.now()}-${_idSeq++}`;
-
+const eventSentAt = (event: any) => event.createdAt ?? event.created_at ?? event.timestamp ?? new Date().toISOString();
 interface SessionState {
   items: ChatItem[];
   streaming: boolean;
   error: string | null;
   status: string | null;
   loaded: boolean;
+  connection: "connecting" | "connected" | "reconnecting" | "disconnected";
+  queuedCount: number;
+  activeStatus: SubmissionStatus | null;
+  failedDraft: SubmissionDraft | null;
 }
 
 interface SessionEntry {
@@ -42,6 +28,7 @@ interface SessionEntry {
   viewers: number;
   closeTimer: ReturnType<typeof setTimeout> | null;
   msgIndex: Map<string, number>; // messageId -> items index
+  connectionFailures: number;
 }
 
 const EMPTY: SessionState = {
@@ -50,11 +37,13 @@ const EMPTY: SessionState = {
   error: null,
   status: null,
   loaded: false,
+  connection: "connecting",
+  queuedCount: 0,
+  activeStatus: null,
+  failedDraft: null,
 };
-
 const entries = new Map<string, SessionEntry>();
 const renameListeners = new Set<(sessionId: string, title: string) => void>();
-
 function getEntry(sessionId: string): SessionEntry {
   let e = entries.get(sessionId);
   if (!e) {
@@ -65,6 +54,7 @@ function getEntry(sessionId: string): SessionEntry {
       viewers: 0,
       closeTimer: null,
       msgIndex: new Map(),
+      connectionFailures: 0,
     };
     entries.set(sessionId, e);
   }
@@ -72,19 +62,16 @@ function getEntry(sessionId: string): SessionEntry {
 }
 
 function emit(e: SessionEntry) {
-  // Shallow-clone state so useSyncExternalStore sees a new reference.
   e.state = { ...e.state };
   for (const l of e.listeners) l();
 }
 
-// ── Mutations ──
-
-function ensureAssistant(e: SessionEntry, messageId: string): number {
+function ensureAssistant(e: SessionEntry, messageId: string, sentAt = new Date().toISOString()): number {
   const idx = e.msgIndex.get(messageId);
   if (idx !== undefined) return idx;
   const items = e.state.items.slice();
   const newIdx = items.length;
-  items.push({ id: messageId, role: "assistant", blocks: [], done: false });
+  items.push({ id: messageId, role: "assistant", blocks: [], done: false, sentAt });
   e.state.items = items;
   e.msgIndex.set(messageId, newIdx);
   return newIdx;
@@ -100,14 +87,36 @@ function updateAssistant(e: SessionEntry, messageId: string, fn: (blocks: Block[
   e.state.items = items;
 }
 
+function submissionView(e: SessionEntry): SubmissionView {
+  return {
+    items: e.state.items,
+    failedDraft: e.state.failedDraft,
+    queuedCount: e.state.queuedCount,
+    activeStatus: e.state.activeStatus,
+  };
+}
+
+function applySubmission(e: SessionEntry, submission: Submission, accepted = true, kind: "message" | "queue" = "message") {
+  const next = reconcileSubmission(submissionView(e), submission, { accepted, kind });
+  Object.assign(e.state, next);
+  if (["starting", "running"].includes(submission.status)) e.state.streaming = true;
+  if (submission.status === "failed") {
+    e.state.error = submission.error || "Your message wasn’t delivered. Your draft is ready to retry.";
+  } else if (["queued", "starting", "running", "completed"].includes(submission.status)) {
+    e.state.error = null;
+  }
+}
+
 function applyEvent(e: SessionEntry, ev: any) {
   switch (ev.type) {
     case "ping":
       return;
 
     case "sync": {
-      // Reconnect snapshot. If streaming with partial text and no live msg, create one.
+      e.connectionFailures = 0;
+      e.state.connection = "connected";
       e.state.streaming = !!ev.streaming;
+      for (const submission of ev.submissions || []) applySubmission(e, submission);
       if (ev.streaming && ev.partialText) {
         const liveIdx = [...e.msgIndex.values()].find((i) => {
           const m = e.state.items[i];
@@ -115,7 +124,7 @@ function applyEvent(e: SessionEntry, ev: any) {
         });
         if (liveIdx === undefined) {
           const id = `sync-${uid()}`;
-          ensureAssistant(e, id);
+          ensureAssistant(e, id, eventSentAt(ev));
           updateAssistant(e, id, (b) => appendText(b, ev.partialText));
         }
       }
@@ -129,25 +138,33 @@ function applyEvent(e: SessionEntry, ev: any) {
       emit(e);
       return;
 
+    case "submission":
+      applySubmission(e, ev.submission);
+      if (ev.submission.status === "starting") e.state.status = "Starting agent…";
+      if (ev.submission.status === "running") e.state.status = "Agent working";
+      if (["completed", "failed", "cancelled"].includes(ev.submission.status)) e.state.status = null;
+      emit(e);
+      return;
+
     case "message_start":
-      ensureAssistant(e, ev.messageId);
+      ensureAssistant(e, ev.messageId, eventSentAt(ev));
       emit(e);
       return;
 
     case "text_delta":
-      ensureAssistant(e, ev.messageId);
+      ensureAssistant(e, ev.messageId, eventSentAt(ev));
       updateAssistant(e, ev.messageId, (b) => appendText(b, ev.delta || ""));
       emit(e);
       return;
 
     case "thinking_delta":
-      ensureAssistant(e, ev.messageId);
+      ensureAssistant(e, ev.messageId, eventSentAt(ev));
       updateAssistant(e, ev.messageId, (b) => appendThinking(b, ev.delta || ""));
       emit(e);
       return;
 
     case "tool_start":
-      ensureAssistant(e, ev.messageId);
+      ensureAssistant(e, ev.messageId, eventSentAt(ev));
       updateAssistant(e, ev.messageId, (b) =>
         appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args })
       );
@@ -175,7 +192,7 @@ function applyEvent(e: SessionEntry, ev: any) {
       return;
 
     case "end":
-      e.state.streaming = false;
+      e.state.streaming = e.state.queuedCount > 0;
       e.state.status = null;
       // Mark all live assistant messages done.
       e.state.items = e.state.items.map((m) =>
@@ -186,11 +203,7 @@ function applyEvent(e: SessionEntry, ev: any) {
 
     case "error":
       e.state.streaming = false;
-      e.state.error = ev.message || "Unknown error";
-      e.state.items = [
-        ...e.state.items,
-        { id: uid(), role: "system", content: `⚠ ${ev.message || "Error"}` },
-      ];
+      e.state.error = "The agent stopped unexpectedly. Your conversation is preserved.";
       emit(e);
       return;
 
@@ -203,8 +216,6 @@ function applyEvent(e: SessionEntry, ev: any) {
   }
 }
 
-// ── SSE lifecycle ──
-
 function openStream(sessionId: string) {
   const e = getEntry(sessionId);
   if (e.es) return;
@@ -212,7 +223,12 @@ function openStream(sessionId: string) {
     clearTimeout(e.closeTimer);
     e.closeTimer = null;
   }
-  const es = new EventSource(`/api/sessions/${sessionId}/stream${authQ}`, { withCredentials: true });
+  const es = openSessionStream(sessionId);
+  e.state.connection = e.connectionFailures > 0 ? "reconnecting" : "connecting";
+  emit(e);
+  es.onopen = () => {
+    e.connectionFailures = 0;
+  };
   es.onmessage = (msg) => {
     try {
       const ev = JSON.parse(msg.data);
@@ -223,6 +239,11 @@ function openStream(sessionId: string) {
       }
       applyEvent(e, ev);
     } catch {}
+  };
+  es.onerror = () => {
+    e.connectionFailures++;
+    e.state.connection = e.connectionFailures >= 3 ? "disconnected" : "reconnecting";
+    emit(e);
   };
   e.es = es;
 }
@@ -238,8 +259,6 @@ function scheduleClose(sessionId: string) {
     e.closeTimer = null;
   }, 30000);
 }
-
-// ── Public API ──
 
 export function acquire(sessionId: string) {
   const e = getEntry(sessionId);
@@ -258,30 +277,16 @@ export function release(sessionId: string) {
 async function loadHistory(sessionId: string) {
   const e = getEntry(sessionId);
   try {
-    const res = await fetch(`/api/sessions/${sessionId}/messages`, {
-      credentials: "include",
-      headers: jsonHeaders,
-    });
-    const msgs = (await res.json()) as { role: string; content: string; thinking?: string | null }[];
-    const diskItems = msgs.map((m) => {
-      if (m.role === "assistant") {
-        const blocks: Block[] = [];
-        if (m.thinking) blocks.push({ type: "thinking", text: m.thinking });
-        blocks.push({ type: "text", text: m.content || "" });
-        return { id: uid(), role: "assistant" as const, blocks, done: true };
-      }
-      return { id: uid(), role: m.role as any, content: m.content };
-    });
-    // Prepend persisted history, but PRESERVE any transient in-memory items that
-    // arrived during the load window (e.g. live clone-progress system messages
-    // injected right after navigation). Without this, loadHistory would wipe them.
+    const diskItems = await loadHistoryItems(sessionId);
     e.state.items = [...diskItems, ...e.state.items];
-    e.state.loaded = true;
-    emit(e);
     e.msgIndex.clear();
     e.state.loaded = true;
     emit(e);
-  } catch {}
+  } catch {
+    e.state.loaded = true;
+    e.state.error = "Couldn’t load this conversation. Your saved messages are unchanged.";
+    emit(e);
+  }
 }
 
 export function subscribe(sessionId: string, listener: () => void) {
@@ -294,76 +299,80 @@ export function getSnapshot(sessionId: string): SessionState {
   return getEntry(sessionId).state;
 }
 
+async function postDraft(sessionId: string, draft: SubmissionDraft): Promise<boolean> {
+  const e = getEntry(sessionId);
+  openStream(sessionId);
+  try {
+    const submission = await submitDraft(sessionId, draft.kind, draft);
+    applySubmission(e, submission, true, draft.kind);
+    emit(e);
+    return true;
+  } catch (error) {
+    if (draft.kind === "message" && error instanceof SubmissionError && error.status === 409 && error.body?.error === "busy") {
+      return postDraft(sessionId, { ...draft, kind: "queue" });
+    }
+    applySubmission(e, error instanceof SubmissionError && error.body?.submission ? error.body.submission : {
+      id: draft.id, prompt: draft.prompt, isGoal: draft.isGoal, status: "failed",
+      error: error instanceof Error ? error.message : "Submission failed",
+    }, false, draft.kind);
+    e.state.streaming = e.state.activeStatus === "running";
+    e.state.status = null;
+    emit(e);
+    return false;
+  }
+}
+
 export async function send(sessionId: string, prompt: string, isGoal: boolean): Promise<void> {
   const e = getEntry(sessionId);
-  // Optimistic user message.
-  e.state.items = [...e.state.items, { id: uid(), role: "user", content: prompt, isGoal }];
+  const draft = newDraft(prompt, isGoal, "message");
+  Object.assign(e.state, optimisticSubmission(submissionView(e), draft));
   e.state.error = null;
+  e.state.status = "Sending…";
   emit(e);
+  await postDraft(sessionId, draft);
+}
 
-  openStream(sessionId); // ensure events can flow
+export async function queue(sessionId: string, prompt: string, isGoal = false): Promise<boolean> {
+  const e = getEntry(sessionId);
+  const draft = newDraft(prompt, isGoal, "queue");
+  Object.assign(e.state, optimisticSubmission(submissionView(e), draft));
+  emit(e);
+  return postDraft(sessionId, draft);
+}
 
-  const res = await fetch(`/api/sessions/${sessionId}/message`, {
-    method: "POST",
-    credentials: "include",
-    headers: jsonHeaders,
-    body: JSON.stringify({ prompt, isGoal }),
-  });
+export async function retry(sessionId: string): Promise<boolean> {
+  const e = getEntry(sessionId);
+  e.state.error = null;
+  e.connectionFailures = 0;
+  e.es?.close();
+  e.es = null;
+  openStream(sessionId);
+  if (!e.state.loaded) void loadHistory(sessionId);
+  if (e.state.failedDraft) {
+    const draft = { ...e.state.failedDraft, sentAt: new Date().toISOString() };
+    Object.assign(e.state, optimisticSubmission(submissionView(e), draft));
+    e.state.status = "Sending…";
+    emit(e);
+    return postDraft(sessionId, draft);
+  }
+  return false;
+}
 
-  if (res.status === 409) {
-    // Busy → queue a follow-up.
-    await queue(sessionId, prompt);
-  } else if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    e.state.items = [
-      ...e.state.items,
-      { id: uid(), role: "system", content: `⚠ ${body.error || res.statusText}` },
-    ];
+export async function abort(sessionId: string): Promise<void> {
+  const e = getEntry(sessionId);
+  const result = await abortSession(sessionId);
+  if (!result.cancelled && result.reason) {
+    e.state.error = result.reason;
     emit(e);
   }
 }
 
-export async function queue(sessionId: string, prompt: string): Promise<void> {
-  const e = getEntry(sessionId);
-  e.state.items = [
-    ...e.state.items,
-    { id: uid(), role: "system", content: `📝 Queued: "${prompt.slice(0, 80)}${prompt.length > 80 ? "…" : ""}"` },
-  ];
-  emit(e);
-  await fetch(`/api/sessions/${sessionId}/queue`, {
-    method: "POST",
-    credentials: "include",
-    headers: jsonHeaders,
-    body: JSON.stringify({ prompt }),
-  });
-}
-
-export async function abort(sessionId: string): Promise<void> {
-  await fetch(`/api/sessions/${sessionId}/abort`, {
-    method: "POST",
-    credentials: "include",
-    headers: jsonHeaders,
-  });
-}
-
-/**
- * Drop a transient system message into the chat (e.g. a git-conflict notice).
- * Frontend-only — not persisted to disk, consistent with how errors/queued
- * notices are surfaced today. Used by the Git sidebar to tell the user about
- * merge/pull/push issues and that pi has been asked to resolve them.
- */
 export function injectSystem(sessionId: string, content: string) {
   const e = getEntry(sessionId);
-  e.state.items = [...e.state.items, { id: uid(), role: "system", content }];
+  e.state.items = [...e.state.items, { id: uid(), role: "system", content, sentAt: new Date().toISOString() }];
   emit(e);
 }
 
-/**
- * Update-or-insert a keyed system message (e.g. live clone progress that
- * refreshes in place rather than spamming one line per update). If the last
- * item is a system message with the same key, it's replaced in place;
- * otherwise a new one is appended.
- */
 export function injectProgress(sessionId: string, key: string, content: string) {
   const e = getEntry(sessionId);
   const items = e.state.items.slice();
@@ -371,18 +380,15 @@ export function injectProgress(sessionId: string, key: string, content: string) 
   if (last && last.role === "system" && (last as any).key === key) {
     items[items.length - 1] = { ...last, content } as any;
   } else {
-    items.push({ id: uid(), role: "system", content, key } as any);
+    items.push({ id: uid(), role: "system", content, key, sentAt: new Date().toISOString() });
   }
   e.state.items = items;
   emit(e);
 }
-
 export function onRename(cb: (sessionId: string, title: string) => void): () => void {
   renameListeners.add(cb);
   return () => renameListeners.delete(cb);
 }
-
-// ── React binding ──
 
 export function useSessionChat(sessionId: string) {
   return useSyncExternalStore(

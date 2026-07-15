@@ -13,8 +13,8 @@
   position: fixed;
   top: 0;
   right: 0;
-  height: 100vh;
-  width: min(88vw, 380px);
+  height: 100dvh;
+  width: 100vw;
   background: var(--bg-surface);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
@@ -27,9 +27,20 @@
 }
 .git-panel.open { transform: translateX(0); }
 
-@media (min-width: 768px) {
-  .git-panel { width: min(92vw, 860px); }
-  .git-overlay { background: rgba(0, 0, 0, 0.35); }
+@media (min-width: 769px) {
+  .git-panel {
+    position: relative;
+    inset: auto;
+    z-index: 4;
+    display: none;
+    flex: 0 0 clamp(360px, 34vw, 480px);
+    width: clamp(360px, 34vw, 480px);
+    height: 100%;
+    transform: none;
+    box-shadow: none;
+  }
+  .git-panel.open { display: flex; }
+  .git-overlay { display: none; }
 }
 
 /* ── Header ── */
@@ -115,7 +126,11 @@
   font-size: 12.5px;
   border-bottom: 1px solid var(--border);
   word-break: break-word;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
+.git-error span { flex: 1; }.git-error button { min-height: 30px; padding: 5px 8px; border: 1px solid rgba(239,68,68,.35); border-radius: 6px; color: var(--text); background: var(--bg-elevated); font-weight: 650; }
 
 /* ── Tabs ── */
 .git-tabs {

@@ -2,6 +2,18 @@ import Foundation
 import SwiftUI
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
+#if canImport(UIKit)
+private typealias PlatformColor = UIColor
+private typealias PlatformFont = UIFont
+private let platformLabelColor = UIColor.label
+#elseif canImport(AppKit)
+private typealias PlatformColor = NSColor
+private typealias PlatformFont = NSFont
+private let platformLabelColor = NSColor.labelColor
 #endif
 
 // MARK: - Lightweight syntax highlighter
@@ -18,7 +30,7 @@ enum CodeHighlighter {
     static func highlight(_ code: String, language: String) -> AttributedString {
         let base = NSMutableAttributedString(
             string: code,
-            attributes: [.foregroundColor: UIColor.label]
+            attributes: [.foregroundColor: platformLabelColor]
         )
         let lang = language.lowercased()
         let family = family(for: lang)
@@ -95,7 +107,7 @@ enum CodeHighlighter {
 
     // MARK: Regex application (skip already-styled ranges)
 
-    private static func applyRegex(_ s: NSMutableAttributedString, pattern: String, color: UIColor) {
+    private static func applyRegex(_ s: NSMutableAttributedString, pattern: String, color: PlatformColor) {
         guard let re = try? NSRegularExpression(pattern: pattern, options: []) else { return }
         let range = NSRange(location: 0, length: s.length)
         re.enumerateMatches(in: s.string, options: [], range: range) { match, _, _ in
@@ -106,7 +118,7 @@ enum CodeHighlighter {
         }
     }
 
-    private static func applyWordSet(_ s: NSMutableAttributedString, words: Set<String>, color: UIColor) {
+    private static func applyWordSet(_ s: NSMutableAttributedString, words: Set<String>, color: PlatformColor) {
         // Match whole words only.
         let pattern = "\\b(?:" + words.map { NSRegularExpression.escapedPattern(for: $0) }.joined(separator: "|") + ")\\b"
         applyRegex(s, pattern: pattern, color: color)
@@ -136,14 +148,14 @@ enum CodeHighlighter {
                 stop.pointee = true
             }
         }
-        return any && (s.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? UIColor) != UIColor.label
+        return any && (s.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? PlatformColor) != platformLabelColor
     }
 
-    private static func colorRange(_ s: NSMutableAttributedString, range: NSRange, color: UIColor, italic: Bool) {
+    private static func colorRange(_ s: NSMutableAttributedString, range: NSRange, color: PlatformColor, italic: Bool) {
         guard range.location != NSNotFound, range.length > 0 else { return }
         // Only set color on substrings that are still the base label color.
         s.enumerateAttribute(.foregroundColor, in: range, options: []) { existing, subRange, _ in
-            if existing == nil || (existing as? UIColor) == UIColor.label {
+            if existing == nil || (existing as? PlatformColor) == platformLabelColor {
                 s.addAttribute(.foregroundColor, value: color, range: subRange)
                 if italic {
                     s.addAttribute(.font, value: italicMonoFont(), range: subRange)
@@ -152,40 +164,48 @@ enum CodeHighlighter {
         }
     }
 
-    private static func italicMonoFont() -> UIFont {
-        let base = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
-        return base.withTraits(.traitItalic)
+    private static func italicMonoFont() -> PlatformFont {
+        let base = PlatformFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+        return base.withItalicTraits()
     }
 
     // MARK: Palette
 
     private struct Palette {
-        let comment: UIColor
-        let string: UIColor
-        let number: UIColor
-        let keyword: UIColor
-        let type: UIColor
-        let attribute: UIColor
+        let comment: PlatformColor
+        let string: PlatformColor
+        let number: PlatformColor
+        let keyword: PlatformColor
+        let type: PlatformColor
+        let attribute: PlatformColor
     }
 
     private static var palette: Palette {
         // Tuned for dark UI; falls back gracefully on light mode via dynamic colors.
         Palette(
-            comment:   UIColor { _ in UIColor(white: 0.50, alpha: 1.0) },
-            string:    UIColor { _ in UIColor(red: 0.49, green: 0.78, blue: 0.56, alpha: 1.0) }, // green
-            number:    UIColor { _ in UIColor(red: 0.82, green: 0.64, blue: 0.37, alpha: 1.0) }, // orange
-            keyword:   UIColor { _ in UIColor(red: 0.78, green: 0.47, blue: 0.87, alpha: 1.0) }, // purple
-            type:      UIColor { _ in UIColor(red: 0.90, green: 0.75, blue: 0.48, alpha: 1.0) }, // yellow
-            attribute: UIColor { _ in UIColor(red: 0.43, green: 0.74, blue: 0.82, alpha: 1.0) }  // teal
+            comment: PlatformColor(white: 0.50, alpha: 1.0),
+            string: PlatformColor(red: 0.49, green: 0.78, blue: 0.56, alpha: 1.0),
+            number: PlatformColor(red: 0.82, green: 0.64, blue: 0.37, alpha: 1.0),
+            keyword: PlatformColor(red: 0.78, green: 0.47, blue: 0.87, alpha: 1.0),
+            type: PlatformColor(red: 0.90, green: 0.75, blue: 0.48, alpha: 1.0),
+            attribute: PlatformColor(red: 0.43, green: 0.74, blue: 0.82, alpha: 1.0)
         )
     }
 }
 
+#if canImport(UIKit)
 private extension UIFont {
-    func withTraits(_ traits: UIFontDescriptor.SymbolicTraits) -> UIFont {
-        if let descriptor = fontDescriptor.withSymbolicTraits(traits) {
+    func withItalicTraits() -> UIFont {
+        if let descriptor = fontDescriptor.withSymbolicTraits(.traitItalic) {
             return UIFont(descriptor: descriptor, size: 0)
         }
         return self
     }
 }
+#elseif canImport(AppKit)
+private extension NSFont {
+    func withItalicTraits() -> NSFont {
+        NSFontManager.shared.convert(self, toHaveTrait: .italicFontMask)
+    }
+}
+#endif

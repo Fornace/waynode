@@ -45,7 +45,8 @@ The public site is five sections, in this order:
 2. Continuity: a real three-frame sequence—start on Mac, status on iPhone, review on iPad—using the same seeded worktree/session.
 3. Review: one legible real diff and the statement “The worktree is the product.”
 4. Deployment: Cloud and self-hosted as equal, factual choices; capability differences are explicit.
-5. Verified pricing, security/privacy links, and sign-in.
+5. Footer with GitHub, guides, agent-readable content, and sign-in. Public plan
+   cards stay removed; hosted billing remains inside organization settings.
 
 Remove the marquee, generic competitor comparison, fabricated phone UI, miniature illegible terminal, repeated CTA sections, “Most popular,” and any App Store billing or hosted-terminal claim not enabled in production. No focusable mock controls. Real captures may be annotated, never composited into fake chrome. On narrow screens replace wide screenshots with purpose-made crops, not shrink-to-fit.
 
@@ -81,7 +82,7 @@ Use `NavigationSplitView`: Worktrees / Sessions / Session, with Review as the sy
 
 ### Mac
 
-Ship a first-class macOS SwiftUI/AppKit target sharing WaynodeCore—not a Catalyst release. Use a resizable three-pane window, native unified toolbar, inspector, menus, contextual actions, Settings scene, notifications, and window restoration. Support multiple session windows and tabs. Required commands: new worktree `⌘N`, new session `⇧⌘N`, send `⌘↩`, search transcript `⌘F`, toggle Review `⌥⌘R`, toggle Terminal `⌥⌘T`, and command palette `⇧⌘P`. Terminal receives raw keys while focused; reserved app shortcuts remain reachable through menus. Drag repository URLs/files into appropriate destinations.
+Ship a first-class macOS SwiftUI/AppKit target sharing WaynodeCore—not a Catalyst release. Use a resizable three-pane window, native unified toolbar, inspector, menus, contextual actions, Settings scene, notifications, and window restoration. Support multiple session windows and tabs. Required commands: new window `⌘N`, new worktree `⌥⌘N`, new session `⇧⌘N`, send `⌘↩`, search transcript `⌘F`, toggle Review `⌥⌘R`, toggle Terminal `⌥⌘T`, and command palette `⇧⌘P`. Terminal receives raw keys while focused; reserved app shortcuts remain reachable through menus. Drag repository URLs/files into appropriate destinations.
 
 ## State model
 

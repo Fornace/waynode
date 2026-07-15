@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { resolveApiToken } from "../lib/auth.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { billingEnabled, checkQuota } from "../lib/billing.mjs";
+import { enforceTerminalAvailability } from "../lib/pi-runner.mjs";
 
 const router = Router();
 
@@ -17,6 +18,9 @@ try {
 } catch {}
 
 export function terminalBillingRejection(session) {
+  // Defense in depth only: getTerminal/enforceTerminalAvailability rejects
+  // every hosted terminal before a PTY is acquired. Therefore there is no
+  // hosted terminal lifecycle to reserve; self-host terminals bypass billing.
   if (!billingEnabled) return null;
   const space = getSpace(session.space_id);
   if (!space?.org_id) return null;
@@ -127,6 +131,9 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
         // pty — spawning one only if none exists yet.
         let handle;
         try {
+          // Capability denial precedes billing and PTY acquisition so hosted
+          // clients always receive the truthful deployment-level decision.
+          enforceTerminalAvailability();
           const billingRejection = terminalBillingRejection(session);
           if (billingRejection) {
             const error = new Error(billingRejection);

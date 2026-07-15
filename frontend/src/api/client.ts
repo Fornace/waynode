@@ -2,16 +2,29 @@ import type { User, Space, Session, GoalStatus, ChatMessage, GitSnapshot, Org } 
 
 const base = "";
 
-const DEV_TOKEN = localStorage.getItem("waynode-dev-token") || "";
+function getDevToken() {
+  return localStorage.getItem("waynode-dev-token") || "";
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getDevToken();
+  return token ? { "x-dev-token": token } : {};
+}
+
+function getAuthQuery() {
+  const token = getDevToken();
+  return token ? `?t=${encodeURIComponent(token)}` : "";
+}
 
 async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(base + url, {
+    ...opts,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(DEV_TOKEN ? { "x-dev-token": DEV_TOKEN } : {}),
+      ...getAuthHeaders(),
+      ...opts?.headers,
     },
-    ...opts,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -29,6 +42,7 @@ export const api = {
       user: User | null;
       providers: { github: boolean; gitlab: boolean; dev?: boolean };
       availableProviders: { github: boolean; gitlab: boolean };
+      capabilities?: { terminal?: boolean };
     }>("/api/auth/me"),
     logout: () => fetchJSON("/auth/logout", { method: "POST" }),
     deletionCheck: () => fetchJSON<{ can_delete: boolean; blockers: Array<{ id: string; name: string; slug: string }> }>("/api/auth/account/deletion-check"),
@@ -58,7 +72,7 @@ export const api = {
     pull: (id: string) => fetchJSON<{ output: string }>(`/api/spaces/${id}/pull`, { method: "POST" }),
     /** SSE stream of git clone progress lines for a freshly cloned space. */
     cloneStream: (id: string) =>
-      new EventSource(`/api/spaces/${id}/clone-events${DEV_TOKEN ? `?t=${encodeURIComponent(DEV_TOKEN)}` : ""}`, { withCredentials: true }),
+      new EventSource(`/api/spaces/${id}/clone-events${getAuthQuery()}`, { withCredentials: true }),
   },
 
   sessions: {
@@ -113,7 +127,7 @@ export const api = {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        ...(DEV_TOKEN ? { "x-dev-token": DEV_TOKEN } : {}),
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({ prompt, isGoal }),
     });
@@ -129,7 +143,7 @@ export const api = {
     status: (spaceId: string) => fetchJSON<GitSnapshot>(`/api/spaces/${spaceId}/git`),
     /** Live SSE stream — pushes a snapshot whenever the tree changes. */
     stream: (spaceId: string) =>
-      new EventSource(`/api/spaces/${spaceId}/git/sse${DEV_TOKEN ? `?t=${encodeURIComponent(DEV_TOKEN)}` : ""}`, {
+      new EventSource(`/api/spaces/${spaceId}/git/sse${getAuthQuery()}`, {
         withCredentials: true,
       }),
     diff: (spaceId: string, path: string) =>

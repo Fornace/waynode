@@ -1,5 +1,8 @@
 import SwiftUI
 import WaynodeCore
+#if os(macOS)
+import Darwin
+#endif
 
 // MARK: - WaynodeApp
 //
@@ -12,6 +15,13 @@ struct WaynodeApp: App {
     @State private var appModel: AppModel
 
     init() {
+        #if DEBUG && os(macOS)
+        if CommandLine.arguments.contains("-ui-test-keychain-headless") {
+            let failure = SignedKeychainProbe.run()
+            SignedKeychainProbe.emit(failure: failure)
+            Darwin.exit(failure == nil ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+        #endif
         #if DEBUG
         let uiTestAuth = CommandLine.arguments.contains("-ui-test-auth")
             || ProcessInfo.processInfo.environment["WAYNODE_UI_TEST_AUTH"] == "1"
@@ -37,7 +47,7 @@ struct WaynodeApp: App {
            idx + 1 < CommandLine.arguments.count {
             let token = CommandLine.arguments[idx + 1]
             do {
-                try auth.keychain.writeToken(token)
+                try auth.keychain.writeToken(token, for: auth.serverConfig.credentialScope)
                 print("Waynode diagnostics: test credential persisted")
             } catch {
                 print("Waynode diagnostics: test credential persistence failed: \(error.localizedDescription)")
@@ -54,39 +64,50 @@ struct WaynodeApp: App {
     }
 
     var body: some Scene {
+        #if os(macOS)
         WindowGroup {
-            RootView()
-                .environment(appModel)
-                .task {
-                    let fixture = CommandLine.arguments.contains("-ui-test-auth")
-                        || ProcessInfo.processInfo.environment["WAYNODE_UI_TEST_AUTH"] == "1"
-                    #if DEBUG
-                    if fixture {
-                        appModel.auth.installUITestUser()
-                        appModel.installUITestFixture()
-                    }
-                    #endif
-                    if !fixture { await appModel.auth.verifyToken() }
-                    if appModel.auth.isAuthenticated && !fixture {
-                        await appModel.bootstrap()
-                    }
-                    #if DEBUG
-                    // Deep-link navigation via launch args (for testing)
-                    let args = CommandLine.arguments
-                    if let spaceIdx = args.firstIndex(of: "-space"),
-                       spaceIdx + 1 < args.count {
-                        let spaceId = args[spaceIdx + 1]
-                        if let sessionIdx = args.firstIndex(of: "-session"),
-                           sessionIdx + 1 < args.count {
-                            let sessionId = args[sessionIdx + 1]
-                            appModel.pendingDeepLink = .sessionDetail(spaceId: spaceId, sessionId: sessionId)
-                        } else {
-                            appModel.pendingDeepLink = .sessionsList(spaceId: spaceId)
-                        }
-                    }
-                    #endif
-                }
+            appRoot
+                .frame(minWidth: 940, minHeight: 640)
         }
+        .defaultLaunchBehavior(.presented)
+        .restorationBehavior(.disabled)
+        .defaultSize(width: 1280, height: 820)
+        .windowResizability(.contentMinSize)
+        .commands {
+            WaynodeMacCommands(terminalSupported: appModel.auth.terminalCapability == .supported)
+        }
+
+        Settings {
+            MacSettingsView()
+                .environment(appModel)
+        }
+        #else
+        WindowGroup {
+            appRoot
+        }
+        #endif
+    }
+
+    private var appRoot: some View {
+        RootView()
+            .environment(appModel)
+            .task {
+                let fixture = CommandLine.arguments.contains("-ui-test-auth")
+                    || ProcessInfo.processInfo.environment["WAYNODE_UI_TEST_AUTH"] == "1"
+                #if DEBUG
+                if fixture {
+                    appModel.auth.installUITestUser()
+                    appModel.installUITestFixture()
+                }
+                #endif
+                if !fixture { await appModel.auth.verifyToken() }
+                if appModel.auth.isAuthenticated && !fixture {
+                    await appModel.bootstrap()
+                }
+                #if DEBUG
+                applyDebugDeepLink()
+                #endif
+            }
     }
 
     #if DEBUG
@@ -94,6 +115,22 @@ struct WaynodeApp: App {
         guard let index = CommandLine.arguments.firstIndex(of: flag),
               index + 1 < CommandLine.arguments.count else { return nil }
         return URL(string: CommandLine.arguments[index + 1])
+    }
+
+    private func applyDebugDeepLink() {
+        let args = CommandLine.arguments
+        guard let spaceIndex = args.firstIndex(of: "-space"),
+              spaceIndex + 1 < args.count else { return }
+        let spaceID = args[spaceIndex + 1]
+        if let sessionIndex = args.firstIndex(of: "-session"),
+           sessionIndex + 1 < args.count {
+            appModel.pendingDeepLink = .sessionDetail(
+                spaceId: spaceID,
+                sessionId: args[sessionIndex + 1]
+            )
+        } else {
+            appModel.pendingDeepLink = .sessionsList(spaceId: spaceID)
+        }
     }
     #endif
 }

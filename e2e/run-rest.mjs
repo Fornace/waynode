@@ -108,13 +108,46 @@ let isolatedSessionId = null;
 
 try {
   await flow("auth", async () => {
-    await call("browser_navigate", { url: BASE, waitUntil: "networkidle", timeout: 30000 });
-    await call("browser_evaluate", { script: INJECT });
-    await call("browser_navigate", { url: BASE, waitUntil: "networkidle", timeout: 30000 });
-    const r = await call("browser_evaluate", { script: "return { spaces: document.querySelectorAll('.space-item').length, hasToken: !!localStorage.getItem('waynode-dev-token') }" });
+    const firstNavigation = await call("browser_navigate", { url: BASE, waitUntil: "domcontentloaded", timeout: 30000 });
+    const injection = await jval(await call("browser_evaluate", {
+      script: `${INJECT} return {stored:!!localStorage.getItem('waynode-dev-token'), href:location.href, origin:location.origin}`,
+    }));
+    if (!injection?.stored) {
+      const detail = injection?.href || val(firstNavigation).slice(0, 160) || "unknown page";
+      throw new Error(`token injection failed at ${detail}`);
+    }
+    await call("browser_navigate", { url: BASE, waitUntil: "domcontentloaded", timeout: 30000 });
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const count = await jval(await call("browser_evaluate", {
+        script: "return document.querySelectorAll('.space-item').length",
+      }));
+      if (count) break;
+      await call("browser_wait", { time: 2500 });
+    }
+    const r = await call("browser_evaluate", { script: `return (async () => {
+      const token = localStorage.getItem('waynode-dev-token');
+      const headers = token ? {'x-dev-token':token} : {};
+      const orgResponse = await fetch('/api/orgs', {headers, credentials:'include'});
+      const orgs = await orgResponse.json().catch(() => null);
+      const orgId = Array.isArray(orgs) ? orgs[0]?.id : null;
+      const response = await fetch('/api/spaces'+(orgId ? '?orgId='+encodeURIComponent(orgId) : ''), {headers, credentials:'include'});
+      const body = await response.json().catch(() => null);
+      return {
+        spaces: document.querySelectorAll('.space-item').length,
+        hasToken: !!token,
+        orgStatus: orgResponse.status,
+        orgs: Array.isArray(orgs) ? orgs.length : null,
+        apiStatus: response.status,
+        apiSpaces: Array.isArray(body) ? body.length : null,
+        loginVisible: !!document.querySelector('.login-page, .login-card'),
+        pageText: document.body.innerText.slice(0, 180),
+      };
+    })();` });
     const v = await jval(r);
     if (!v || !v.hasToken) throw new Error("token not set");
-    if (!v.spaces) throw new Error("no spaces rendered — auth failed");
+    if (!v.spaces) {
+      throw new Error(`no spaces rendered (org API ${v.orgStatus}/${v.orgs ?? "?"}, spaces API ${v.apiStatus}/${v.apiSpaces ?? "?"}, login ${v.loginVisible ? "visible" : "hidden"}): ${v.pageText || "empty page"}`);
+    }
     await shot("01-auth");
     console.log(`   ${v.spaces} spaces`);
   });
@@ -133,7 +166,10 @@ try {
         const response = await fetch('/api/spaces/'+spaces[0].id+'/sessions', {
           method:'POST', headers, credentials:'include', body:${JSON.stringify(JSON.stringify({ title }))}
         });
-        if (!response.ok) return {error:'create HTTP '+response.status};
+        if (!response.ok) {
+          const failure = await response.json().catch(() => ({}));
+          return {error:'create HTTP '+response.status+': '+(failure.error || failure.err || 'unknown error')};
+        }
         return {space:spaces[0], session:await response.json()};
       })();`,
     }));
@@ -141,11 +177,21 @@ try {
     isolatedSessionId = created.session.id;
     const shortId = (id) => id.replaceAll("-", "").slice(0, 8).toLowerCase();
     sessionUrl = `${BASE}/${shortId(created.space.id)}/${shortId(created.session.id)}`;
-    await call("browser_navigate", { url: sessionUrl, waitUntil: "networkidle", timeout: 30000 });
-    await call("browser_wait", { selector: ".workspace-tabs", timeout: 10000 });
-    const r = await call("browser_evaluate", { script: "return { url: location.href, tabs: !!document.querySelector('.workspace-tabs') }" });
+    await call("browser_navigate", { url: sessionUrl, waitUntil: "domcontentloaded", timeout: 30000 });
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const ready = await jval(await call("browser_evaluate", {
+        script: "return !!document.querySelector('.composer-input')",
+      }));
+      if (ready) break;
+      await call("browser_wait", { time: 2500 });
+    }
+    const r = await call("browser_evaluate", { script: `return {
+      url: location.href,
+      ready: !!document.querySelector('.composer-input'),
+      text: document.body.innerText.slice(0, 240),
+    }` });
     const v = await jval(r);
-    if (!v?.tabs) throw new Error("session tabs did not render");
+    if (!v?.ready) throw new Error(`session workspace did not render: ${v?.text || "empty page"}`);
     sessionUrl = v.url;
     await shot("02-session");
     console.log(`   ${sessionUrl.slice(0, 60)}…`);
@@ -154,41 +200,49 @@ try {
   await flow("chat-send", async () => {
     const nonce = `WAYNODE_E2E_${randomUUID()}`;
     const prompt = `Reply with exactly: ${nonce}`;
-    await call("browser_evaluate", {
-      script: `const probe = {ready:false, done:false, messageId:null, text:'', error:null};
-        const token = localStorage.getItem('waynode-dev-token');
-        const stream = new EventSource('/api/sessions/${isolatedSessionId}/stream?t='+encodeURIComponent(token));
-        stream.onmessage = (message) => {
-          const event = JSON.parse(message.data);
-          if (event.type === 'sync') probe.ready = true;
-          if (event.type === 'message_start' && !probe.messageId) probe.messageId = event.messageId;
-          if (event.type === 'text_delta' && event.messageId === probe.messageId) probe.text += event.delta || '';
-          if (event.type === 'error') probe.error = event.message || 'stream error';
-          if (event.type === 'end') { probe.done = true; stream.close(); }
-        };
-        stream.onerror = () => { if (!probe.ready) probe.error = 'stream did not connect'; };
-        window.__waynodeChatProbe = probe;
-        return true;`,
-    });
     let ready = false;
     for (let i = 0; i < 12; i++) {
       await call("browser_wait", { time: 2500 });
-      const probe = await jval(await call("browser_evaluate", { script: "return window.__waynodeChatProbe" }));
-      if (probe?.error) throw new Error(probe.error);
-      if (probe?.ready) { ready = true; break; }
+      const state = await jval(await call("browser_evaluate", {
+        script: "return document.querySelector('.session-run-state')?.textContent?.trim() || ''",
+      }));
+      if (state === "Ready") { ready = true; break; }
+      if (state === "Disconnected") throw new Error("workspace stream disconnected");
     }
-    if (!ready) throw new Error("isolated session stream did not become ready");
+    if (!ready) {
+      const diagnostic = await jval(await call("browser_evaluate", { script: `return {
+        runState: document.querySelector('.session-run-state')?.textContent?.trim() || '',
+        recovery: document.querySelector('.chat-recovery')?.textContent?.trim() || '',
+        banners: [...document.querySelectorAll('.run-state-banner')].map(node => (node.textContent || '').trim()),
+      }` }));
+      await shot("03-stream-failed");
+      throw new Error(`workspace stream did not become ready: ${JSON.stringify(diagnostic)}`);
+    }
 
     await call("browser_type", { selector: ".composer-input", text: prompt, clearFirst: true, timeout: 10000 });
     await call("browser_click", { selector: ".send-btn", timeout: 8000 });
     let streamed = null;
     for (let i = 0; i < 40; i++) {
       await call("browser_wait", { time: 2500 });
-      const probe = await jval(await call("browser_evaluate", { script: "return window.__waynodeChatProbe" }));
-      if (probe?.error) throw new Error(probe.error);
-      if (probe?.done) { streamed = probe.text.trim(); break; }
+      const state = await jval(await call("browser_evaluate", { script: `return {
+        replies: [...document.querySelectorAll('.msg-assistant .msg-text')].map(node => (node.textContent || '').trim()),
+        error: document.querySelector('[role="alert"]')?.textContent?.trim() || '',
+        runState: document.querySelector('.session-run-state')?.textContent?.trim() || '',
+      }` }));
+      if (state?.replies?.includes(nonce)) { streamed = nonce; break; }
+      if (state?.runState === "Disconnected") throw new Error("workspace stream disconnected during the turn");
+      if (state?.error) throw new Error(state.error);
     }
-    if (streamed !== nonce) throw new Error(`assistant stream mismatch: ${streamed || "no completed reply"}`);
+    if (streamed !== nonce) {
+      const diagnostic = await jval(await call("browser_evaluate", { script: `return {
+        runState: document.querySelector('.session-run-state')?.textContent?.trim() || '',
+        systemEvents: [...document.querySelectorAll('.system-event')].map(node => (node.textContent || '').trim()).slice(-3),
+        userTags: [...document.querySelectorAll('.msg-user .msg-tag')].map(node => (node.textContent || '').trim()).slice(-3),
+        replies: [...document.querySelectorAll('.msg-assistant .msg-text')].map(node => (node.textContent || '').trim()).slice(-2),
+      }` }));
+      await shot("03-chat-failed");
+      throw new Error(`assistant stream mismatch: ${streamed || "no completed reply"}; state ${JSON.stringify(diagnostic)}`);
+    }
 
     let persisted = null;
     for (let i = 0; i < 12; i++) {
@@ -212,8 +266,7 @@ try {
     }
 
     const reloadUrl = await jval(await call("browser_evaluate", { script: "return location.href" }));
-    await call("browser_navigate", { url: reloadUrl, waitUntil: "networkidle", timeout: 30000 });
-    await call("browser_wait", { selector: ".workspace-tabs", timeout: 10000 });
+    await call("browser_navigate", { url: reloadUrl, waitUntil: "domcontentloaded", timeout: 30000 });
     let hydrated = false;
     for (let i = 0; i < 12; i++) {
       await call("browser_wait", { time: 2500 });
@@ -224,17 +277,30 @@ try {
       if (hydrated) break;
     }
     if (!hydrated) throw new Error("persisted assistant reply did not hydrate after reload");
+    const timestampCoverage = await jval(await call("browser_evaluate", {
+      script: `return {
+        messages: document.querySelectorAll('.msg-user, .msg-assistant').length,
+        timestamps: document.querySelectorAll('.msg-user .msg-time, .msg-assistant .msg-time').length,
+      }`,
+    }));
+    if (!timestampCoverage?.messages || timestampCoverage.timestamps !== timestampCoverage.messages) {
+      throw new Error(`message timestamps missing (${timestampCoverage?.timestamps || 0}/${timestampCoverage?.messages || 0})`);
+    }
     await shot("03-chat");
-    console.log("   assistant streamed, persisted, and rehydrated");
+    console.log("   assistant streamed, persisted, rehydrated, and timestamped");
   });
 
   await flow("model-switch", async () => {
-    const has = await jval(await call("browser_evaluate", { script: "return !!document.querySelector('.model-select')" }));
+    await call("browser_click", { selector: "button[aria-label='Session menu']", timeout: 8000 });
+    const has = await jval(await call("browser_evaluate", { script: "return !!document.querySelector('.session-command-menu select')" }));
     if (!has) throw new Error("no model selector");
-    const opts = await jval(await call("browser_evaluate", { script: "return [...document.querySelectorAll('.model-select option')].map(o=>o.textContent.trim())" }));
-    const target = opts.find((o) => /reasoning|max/i.test(o));
-    if (!target) { console.log("   (no reasoning/max model — skipping)"); return; }
-    await call("browser_evaluate", { script: `const s=document.querySelector('.model-select'); [...s.options].find(o=>o.textContent.trim()===${JSON.stringify(target)}).selected=true; s.dispatchEvent(new Event('change',{bubbles:true}));` });
+    const opts = await jval(await call("browser_evaluate", { script: "return [...document.querySelectorAll('.session-command-menu select option')].map(o=>o.textContent.trim())" }));
+    const selected = await jval(await call("browser_evaluate", {
+      script: "return document.querySelector('.session-command-menu select')?.selectedOptions?.[0]?.textContent?.trim() || ''",
+    }));
+    const target = opts.find((option) => option !== selected);
+    if (!target) { console.log("   (one configured model — switching is not applicable)"); return; }
+    await call("browser_evaluate", { script: `const s=document.querySelector('.session-command-menu select'); [...s.options].find(o=>o.textContent.trim()===${JSON.stringify(target)}).selected=true; s.dispatchEvent(new Event('change',{bubbles:true}));` });
     await call("browser_wait", { time: 2500 });
     await shot("04-model");
     console.log(`   → ${target}`);
@@ -306,7 +372,12 @@ try {
     }).catch(() => null));
     if (!cleanup?.ok) console.warn(`isolated session cleanup failed (HTTP ${cleanup?.status || "unknown"})`);
   }
-  if (!process.env.KEEP) await call("browser_close_session", {}).catch(() => {});
+  if (!process.env.KEEP && SID) {
+    const closed = await call("browser_close_session", { sessionId: SID }).catch(() => null);
+    const outcome = closed ? val(closed) : "";
+    if (!outcome.includes(SID)) console.warn(`browser session cleanup failed for ${SID}`);
+    else console.log("browser session closed");
+  }
 }
 
 console.log("\n──────── E2E SUMMARY ────────");

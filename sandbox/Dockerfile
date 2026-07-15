@@ -10,7 +10,10 @@
 #    separately provisioned, model/rate-limited runtime virtual key.
 #  - No waynode server code, DB access, or other tenants' repos are present.
 
-FROM node:26-slim
+FROM node:26.0.0-slim@sha256:ccd1c33b2876c07564b3fae7f6a5815aa42f71163faf07d00a9907e398d48bdc
+
+ARG WAYNODE_REVISION=development
+LABEL org.opencontainers.image.revision=$WAYNODE_REVISION
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -32,15 +35,19 @@ RUN git config --global user.name "Waynode" && \
     git config --global --add safe.directory '*'
 
 # pi CLI + the two extensions waynode relies on.
-RUN npm install -g @earendil-works/pi-coding-agent@latest
-RUN pi install npm:pi-codex-goal --approve || true
-RUN pi install npm:pi-lean-ctx --approve || true
+RUN npm install -g @earendil-works/pi-coding-agent@0.80.7
+RUN pi install npm:pi-codex-goal@0.1.36 --approve
+RUN pi install npm:pi-lean-ctx@3.9.9 --approve
 
 # lean-ctx standalone binary (for pi-lean-ctx extension).
-RUN curl -fsSL https://github.com/yvgude/lean-ctx/releases/download/v3.8.11/lean-ctx-x86_64-unknown-linux-musl.tar.gz \
-    | tar xzf - -C /tmp && \
-    mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx || \
-    echo "lean-ctx install failed, pi-lean-ctx will run without it"
+ARG LEAN_CTX_VERSION=v3.9.9
+ARG LEAN_CTX_SHA256=5e33a5f6214fcffccac38d955c56d7467adfde4455c22dbb16dd37ce05460ba4
+RUN curl -fsSL -o /tmp/lean-ctx.tar.gz \
+      https://github.com/yvgude/lean-ctx/releases/download/${LEAN_CTX_VERSION}/lean-ctx-x86_64-unknown-linux-musl.tar.gz && \
+    echo "${LEAN_CTX_SHA256}  /tmp/lean-ctx.tar.gz" | sha256sum -c - && \
+    tar xzf /tmp/lean-ctx.tar.gz -C /tmp && \
+    mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx && \
+    lean-ctx --version
 
 # Fornace LLM provider. Endpoint is the WIREGUARD tunnel address on
 # 49.12.9.255 (10.200.0.1:4000) — reachable from the microVM only because the

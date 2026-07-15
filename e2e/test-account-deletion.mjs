@@ -2,6 +2,7 @@
 // Self-contained regression coverage for the destructive account-deletion
 // flow. Uses the dev auth header only in a throwaway server/database.
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -46,8 +47,66 @@ try {
   assert(result.status === 200 && result.body?.can_delete === false, "sole administrator receives a deletion blocker");
   assert(result.body?.blockers?.[0]?.name === "Paid workspace", "blocker identifies the organization");
 
-  console.log("[2] Ownership transfer and revocation");
   const db = new DatabaseSync(join(dataDir, "waynode.db"));
+
+  console.log("[2] Native reauthentication grants are identity-bound and one-shot");
+  db.prepare("INSERT INTO users (id, name, github_id, gitlab_id) VALUES ('grant-a', 'Grant A', 9001, 9101)").run();
+  db.prepare("INSERT INTO users (id, name, github_id) VALUES ('grant-b', 'Grant B', 9002)").run();
+  process.env.DATA_DIR = dataDir;
+  process.env.SESSION_SECRET = "test-delete-session";
+  process.env.ENCRYPTION_KEY = "0".repeat(64);
+  const grants = await import(`../lib/account-deletion-grants.mjs?test=${Date.now()}`);
+  const nonce = Buffer.alloc(32, 3).toString("base64url");
+  const otherNonce = Buffer.alloc(32, 4).toString("base64url");
+  const wrongUserNonce = Buffer.alloc(32, 6).toString("base64url");
+  assert(grants.createDeletionChallenge("grant-a", "github", nonce, 1_000), "native challenge is created for the authenticated user and provider");
+  assert(grants.consumeDeletionChallenge("gitlab", nonce, 1_001) === null, "wrong provider cannot consume a deletion challenge");
+  assert(grants.consumeDeletionChallenge("github", otherNonce, 1_001) === null, "nonce mismatch cannot consume a deletion challenge");
+  assert(grants.consumeDeletionChallenge("github", nonce, 1_001) === "grant-a", "matching provider and nonce consume the bound challenge");
+  assert(grants.consumeDeletionChallenge("github", nonce, 1_002) === null, "deletion challenge replay is rejected");
+  assert(grants.createDeletionChallenge("grant-a", "github", wrongUserNonce, 1_100), "identity-check challenge is created");
+  assert(grants.exchangeDeletionChallenge("grant-b", "github", wrongUserNonce, 1_101).error === "identity_mismatch", "OAuth identity must match the bearer-authenticated user");
+  assert(grants.exchangeDeletionChallenge("grant-a", "github", wrongUserNonce, 1_102).error === "invalid_or_expired_challenge", "identity mismatch consumes the challenge to prevent replay");
+
+  let oneTimeGrant = grants.issueDeletionGrant("grant-a", "github", nonce, 2_000);
+  assert(!grants.consumeDeletionGrant("grant-b", oneTimeGrant, nonce, 2_001), "wrong OAuth user cannot consume another user's grant");
+  assert(!grants.consumeDeletionGrant("grant-a", oneTimeGrant, otherNonce, 2_001), "grant is bound to the native nonce");
+  assert(grants.consumeDeletionGrant("grant-a", oneTimeGrant, nonce, 2_001), "correct identity and nonce consume the grant");
+  assert(!grants.consumeDeletionGrant("grant-a", oneTimeGrant, nonce, 2_002), "grant replay is rejected");
+  const expiredGrant = grants.issueDeletionGrant("grant-a", "github", nonce, 3_000);
+  assert(!grants.consumeDeletionGrant("grant-a", expiredGrant, nonce, 303_001), "expired grant is rejected");
+
+  console.log("[3] Native bearer deletion requires a fresh grant");
+  const rawBearer = `wn_${"n".repeat(40)}`;
+  db.prepare("INSERT INTO users (id, name, github_id) VALUES ('native-delete', 'Native Delete', 9201)").run();
+  db.prepare("INSERT INTO api_tokens (id, user_id, label, token_hash) VALUES ('native-delete-token', 'native-delete', 'iPhone', ?)")
+    .run(createHash("sha256").update(rawBearer).digest("hex"));
+  const nativeHeaders = { Authorization: `Bearer ${rawBearer}` };
+  result = await request("/api/auth/account", {
+    method: "DELETE",
+    headers: nativeHeaders,
+    body: JSON.stringify({ confirmation: "DELETE" }),
+  });
+  assert(result.status === 403, "a stale bearer token alone cannot delete an account");
+  assert(!!db.prepare("SELECT 1 FROM users WHERE id = 'native-delete'").get(), "failed reauthentication leaves the account intact");
+
+  const nativeNonce = Buffer.alloc(32, 5).toString("base64url");
+  result = await request("/api/auth/account/deletion-reauth", {
+    method: "POST",
+    headers: nativeHeaders,
+    body: JSON.stringify({ provider: "github", nonce: nativeNonce }),
+  });
+  assert(result.status === 200 && result.body?.authorization_url?.includes("purpose=delete-account"), "native challenge returns a purpose-bound OAuth URL");
+  oneTimeGrant = grants.issueDeletionGrant("native-delete", "github", nativeNonce);
+  result = await request("/api/auth/account", {
+    method: "DELETE",
+    headers: nativeHeaders,
+    body: JSON.stringify({ confirmation: "DELETE", deletion_grant: oneTimeGrant, native_nonce: nativeNonce }),
+  });
+  assert(result.status === 200 && result.body?.ok === true, "fresh one-time grant authorizes native account deletion");
+  assert(!db.prepare("SELECT 1 FROM users WHERE id = 'native-delete'").get(), "successful native deletion removes the account and token");
+
+  console.log("[4] Ownership transfer and revocation");
   const org = db.prepare("SELECT id FROM orgs WHERE name = ?").get("Paid workspace");
   db.prepare("INSERT INTO users (id, name) VALUES ('successor', 'Successor')").run();
   db.prepare("INSERT INTO org_members (org_id, user_id, role) VALUES (?, 'successor', 'admin')").run(org.id);

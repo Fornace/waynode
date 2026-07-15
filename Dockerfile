@@ -1,16 +1,19 @@
 # ── Builder stage: compile frontend ──
-FROM node:26-slim AS builder
+FROM node:26.0.0-slim@sha256:ccd1c33b2876c07564b3fae7f6a5815aa42f71163faf07d00a9907e398d48bdc AS builder
 
 WORKDIR /build
 
 COPY frontend/package.json frontend/package-lock.json* ./frontend/
-RUN cd frontend && npm ci || npm install
+RUN cd frontend && npm ci
 
 COPY frontend/ ./frontend/
 RUN cd frontend && npm run build
 
 # ── Runtime stage ──
-FROM node:26-slim AS runtime
+FROM node:26.0.0-slim@sha256:ccd1c33b2876c07564b3fae7f6a5815aa42f71163faf07d00a9907e398d48bdc AS runtime
+
+ARG WAYNODE_REVISION=development
+LABEL org.opencontainers.image.revision=$WAYNODE_REVISION
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -32,10 +35,13 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     apt-get update && apt-get install -y gh && rm -rf /var/lib/apt/lists/*
 
 # Install lean-ctx CLI (standalone binary for pi-lean-ctx extension)
-ARG LEAN_CTX_VERSION=v3.8.12
-RUN curl -fsSL https://github.com/yvgude/lean-ctx/releases/download/${LEAN_CTX_VERSION}/lean-ctx-x86_64-unknown-linux-musl.tar.gz \
-      | tar xzf - -C /tmp && \
-    mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx && \
+ARG LEAN_CTX_VERSION=v3.9.9
+ARG LEAN_CTX_SHA256=5e33a5f6214fcffccac38d955c56d7467adfde4455c22dbb16dd37ce05460ba4
+RUN curl -fsSL -o /tmp/lean-ctx.tar.gz \
+      https://github.com/yvgude/lean-ctx/releases/download/${LEAN_CTX_VERSION}/lean-ctx-x86_64-unknown-linux-musl.tar.gz && \
+    echo "${LEAN_CTX_SHA256}  /tmp/lean-ctx.tar.gz" | sha256sum -c - && \
+    tar xzf /tmp/lean-ctx.tar.gz -C /tmp && \
+      mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx && \
     lean-ctx --version
 
 WORKDIR /app
@@ -50,12 +56,12 @@ RUN git config --global user.name "Waynode" && \
 
 # Install server deps
 COPY package.json package-lock.json* ./
-RUN npm ci || npm install
+RUN npm ci
 
 # microsandbox runtime: libkrunfw + msb binary (platform package). Needed for
 # the container to boot hardware-isolated microVMs. No-op on hosts without
 # /dev/kvm (isSandboxAvailable() returns false, falls back to direct pi).
-RUN npx microsandbox install || echo "msb runtime install failed (KVM sandboxing disabled)"
+RUN npx --no-install microsandbox install
 # Put msb on PATH so the microsandbox Node SDK can find it at runtime
 # (npm ci installs it to node_modules/.bin, which isn't on PATH by default).
 RUN ln -sf /app/node_modules/.bin/msb /usr/local/bin/msb
@@ -72,9 +78,9 @@ COPY content/ ./content/
 COPY --from=builder /build/frontend/dist ./frontend/dist
 
 # Install pi CLI
-RUN npm install -g @earendil-works/pi-coding-agent@latest
-RUN pi install npm:pi-codex-goal --approve
-RUN pi install npm:pi-lean-ctx --approve
+RUN npm install -g @earendil-works/pi-coding-agent@0.80.7
+RUN pi install npm:pi-codex-goal@0.1.36 --approve
+RUN pi install npm:pi-lean-ctx@3.9.9 --approve
 
 # pi's fornace-llm provider config (including the API key) is written at
 # CONTAINER STARTUP by lib/pi-config.mjs, from the LLM_BASE_URL / LLM_API_KEY
@@ -90,6 +96,7 @@ VOLUME /data
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
+ENV WAYNODE_REVISION=$WAYNODE_REVISION
 
 EXPOSE 3000
 

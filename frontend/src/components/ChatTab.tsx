@@ -13,7 +13,6 @@ export function ChatTab({ session }: ChatTabProps) {
   const state = store.useSessionChat(session.id);
   const [input, setInput] = useState("");
   const [goal, setGoal] = useState<GoalStatus | null>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [showJump, setShowJump] = useState(false);
@@ -82,7 +81,11 @@ export function ChatTab({ session }: ChatTabProps) {
     refreshGoal();
   }, [refreshGoal, state.streaming]);
 
-  const streaming = state.streaming;
+  useEffect(() => {
+    if (state.failedDraft && !input.trim()) setInput(state.failedDraft.prompt);
+  }, [state.failedDraft, input]);
+
+  const streaming = state.streaming || ["sending", "starting", "running"].includes(state.activeStatus || "");
 
   const sendMessage = async (isGoal: boolean) => {
     if (!input.trim() || streaming) return;
@@ -96,7 +99,6 @@ export function ChatTab({ session }: ChatTabProps) {
       if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }
       bottomRef.current?.scrollIntoView({ block: "end" });
     });
-    setShowDropdown(false);
     await store.send(session.id, prompt, isGoal);
     if (isGoal) refreshGoal();
   };
@@ -104,12 +106,16 @@ export function ChatTab({ session }: ChatTabProps) {
   const handleQueue = async () => {
     if (!input.trim() || !streaming) return;
     const prompt = input.trim();
-    setInput("");
-    await store.queue(session.id, prompt);
+    const accepted = await store.queue(session.id, prompt);
+    if (accepted) setInput("");
   };
 
   const handleAbort = async () => {
     await store.abort(session.id);
+  };
+
+  const handleRetry = async () => {
+    if (await store.retry(session.id)) setInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -176,8 +182,8 @@ export function ChatTab({ session }: ChatTabProps) {
       } else {
         setUploadError(data.err || "The files could not be uploaded.");
       }
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "The files could not be uploaded.");
+    } catch {
+      setUploadError("The files could not be uploaded. Your message draft is unchanged; try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -194,12 +200,35 @@ export function ChatTab({ session }: ChatTabProps) {
         </div>
       )}
 
+      {state.connection === "reconnecting" && (
+        <div className="run-state-banner" role="status" aria-live="polite">
+          <span className="run-state-line" aria-hidden="true" />
+          <span>Reconnecting… Your conversation is preserved.</span>
+        </div>
+      )}
+      {(state.error || state.connection === "disconnected") && (
+        <div className="chat-recovery" role="alert">
+          <div>
+            <strong>{state.connection === "disconnected" ? "Disconnected. Check your network." : state.error}</strong>
+            <span>Your transcript and draft are safe.</span>
+          </div>
+          <button type="button" onClick={handleRetry}>Retry</button>
+        </div>
+      )}
+      {state.queuedCount > 0 && (
+        <div className="queue-state" role="status">
+          <strong>{state.queuedCount === 1 ? "Follow-up queued" : `${state.queuedCount} follow-ups queued`}</strong>
+          <span>It will start when the current turn finishes.</span>
+        </div>
+      )}
+
       <div className="chat-messages" ref={messagesRef} aria-label="Session conversation" aria-busy={streaming}>
         <div className="chat-lane">
-        {state.items.length === 0 && !streaming && (
+        {!state.loaded && !state.error && <div className="agent-preflight"><StartingAgent phase="Loading conversation…" /></div>}
+        {state.loaded && state.items.length === 0 && !streaming && (
           <div className="chat-empty">
-            <div className="chat-empty-title">What should we do in {session.title || "this workspace"}?</div>
-            <div className="chat-empty-desc">The agent can inspect the repository, make changes, run checks, and leave the worktree ready for review.</div>
+            <div className="chat-empty-title">Give the agent a concrete outcome.</div>
+            <div className="chat-empty-desc">Start with what should change and how you’ll know it is done.</div>
             <div className="chat-starters" aria-label="Suggested prompts">
               {[
                 "Explain this codebase",
@@ -249,7 +278,6 @@ export function ChatTab({ session }: ChatTabProps) {
         input={input}
         streaming={streaming}
         uploading={uploading}
-        showDropdown={showDropdown}
         inputRef={inputRef}
         fileInputRef={fileInputRef}
         onInput={setInput}
@@ -258,8 +286,8 @@ export function ChatTab({ session }: ChatTabProps) {
         onFileUpload={handleFileUpload}
         onInsertNewline={insertNewline}
         onAbort={handleAbort}
+        onQueue={handleQueue}
         onSend={sendMessage}
-        onToggleDropdown={() => setShowDropdown((value) => !value)}
       />
     </div>
   );

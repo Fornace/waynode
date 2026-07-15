@@ -58,24 +58,29 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
         public var id: String
         public var content: String
         public var isGoal: Bool
-        public init(id: String, content: String, isGoal: Bool = false) {
+        public var submissionStatus: SubmissionStatus?
+        public var sentAt: Date?
+        public init(id: String, content: String, isGoal: Bool = false, submissionStatus: SubmissionStatus? = nil, sentAt: Date? = Date()) {
             self.id = id; self.content = content; self.isGoal = isGoal
+            self.submissionStatus = submissionStatus; self.sentAt = sentAt
         }
     }
     public struct AssistantItem: Hashable, Sendable, Identifiable {
         public var id: String
         public var blocks: [Block]
         public var done: Bool
-        public init(id: String, blocks: [Block] = [], done: Bool = false) {
-            self.id = id; self.blocks = blocks; self.done = done
+        public var sentAt: Date?
+        public init(id: String, blocks: [Block] = [], done: Bool = false, sentAt: Date? = Date()) {
+            self.id = id; self.blocks = blocks; self.done = done; self.sentAt = sentAt
         }
     }
     public struct SystemItem: Hashable, Sendable, Identifiable {
         public var id: String
         public var content: String
         public var key: String?
-        public init(id: String, content: String, key: String? = nil) {
-            self.id = id; self.content = content; self.key = key
+        public var sentAt: Date?
+        public init(id: String, content: String, key: String? = nil, sentAt: Date? = Date()) {
+            self.id = id; self.content = content; self.key = key; self.sentAt = sentAt
         }
     }
 
@@ -87,10 +92,58 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
         }
     }
 
+    public var sentAt: Date? {
+        switch self {
+        case .user(let i): i.sentAt
+        case .assistant(let i): i.sentAt
+        case .system(let i): i.sentAt
+        }
+    }
+
     /// Is the assistant item still receiving events this turn?
     public var isStreaming: Bool {
         if case .assistant(let a) = self { return !a.done }
         return false
+    }
+}
+
+public enum SubmissionStatus: String, Codable, Sendable, Hashable {
+    case sending, queued, starting, running, completed, failed, cancelled
+}
+
+public struct Submission: Codable, Sendable, Hashable, Identifiable {
+    public var id: String
+    public var prompt: String
+    public var isGoal: Bool
+    public var status: SubmissionStatus
+    public var error: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, prompt, status, error
+        case isGoal = "isGoal"
+    }
+
+    public init(id: String, prompt: String, isGoal: Bool, status: SubmissionStatus, error: String? = nil) {
+        self.id = id
+        self.prompt = prompt
+        self.isGoal = isGoal
+        self.status = status
+        self.error = error
+    }
+}
+
+public struct SubmissionDraft: Sendable, Hashable {
+    public enum Kind: String, Sendable, Hashable { case message, queue }
+    public var id: String
+    public var prompt: String
+    public var isGoal: Bool
+    public var kind: Kind
+
+    public init(id: String, prompt: String, isGoal: Bool, kind: Kind) {
+        self.id = id
+        self.prompt = prompt
+        self.isGoal = isGoal
+        self.kind = kind
     }
 }
 
@@ -118,6 +171,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case end
         case error(message: String)
         case status(text: String)
+        case submission(Submission)
         case sync(snapshot: SyncSnapshot)
         case sessionRenamed(title: String)
         case ping
@@ -167,6 +221,8 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case "status":
             let text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
             kind = .status(text: text)
+        case "submission":
+            kind = .submission(try c.decode(Submission.self, forKey: .submission))
         case "sync":
             // Server wire format: { type: "sync", streaming: Bool, partialText: String, tools: [...] }
             // We build a SyncSnapshot from the flat fields. partialText becomes an assistant item.
@@ -179,7 +235,9 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
             if let tools = try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .tools) {
                 items.append(contentsOf: tools)
             }
-            kind = .sync(snapshot: SyncSnapshot(items: items))
+            let submissions = try c.decodeIfPresent([Submission].self, forKey: .submissions) ?? []
+            let streaming = try c.decodeIfPresent(Bool.self, forKey: .streaming) ?? false
+            kind = .sync(snapshot: SyncSnapshot(items: items, submissions: submissions, streaming: streaming))
         case "session_renamed":
             let title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
             kind = .sessionRenamed(title: title)
@@ -192,7 +250,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case type, messageId = "messageId", delta, toolName = "toolName"
         case toolCallId = "toolCallId", toolInput = "toolInput"
         case message, text, snapshot, title
-        case streaming, partialText, tools
+        case streaming, partialText, tools, submission, submissions
         case args
         case isError = "isError"
     }
@@ -224,4 +282,12 @@ public struct SyncSnapshot: Codable, Equatable, Sendable {
         public var status: String?
     }
     public var items: [WireItem]
+    public var submissions: [Submission] = []
+    public var streaming: Bool
+
+    public init(items: [WireItem], submissions: [Submission] = [], streaming: Bool = true) {
+        self.items = items
+        self.submissions = submissions
+        self.streaming = streaming
+    }
 }

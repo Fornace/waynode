@@ -55,12 +55,45 @@ public struct User: Codable, Hashable, Identifiable, Sendable {
 public struct AuthMeResponse: Codable, Sendable {
     public var user: User?
     public var providers: Providers?
+    public var capabilities: Capabilities?
     public struct Providers: Codable, Sendable {
         public var github: Bool?
         public var gitlab: Bool?
         public var dev: Bool?
     }
-    public init(user: User? = nil, providers: Providers? = nil) { self.user = user; self.providers = providers }
+    public struct Capabilities: Codable, Sendable {
+        public var terminal: Bool?
+        public init(terminal: Bool? = nil) { self.terminal = terminal }
+    }
+    public init(user: User? = nil, providers: Providers? = nil, capabilities: Capabilities? = nil) {
+        self.user = user; self.providers = providers; self.capabilities = capabilities
+    }
+}
+
+public enum TerminalCapabilityState: Sendable, Equatable {
+    case checking
+    case supported
+    case unsupported
+    case unavailable
+
+    public init(serverValue: Bool?) {
+        if serverValue == true { self = .supported }
+        else if serverValue == false { self = .unsupported }
+        else { self = .unavailable }
+    }
+}
+
+public enum BillingCapabilityState: Sendable, Equatable {
+    case checking
+    case hosted
+    case selfHosted
+    case unavailable
+
+    public init(deployment: String?) {
+        if deployment == "hosted" { self = .hosted }
+        else if deployment == "self-hosted" { self = .selfHosted }
+        else { self = .unavailable }
+    }
 }
 
 // MARK: Org

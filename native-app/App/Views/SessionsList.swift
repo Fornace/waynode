@@ -81,13 +81,21 @@ struct SessionsList: View {
                         }
                         .accessibilityIdentifier("session.\(session.id).delete")
                     }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            sessionToDelete = session
+                        } label: {
+                            Label("Delete Session", systemImage: "trash")
+                        }
+                        .accessibilityIdentifier("session.\(session.id).delete")
+                    }
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sessions.list")
         .navigationTitle(spaceName)
-        .navigationBarTitleDisplayMode(.inline)
+        .platformInlineNavigationTitle()
         .searchable(text: $searchText, prompt: "Search sessions")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -122,8 +130,7 @@ struct SessionsList: View {
                     showingNewSession = false
                 }
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .platformAdaptiveSheet()
         }
         .alert(
             "Delete Session?",
@@ -197,7 +204,7 @@ struct NewSessionSheet: View {
                 }
             }
             .navigationTitle("New Session")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: cancel)
@@ -225,7 +232,7 @@ struct NewSessionSheet: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("session.new.surface")
-        #if targetEnvironment(macCatalyst)
+        #if targetEnvironment(macCatalyst) || os(macOS)
         .frame(minWidth: 440, minHeight: 220)
         #endif
     }
@@ -280,8 +287,7 @@ struct SessionUITestFixtureView: View {
                     .sheet(isPresented: $showingNewSession) {
                         NewSessionSheet(title: $title, error: $error, onCreate: create,
                                         onCancel: { showingNewSession = false })
-                        .presentationDetents([.medium, .large])
-                        .presentationDragIndicator(.visible)
+                        .platformAdaptiveSheet()
                     }
             }
         }

@@ -12,6 +12,7 @@ process.env.LLM_API_KEY = "admin-key-must-stay-host-side";
 process.env.PI_PROVIDER_API_KEY = "bootstrap-key-must-not-leak";
 
 const { default: db } = await import("../lib/db.mjs");
+const { encryptOAuthToken } = await import("../lib/oauth-tokens.mjs");
 const { setSecret } = await import("../lib/secrets.mjs");
 const { buildHostedSandboxEnv, buildPiEnv } = await import("../lib/pi-env.mjs");
 const { sandboxChatLlmEnv } = await import("../lib/sandbox-llm-key.mjs");
@@ -26,7 +27,10 @@ const {
 const escapedRoot = mkdtempSync(join(tmpdir(), "waynode-sandbox-escape-"));
 try {
   db.prepare("INSERT INTO users (id, name, email, github_token) VALUES (?, ?, ?, ?)")
-    .run("owner", "Owner", "owner@example.test", "persistent-github-token");
+    .run(
+      "owner", "Owner", "owner@example.test",
+      encryptOAuthToken("persistent-github-token", "github"),
+    );
   db.prepare("INSERT INTO orgs (id, name, slug) VALUES (?, ?, ?)")
     .run("org", "Org", "org");
   db.prepare(`

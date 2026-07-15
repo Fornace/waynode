@@ -16,8 +16,13 @@ import WaynodeCore
 
 struct MainView: View {
     @Environment(AppModel.self) private var appModel
+    #if !os(macOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @State private var spacesPath = NavigationPath()
+    #if os(macOS)
+    @State private var showingCommandPalette = false
+    #endif
 
     var body: some View {
         Group {
@@ -34,10 +39,18 @@ struct MainView: View {
         .onAppear {
             handleDeepLink()
         }
+        #if os(macOS)
+        .sheet(isPresented: $showingCommandPalette) {
+            MacCommandPalette()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .waynodeCommandPalette)) { _ in
+            showingCommandPalette = true
+        }
+        #endif
     }
 
     private var usesWorkbench: Bool {
-        #if targetEnvironment(macCatalyst)
+        #if targetEnvironment(macCatalyst) || os(macOS)
         true
         #else
         horizontalSizeClass == .regular
@@ -81,11 +94,14 @@ struct MainView: View {
 }
 
 private struct WorkbenchView: View {
+    private enum Sheet: String, Identifiable {
+        case account, clone, newSession
+        var id: String { rawValue }
+    }
+
     @Environment(AppModel.self) private var appModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showingAccount = false
-    @State private var showingCloneSheet = false
-    @State private var showingNewSession = false
+    @State private var activeSheet: Sheet?
     @State private var newSessionTitle = ""
     @State private var sessionError: String?
     @State private var spaceToDelete: Space?
@@ -107,7 +123,7 @@ private struct WorkbenchView: View {
                         } description: {
                             Text("Clone a repository to create your first worktree.")
                         } actions: {
-                            Button("Clone Repository") { showingCloneSheet = true }
+                            Button("Clone Repository") { activeSheet = .clone }
                                 .buttonStyle(.glassProminent)
                                 .accessibilityIdentifier("worktree.clone")
                         }
@@ -137,7 +153,7 @@ private struct WorkbenchView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
-                        showingCloneSheet = true
+                        activeSheet = .clone
                     } label: {
                         Label("Clone Repository", systemImage: "plus")
                     }
@@ -145,7 +161,7 @@ private struct WorkbenchView: View {
                     .accessibilityIdentifier("worktree.clone")
                     .keyboardShortcut("o", modifiers: [.command, .shift])
                     Button {
-                        showingAccount = true
+                        activeSheet = .account
                     } label: {
                         Label("Account", systemImage: "person.crop.circle")
                     }
@@ -227,7 +243,7 @@ private struct WorkbenchView: View {
                     .disabled(model.selectedSpaceId == nil)
                     .help("Start a session in the selected worktree")
                     .accessibilityIdentifier("session.new")
-                    .keyboardShortcut("n", modifiers: .command)
+                    .platformNewSessionShortcut()
                 }
             }
             .task(id: model.selectedSpaceId) {
@@ -244,7 +260,7 @@ private struct WorkbenchView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
-            #if targetEnvironment(macCatalyst)
+            #if targetEnvironment(macCatalyst) || os(macOS)
             ToolbarItemGroup(placement: .navigation) {
                 Button(action: toggleNavigation) {
                     Label("Toggle Navigation", systemImage: "sidebar.left")
@@ -265,21 +281,21 @@ private struct WorkbenchView: View {
             }
             #endif
         }
-        .sheet(isPresented: $showingAccount) {
-            AccountSheetContainer()
-        }
-        .sheet(isPresented: $showingCloneSheet) {
-            CloneSheet()
-        }
-        .sheet(isPresented: $showingNewSession) {
-            NewSessionSheet(
-                title: $newSessionTitle,
-                error: $sessionError,
-                onCreate: createSession,
-                onCancel: { showingNewSession = false }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .account:
+                AccountSheetContainer()
+            case .clone:
+                CloneSheet()
+            case .newSession:
+                NewSessionSheet(
+                    title: $newSessionTitle,
+                    error: $sessionError,
+                    onCreate: createSession,
+                    onCancel: { activeSheet = nil }
+                )
+                .platformAdaptiveSheet()
+            }
         }
         .workbenchDeletionAlerts(space: $spaceToDelete, session: $sessionToDelete)
         .task {
@@ -287,6 +303,14 @@ private struct WorkbenchView: View {
             selectFirstSpaceIfNeeded()
             focusedColumn = .worktrees
         }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: .waynodeNewWorktree)) { _ in
+            activeSheet = .clone
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .waynodeNewSession)) { _ in
+            openNewSession()
+        }
+        #endif
         .onChange(of: model.spaces.map(\.id)) {
             selectFirstSpaceIfNeeded()
         }
@@ -302,7 +326,7 @@ private struct WorkbenchView: View {
     private func openNewSession() {
         newSessionTitle = ""
         sessionError = nil
-        showingNewSession = true
+        activeSheet = .newSession
     }
 
     private func createSession() async throws {
@@ -314,7 +338,7 @@ private struct WorkbenchView: View {
         )
         try Task.checkCancellation()
         appModel.selectedSessionId = session.id
-        showingNewSession = false
+        activeSheet = nil
         Haptics.success()
     }
 
@@ -357,7 +381,7 @@ struct AccountSheetContainer: View {
         NavigationStack {
             AccountScene()
         }
-        #if targetEnvironment(macCatalyst)
+        #if targetEnvironment(macCatalyst) || os(macOS)
         .frame(minWidth: 560, minHeight: 620)
         #endif
     }

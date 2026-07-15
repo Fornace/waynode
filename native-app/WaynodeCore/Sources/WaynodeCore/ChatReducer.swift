@@ -45,6 +45,7 @@ public struct ChatReducer: Sendable, Equatable {
     public private(set) var statusText: String?
     public private(set) var lastError: String?
     public private(set) var turnEnded: Bool = false
+    public private(set) var submissionState = ChatSubmissionState()
 
     // The id of the assistant message currently receiving deltas. Cleared on
     // message_end. Used to resolve text_delta events that omit messageId
@@ -63,7 +64,7 @@ public struct ChatReducer: Sendable, Equatable {
         for h in history {
             switch h.role {
             case "user":
-                items.append(.user(.init(id: h.id, content: h.content ?? "", isGoal: h.isGoal ?? false)))
+                items.append(.user(.init(id: h.id, content: h.content ?? "", isGoal: h.isGoal ?? false, sentAt: h.sentAt)))
             case "assistant":
                 // Server sends assistant text as `content` (NOT `text`), and
                 // optional reasoning as `thinking`. This mirrors the web
@@ -77,10 +78,10 @@ public struct ChatReducer: Sendable, Equatable {
                 // Skip pure tool-call turns (no text/thinking) — they were
                 // already filtered server-side, but guard defensively.
                 if !blocks.isEmpty {
-                    items.append(.assistant(.init(id: h.id, blocks: blocks, done: true)))
+                    items.append(.assistant(.init(id: h.id, blocks: blocks, done: true, sentAt: h.sentAt)))
                 }
             case "system":
-                items.append(.system(.init(id: h.id, content: h.content ?? "", key: h.key)))
+                items.append(.system(.init(id: h.id, content: h.content ?? "", key: h.key, sentAt: h.sentAt)))
             default:
                 break
             }
@@ -95,9 +96,10 @@ public struct ChatReducer: Sendable, Equatable {
         public var text: String?
         public var thinking: String?
         public var key: String?
-        public init(role: String, id: String, content: String? = nil, isGoal: Bool? = nil, text: String? = nil, thinking: String? = nil, key: String? = nil) {
+        public var sentAt: Date?
+        public init(role: String, id: String, content: String? = nil, isGoal: Bool? = nil, text: String? = nil, thinking: String? = nil, key: String? = nil, sentAt: Date? = nil) {
             self.role = role; self.id = id; self.content = content; self.isGoal = isGoal
-            self.text = text; self.thinking = thinking; self.key = key
+            self.text = text; self.thinking = thinking; self.key = key; self.sentAt = sentAt
         }
     }
 
@@ -110,6 +112,24 @@ public struct ChatReducer: Sendable, Equatable {
         items.append(.user(.init(id: mid, content: content, isGoal: isGoal)))
         revision += 1
     }
+
+    public mutating func appendSubmission(_ draft: SubmissionDraft) {
+        reconcileSubmission(.init(
+            id: draft.id, prompt: draft.prompt, isGoal: draft.isGoal,
+            status: .sending, error: nil
+        ), kind: draft.kind)
+    }
+
+    public mutating func reconcileSubmission(
+        _ submission: Submission,
+        accepted: Bool = true,
+        kind: SubmissionDraft.Kind = .message
+    ) {
+        submissionState.reconcile(items: &items, submission: submission, accepted: accepted, kind: kind)
+        revision += 1
+    }
+
+    public mutating func discardFailedDraft() { submissionState.discardFailedDraft(); revision += 1 }
 
     // MARK: - Event folding
 
@@ -176,7 +196,7 @@ public struct ChatReducer: Sendable, Equatable {
             return true
 
         case .end:
-            isStreaming = false
+            isStreaming = submissionState.queuedCount > 0
             turnEnded = true
             finalisePendingAssistant()
             return true
@@ -190,6 +210,13 @@ public struct ChatReducer: Sendable, Equatable {
 
         case .status(let text):
             statusText = text.isEmpty ? nil : text
+            return true
+
+        case .submission(let submission):
+            reconcileSubmission(submission)
+            if submission.status == .starting { statusText = "Starting agent…" }
+            if submission.status == .running { statusText = "Agent working"; isStreaming = true }
+            if [.completed, .failed, .cancelled].contains(submission.status) { statusText = nil }
             return true
 
         case .sync(let snapshot):
@@ -300,7 +327,8 @@ public struct ChatReducer: Sendable, Equatable {
     /// partial transcript of the current turn. We reconstruct assistant items
     /// from the snapshot. Existing history items are preserved.
     private mutating func applySync(_ snapshot: SyncSnapshot) {
-        isStreaming = true
+        isStreaming = snapshot.streaming
+        for submission in snapshot.submissions { reconcileSubmission(submission) }
         for wire in snapshot.items {
             switch wire.role {
             case "assistant":
@@ -325,7 +353,7 @@ public struct ChatReducer: Sendable, Equatable {
                     default: break
                     }
                 }
-                let done = !isStreaming // snapshot of an in-progress turn → not done
+                let done = !snapshot.streaming
                 let idx = items.count
                 items.append(.assistant(.init(id: mid, blocks: blocks, done: done)))
                 msgIndex[mid] = idx
@@ -366,6 +394,7 @@ public struct ChatReducer: Sendable, Equatable {
         items.removeAll()
         msgIndex.removeAll()
         toolIndex.removeAll()
+        submissionState.reset()
         resetTurn()
     }
 }

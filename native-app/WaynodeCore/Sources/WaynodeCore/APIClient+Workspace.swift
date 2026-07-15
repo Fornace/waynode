@@ -115,6 +115,7 @@ extension APIClient {
 
     public struct BillingEnabledResponse: Decodable, Sendable {
         public let enabled: Bool
+        public let deployment: String?
     }
 
     public struct BillingInfo: Decodable, Sendable {
@@ -130,9 +131,9 @@ extension APIClient {
 
     private struct CheckoutResponse: Decodable, Sendable { let url: URL }
 
-    public func hostedBillingEnabled() async throws -> Bool {
+    public func billingCapability() async throws -> BillingCapabilityState {
         let response: BillingEnabledResponse = try await request("/api/billing/enabled")
-        return response.enabled
+        return BillingCapabilityState(deployment: response.deployment)
     }
 
     public func billing(orgId: String) async throws -> BillingInfo {
