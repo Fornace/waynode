@@ -31,6 +31,17 @@ for (const [name, dockerfile] of [
   assert.doesNotMatch(dockerfile, /@latest|npm ci \|\||install failed|\|\| true/);
 }
 
+assert.doesNotMatch(
+  serverDockerfile,
+  /npx\s+--no-install\s+microsandbox\s+install/,
+  "the microsandbox CLI install command expects an OCI image, not runtime setup",
+);
+assert.match(
+  serverDockerfile,
+  /import \{ install, isInstalled \} from 'microsandbox'/,
+  "the runtime must be installed and verified through the microsandbox SDK",
+);
+
 assert.match(deploy, /Unreconciled production source changes found/);
 assert.match(deploy, /waynode-backup\.sh" restore-offline/);
 assert.match(deploy, /api\/health\/version/);

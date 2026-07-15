@@ -58,10 +58,11 @@ RUN git config --global user.name "Waynode" && \
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# microsandbox runtime: libkrunfw + msb binary (platform package). Needed for
-# the container to boot hardware-isolated microVMs. No-op on hosts without
-# /dev/kvm (isSandboxAvailable() returns false, falls back to direct pi).
-RUN npx --no-install microsandbox install
+# Install and verify the microsandbox runtime through the SDK setup API. The
+# `microsandbox`/`msb` CLI `install` subcommand installs an OCI image and
+# therefore requires an image argument; it is not the runtime installer.
+RUN node --input-type=module -e \
+      "import { install, isInstalled } from 'microsandbox'; await install(); if (!isInstalled()) throw new Error('microsandbox runtime verification failed')"
 # Put msb on PATH so the microsandbox Node SDK can find it at runtime
 # (npm ci installs it to node_modules/.bin, which isn't on PATH by default).
 RUN ln -sf /app/node_modules/.bin/msb /usr/local/bin/msb
