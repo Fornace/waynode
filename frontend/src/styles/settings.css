@@ -252,3 +252,13 @@
   line-height: 1.55;
   resize: vertical;
 }
+
+.hammersmith-detection { display: grid; gap: 3px; margin-bottom: 10px; padding: 12px 14px; border: 1px solid rgba(245,158,11,.25); border-radius: 10px; background: rgba(245,158,11,.07); }
+.hammersmith-detection.is-ready { border-color: rgba(16,185,129,.28); background: rgba(16,185,129,.07); }
+.hammersmith-detection strong { color: var(--text); font-size: 13px; }.hammersmith-detection span { color: var(--text-dim); font-size: 12px; }
+.hammersmith-key-guide { margin-top: 10px; }.hammersmith-key-guide strong { color: var(--text); }
+.hammersmith-settings-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.hammersmith-settings-actions button { min-height: 44px; }
+.hammersmith-saved { margin-top: 9px; color: #a7f3d0; font-size: 12px; }
+.hammersmith-settings .model-select { width: 100%; max-width: none; min-height: 44px; }
+@media (max-width: 560px) { .hammersmith-settings-actions { flex-direction: column-reverse; }.hammersmith-settings-actions button { width: 100%; }.hammersmith-settings .model-select { width: 100%; max-width: none; min-height: 44px; } }

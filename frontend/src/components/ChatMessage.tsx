@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ChatItem, Block, ToolStatus } from "../types";
 import { WaynodeMark } from "./Brand";
 import { MarkdownDocument } from "./MarkdownDocument";
+import { HammersmithRunWidget } from "./HammersmithRunWidget";
 
 interface MessageRowProps {
   item: ChatItem;
@@ -11,6 +12,7 @@ interface MessageRowProps {
 }
 
 export function MessageRow({ item, streaming, phase, onQuote }: MessageRowProps) {
+  if (item.role === "hammersmith-run") return <HammersmithRunWidget run={item.run} />;
   if (item.role === "system") return <SystemEvent content={item.content} sentAt={item.sentAt} />;
 
   if (item.role === "user") {
@@ -18,7 +20,8 @@ export function MessageRow({ item, streaming, phase, onQuote }: MessageRowProps)
       <article className="msg msg-user">
         <div className="msg-user-stack">
           <div className="msg-bubble msg-bubble-user">
-            {item.isGoal && <span className="msg-tag">Goal</span>}
+            {(item.mode === "goal" || item.isGoal) && <span className="msg-tag">Goal</span>}
+            {item.mode === "hammersmith" && <span className="msg-tag">Hammersmith</span>}
             {item.submissionStatus && !["completed", "running"].includes(item.submissionStatus) && (
               <span className={`msg-tag submission-${item.submissionStatus}`}>{submissionLabel(item.submissionStatus)}</span>
             )}

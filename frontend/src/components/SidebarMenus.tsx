@@ -7,10 +7,11 @@ interface OrgSwitcherProps {
   activeOrgId: string | null;
   onSelect: (orgId: string) => void;
   onCreate: (name: string) => Promise<void>;
+  onOpenSettings: () => void;
   onToggleSidebar: () => void;
 }
 
-export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onToggleSidebar }: OrgSwitcherProps) {
+export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onOpenSettings, onToggleSidebar }: OrgSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const [name, setName] = useState("");
@@ -58,6 +59,9 @@ export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onToggleSid
           <input className="modal-input" style={{ flex: 1 }} placeholder="Organization name" aria-label="Organization name" autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") create(); if (event.key === "Escape") setShowInput(false); }} />
           <button className="btn-primary" onClick={create} disabled={creating || !name.trim()}>{creating ? "…" : "Add"}</button>
         </div> : <button role="menuitem" className="send-dropdown-item" onClick={() => setShowInput(true)}>New organization</button>}
+        {activeOrg && <button role="menuitem" className="send-dropdown-item org-settings-menu-item" onClick={() => { setOpen(false); onOpenSettings(); }}>
+          Organization settings<span className="item-desc">Members, billing, and organization details</span>
+        </button>}
       </div>}
     </div>
     <button type="button" className="sidebar-collapse-btn icon-btn-ghost" onClick={onToggleSidebar} aria-label="Close worktree navigation">×</button>

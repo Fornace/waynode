@@ -12,6 +12,9 @@ router.get("/api/settings", requireAuth, (req, res) => {
 });
 
 router.patch("/api/settings", requireAuth, (req, res) => {
+  if (Object.keys(req.body || {}).some((key) => key.startsWith("hammersmith_"))) {
+    return res.status(400).json({ error: "Use the validated Hammersmith settings endpoint" });
+  }
   const upsert = db.prepare(`
     INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?)
     ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value

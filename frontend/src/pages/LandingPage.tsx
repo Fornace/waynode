@@ -62,9 +62,16 @@ export function LandingPage() {
             <li>GitHub and GitLab</li>
             <li>MIT licensed</li>
           </ul>
+          <ol className="product-provenance" aria-label="Waynode continuity path">
+            <li><span>01</span><div><b>Repository</b><small>A real clone on the server</small></div></li>
+            <li><span>02</span><div><b>Branch</b><small>The exact line of work</small></div></li>
+            <li><span>03</span><div><b>Session</b><small>Direction and run state</small></div></li>
+            <li><span>04</span><div><b>Changes</b><small>Diff evidence ready to review</small></div></li>
+          </ol>
         </div>
 
         <figure className="product-hero-capture">
+          <div className="product-capture-context"><span>Worktree evidence</span><code>repo / branch / session / changes</code></div>
           <img
             src="/marketing/worktree-session-desktop.png"
             alt="Waynode session showing repository identity, an agent response, and changed files ready for review"
@@ -85,6 +92,7 @@ export function LandingPage() {
             desktop, phone, or tablet without reconstructing the task from a disposable thread.
           </p>
         </div>
+        <p className="product-continuity-note"><span aria-hidden="true" />One worktree identity, carried across every device.</p>
         <div className="product-continuity-grid">
           {continuityCaptures.map((capture) => (
             <figure className={`product-device-capture ${capture.className}`} key={capture.label}>

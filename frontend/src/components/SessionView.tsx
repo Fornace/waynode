@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import type { Session, Space, GitSnapshot } from "../types";
 import { ChatTab } from "./ChatTab";
 import { api } from "../api/client";
@@ -31,6 +31,8 @@ export function SessionView(props: SessionViewProps) {
   const [gitSnapshot, setGitSnapshot] = useState<GitSnapshot | null>(null);
   const [gitError, setGitError] = useState(false);
   const [modelError, setModelError] = useState("");
+  const [modelListError, setModelListError] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [terminalDenied, setTerminalDenied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,9 +63,22 @@ export function SessionView(props: SessionViewProps) {
     if (effectiveTerminalCapability !== "supported") setMode("chat");
   }, [effectiveTerminalCapability]);
 
-  useEffect(() => {
-    fetch("/api/models", { credentials: "include" }).then((response) => response.json()).then((data) => setModels(data.models || [])).catch(() => {});
+  const loadModels = useCallback(async () => {
+    setModelsLoading(true);
+    setModelListError("");
+    try {
+      const response = await fetch("/api/models", { credentials: "include" });
+      if (!response.ok) throw new Error("Model discovery failed.");
+      const data = await response.json();
+      setModels(data.models || []);
+    } catch {
+      setModelListError("Couldn’t refresh available models. Existing options may be stale; the current model is unchanged.");
+    } finally {
+      setModelsLoading(false);
+    }
   }, []);
+
+  useEffect(() => { void loadModels(); }, [loadModels]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,7 +131,7 @@ export function SessionView(props: SessionViewProps) {
             <span className="session-title-name">{session.title}</span>
           </div>
           <span className={`session-run-state is-${runState.tone}`} role="status">{runState.label}</span>
-          <button className={`review-button ${gitOpen ? "active" : ""}`} type="button" onClick={onToggleGit} aria-expanded={gitOpen} aria-controls="git-review-panel">
+          <button className={`review-button ${gitOpen ? "active" : ""}`} type="button" data-review-trigger onClick={onToggleGit} aria-expanded={gitOpen} aria-controls="git-review-panel">
             <span>Review</span>
             {typeof changedCount === "number" && changedCount > 0 && <b>{changedCount}</b>}
             {gitError && <i aria-label="Git status unavailable">!</i>}
@@ -125,7 +140,12 @@ export function SessionView(props: SessionViewProps) {
             <button className="icon-btn" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label="Session menu" aria-expanded={menuOpen} aria-haspopup="menu">•••</button>
             {menuOpen && (
               <div className="session-command-menu" role="menu">
-                <label>Model<select value={currentModel} onChange={(event) => handleModelChange(event.target.value)}>{models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label>
+                <label>Model<select value={currentModel} disabled={modelsLoading && models.length === 0} onChange={(event) => handleModelChange(event.target.value)}>
+                  {currentModel && !models.some((model) => model.id === currentModel) && <option value={currentModel}>{currentModel}</option>}
+                  {!currentModel && models.length === 0 && <option value="">{modelsLoading ? "Loading models…" : "Models unavailable"}</option>}
+                  {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+                </select></label>
+                {modelListError && <div className="session-menu-recovery" role="alert"><span>{modelListError}</span><button type="button" onClick={loadModels}>Retry models</button></div>}
                 {terminalControl === "shown" && <button type="button" role="menuitem" onClick={() => { setMode(mode === "terminal" ? "chat" : "terminal"); setMenuOpen(false); }}>{mode === "terminal" ? "Return to chat" : "Open terminal"}<kbd>⌘⇧T</kbd></button>}
                 {terminalControl === "disabled" && <button type="button" role="menuitem" disabled>{effectiveTerminalCapability === "checking" ? "Checking terminal availability…" : "Terminal availability unavailable"}</button>}
                 <button type="button" role="menuitem" onClick={() => { onOpenSettings(); setMenuOpen(false); }}>Worktree settings</button>

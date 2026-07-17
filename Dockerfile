@@ -19,12 +19,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ripgrep \
     python3 \
+    python3-pip \
     make \
     g++ \
     ca-certificates \
     curl \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
+
+# Pinned Hammersmith runtime. PyPI does not currently publish this package, so
+# both Waynode images install the reproducible tracked source archive instead.
+COPY vendor/hammersmith/hammersmith-0.1.0+296df004.tar.gz /tmp/hammersmith.tar.gz
+COPY vendor/hammersmith/hammersmith-entry.py /tmp/hammersmith-entry.py
+RUN echo "cababa315066df4efa12d59d3024421a577cd1eddc2e9829f987299cd86e42ff  /tmp/hammersmith.tar.gz" | sha256sum -c - && \
+    python3 -m pip install --break-system-packages --no-deps --no-build-isolation /tmp/hammersmith.tar.gz && \
+    install -m 0755 /tmp/hammersmith-entry.py /usr/local/bin/hammersmith && \
+    test "$(hammersmith --version)" = "hammersmith 0.1.0" && \
+    rm -f /tmp/hammersmith.tar.gz /tmp/hammersmith-entry.py
 
 # GitHub CLI — needed for `gh run watch`, PR ops, etc.
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \

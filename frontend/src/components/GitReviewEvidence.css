@@ -1,0 +1,81 @@
+.review-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.git-status-badge {
+  flex: 0 0 22px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  font: 750 10px/1 var(--mono);
+}
+.git-status-badge.is-modified { color: #fbbf24; }
+.git-status-badge.is-added { color: #6ee7b7; }
+.git-status-badge.is-deleted,
+.git-status-badge.is-conflict { color: #fca5a5; }
+.git-status-badge.is-renamed,
+.git-status-badge.is-copied { color: #c4b5fd; }
+.git-status-badge.is-untracked { color: #93c5fd; }
+
+.git-diff-view { min-width: 0; }
+.diff-line {
+  min-width: max-content;
+  display: grid;
+  grid-template-columns: 22px 44px 44px minmax(260px, 1fr);
+  white-space: pre;
+}
+.diff-change,
+.diff-line-number {
+  display: block;
+  padding: 0 6px;
+  border-right: 1px solid var(--border);
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+}
+.diff-change { padding: 0; text-align: center; font-weight: 800; }
+.diff-text { min-width: 0; padding: 0 9px; white-space: pre-wrap; word-break: break-word; }
+.diff-add .diff-change { color: #6ee7b7; }
+.diff-del .diff-change { color: #fca5a5; }
+.diff-hunk {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  grid-template-columns: 22px 44px 44px minmax(260px, 1fr);
+  box-shadow: 0 1px var(--border);
+}
+.diff-hunk .diff-text { font-weight: 650; }
+.git-diff-pane-head {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  background: var(--bg-surface);
+}
+
+@media (max-width: 520px) {
+  .diff-line,
+  .diff-hunk { grid-template-columns: 20px 34px 34px minmax(220px, 1fr); }
+  .diff-change,
+  .diff-line-number { padding-inline: 4px; }
+}
+
+@media (max-width: 1100px) {
+  .git-panel {
+    padding-top: var(--safe-top);
+    padding-right: var(--safe-right);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
+  }
+}

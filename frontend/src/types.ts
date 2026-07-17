@@ -28,6 +28,7 @@ export interface Session {
   pi_session_dir: string;
   model: string | null;
   provider: string | null;
+  composer_mode?: ComposerMode;
   archived?: number | boolean;
   created_at: string;
   updated_at: string;
@@ -43,16 +44,20 @@ export interface ChatMessage {
 }
 
 export type SubmissionStatus = "sending" | "queued" | "starting" | "running" | "completed" | "failed" | "cancelled";
+export type ComposerMode = "message" | "goal" | "hammersmith";
 
 export interface Submission {
   id: string;
   prompt: string;
-  isGoal: boolean;
+  mode: ComposerMode;
+  isGoal?: boolean;
   status: SubmissionStatus;
   error?: string;
   createdAt?: string;
   created_at?: string;
   timestamp?: string;
+  jobId?: string;
+  job?: HammersmithRun;
 }
 
 // ── Rich streaming message model (sessionStore) ──
@@ -65,9 +70,46 @@ export type Block =
   | { type: "tool"; id: string; name: string; args: any; output: string; status: ToolStatus; startedAt?: number; endedAt?: number };
 
 export type ChatItem =
-  | { id: string; role: "user"; content: string; sentAt: string | null; isGoal?: boolean; submissionStatus?: SubmissionStatus }
+  | { id: string; role: "user"; content: string; sentAt: string | null; mode?: ComposerMode; isGoal?: boolean; submissionStatus?: SubmissionStatus }
   | { id: string; role: "assistant"; blocks: Block[]; done: boolean; sentAt: string | null }
-  | { id: string; role: "system"; content: string; sentAt: string | null; key?: string };
+  | { id: string; role: "system"; content: string; sentAt: string | null; key?: string }
+  | { id: string; role: "hammersmith-run"; initiatingItemId: string; run: HammersmithRun; sentAt: string | null };
+
+export interface HammersmithCapability {
+  available: boolean;
+  installed: boolean;
+  dashboardUrl: string | null;
+  version?: string;
+  state?: "ready" | "setup-required" | "unsupported";
+}
+
+export interface HammersmithSettings {
+  dashboardUrl: string | null;
+  hostingMode: "self-hosted" | "hosted";
+  defaultEngine: "pi" | "codex" | "opencode" | "grok";
+  hostingModeLocked: boolean;
+  capability?: HammersmithCapability;
+}
+
+export interface HammersmithRun {
+  id: string;
+  submissionId: string;
+  runId: string | null;
+  sessionId: string;
+  spaceId: string;
+  description: string;
+  lifecycle: "running" | "finished" | "stopped";
+  freshness: "loading" | "live" | "stale" | "reconnecting" | "unavailable";
+  totalTasks: number;
+  checkedTasks: number;
+  passedTasks: number;
+  failedTasks: number;
+  updatedAt: string;
+  createdAt: string;
+  finishedAt: string | null;
+  error: string | null;
+  monitorUrl: string | null;
+}
 
 export interface GoalStatus {
   status: "active" | "paused" | "complete" | "budgetLimited" | null;

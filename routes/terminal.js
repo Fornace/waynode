@@ -9,6 +9,7 @@ import { resolveApiToken } from "../lib/auth.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { billingEnabled, checkQuota } from "../lib/billing.mjs";
 import { enforceTerminalAvailability } from "../lib/pi-runner.mjs";
+import { assertHammersmithLeaseAvailable } from "../lib/hammersmith-lease.mjs";
 
 const router = Router();
 
@@ -134,6 +135,7 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
           // Capability denial precedes billing and PTY acquisition so hosted
           // clients always receive the truthful deployment-level decision.
           enforceTerminalAvailability();
+          assertHammersmithLeaseAvailable(session.space_id);
           const billingRejection = terminalBillingRejection(session);
           if (billingRejection) {
             const error = new Error(billingRejection);
@@ -151,6 +153,8 @@ export function attachTerminalWebSocket(server, sessionMiddleware) {
           // unavailable" instead of treating both as the same hard error.
           if (err.billingBlocked) {
             ws.send(JSON.stringify({ type: "error", billingBlocked: true, message: err.message }), () => ws.close());
+          } else if (err.hammersmithBusy) {
+            ws.send(JSON.stringify({ type: "error", hammersmithBusy: true, message: err.message }), () => ws.close());
           } else if (err.agentBusy) {
             ws.send(JSON.stringify({ type: "error", agentBusy: true, message: err.message }), () => ws.close());
           } else if (err.terminalDisabled) {

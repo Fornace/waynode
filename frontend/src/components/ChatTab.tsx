@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
-import type { Session, GoalStatus } from "../types";
+import type { Session, GoalStatus, ComposerMode, HammersmithCapability } from "../types";
 import { MessageRow, StartingAgent } from "./ChatMessage";
 import { ChatComposer } from "./ChatComposer";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
+import { ComposerModePersistence } from "../lib/composerModePersistence";
 
 interface ChatTabProps {
   session: Session;
@@ -12,7 +13,13 @@ interface ChatTabProps {
 export function ChatTab({ session }: ChatTabProps) {
   const state = store.useSessionChat(session.id);
   const [input, setInput] = useState("");
+  const initialMode = ["message", "goal", "hammersmith"].includes(session.composer_mode || "") ? session.composer_mode as ComposerMode : "message";
+  const [composerMode, setComposerMode] = useState<ComposerMode>(initialMode);
+  const [modeError, setModeError] = useState("");
+  const [hammersmithCapability, setHammersmithCapability] = useState<HammersmithCapability | null>(null);
+  const [capabilityError, setCapabilityError] = useState(false);
   const [goal, setGoal] = useState<GoalStatus | null>(null);
+  const [goalError, setGoalError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [showJump, setShowJump] = useState(false);
@@ -21,11 +28,29 @@ export function ChatTab({ session }: ChatTabProps) {
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modeSaveRef = useRef(new ComposerModePersistence());
 
   // ── Acquire the session stream on mount; release on unmount. ──
   // The stream lives in the module-scoped store, so navigating away does NOT
   // kill an in-flight turn — it keeps running in the background.
   useEffect(() => store.acquire(session.id), [session.id]);
+
+  const refreshHammersmithCapability = useCallback(async () => {
+    try {
+      const capability = (await api.hammersmith.settings()).capability;
+      setHammersmithCapability(capability || null);
+      setCapabilityError(false);
+      if (capability && !capability.available && capability.state === "unsupported" && composerMode === "hammersmith") {
+        setComposerMode("message");
+        setModeError("Hammersmith is unsupported in this environment. Mode returned to Message.");
+        void api.sessions.patch(session.id, { composer_mode: "message" });
+      }
+    } catch {
+      setCapabilityError(true);
+    }
+  }, [composerMode, session.id]);
+
+  useEffect(() => { void refreshHammersmithCapability(); }, [refreshHammersmithCapability]);
 
   // Insert a newline at the caret (mobile affordance): on touch devices the
   // soft keyboard has no Shift, so there's no way to get a newline without a
@@ -74,7 +99,10 @@ export function ChatTab({ session }: ChatTabProps) {
     try {
       const { goal } = await api.sessions.getGoal(session.id);
       setGoal(goal);
-    } catch {}
+      setGoalError("");
+    } catch {
+      setGoalError("Goal status could not be refreshed. The last known status may be stale; the session and run are unchanged.");
+    }
   }, [session.id]);
 
   useEffect(() => {
@@ -82,15 +110,17 @@ export function ChatTab({ session }: ChatTabProps) {
   }, [refreshGoal, state.streaming]);
 
   useEffect(() => {
-    if (state.failedDraft && !input.trim()) setInput(state.failedDraft.prompt);
+    if (state.failedDraft && !input.trim()) {
+      setInput(state.failedDraft.prompt);
+      setComposerMode(state.failedDraft.mode ?? (state.failedDraft.isGoal ? "goal" : "message"));
+    }
   }, [state.failedDraft, input]);
 
   const streaming = state.streaming || ["sending", "starting", "running"].includes(state.activeStatus || "");
 
-  const sendMessage = async (isGoal: boolean) => {
+  const sendMessage = async (mode: ComposerMode) => {
     if (!input.trim() || streaming) return;
     const prompt = input.trim();
-    setInput("");
     // The user just sent — they want to watch the reply, so pin to bottom even
     // if they had scrolled up to read, and shrink the composer back to 1 row.
     stickToBottom.current = true;
@@ -99,8 +129,12 @@ export function ChatTab({ session }: ChatTabProps) {
       if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }
       bottomRef.current?.scrollIntoView({ block: "end" });
     });
-    await store.send(session.id, prompt, isGoal);
-    if (isGoal) refreshGoal();
+    await modeSaveRef.current.beforeSubmit();
+    const accepted = await store.send(session.id, prompt, mode);
+    if (!accepted) return;
+    setInput("");
+    if (mode !== "message") setComposerMode("message");
+    if (mode === "goal") refreshGoal();
   };
 
   const handleQueue = async () => {
@@ -127,7 +161,7 @@ export function ChatTab({ session }: ChatTabProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (streaming) handleQueue();
-      else sendMessage(false);
+      else sendMessage(composerMode);
     }
   };
 
@@ -190,6 +224,22 @@ export function ChatTab({ session }: ChatTabProps) {
     }
   };
 
+  const changeComposerMode = (mode: ComposerMode) => {
+    const previous = composerMode;
+    setComposerMode(mode);
+    setModeError("");
+    const save = modeSaveRef.current.save(() => api.sessions.patch(session.id, { composer_mode: mode }));
+    save.catch(() => {
+      setComposerMode((current) => current === mode ? previous : current);
+      setModeError("The send mode could not be saved. Try again.");
+    });
+  };
+
+  const hammersmithState = capabilityError ? "unavailable"
+    : !hammersmithCapability ? "checking"
+      : hammersmithCapability.available ? "ready"
+        : hammersmithCapability.state === "unsupported" ? "unsupported" : "setup";
+
   return (
     <div className="chat-tab">
       {goal && goal.status && (
@@ -197,6 +247,12 @@ export function ChatTab({ session }: ChatTabProps) {
           <span className={`goal-badge ${goal.status}`}>
             <span aria-hidden="true" /> Goal · {goal.status === "budgetLimited" ? "budget limited" : goal.status}
           </span>
+        </div>
+      )}
+      {goalError && (
+        <div className="goal-recovery" role="alert">
+          <span>{goalError}</span>
+          <button type="button" onClick={refreshGoal}>Retry status</button>
         </div>
       )}
 
@@ -227,13 +283,13 @@ export function ChatTab({ session }: ChatTabProps) {
         {!state.loaded && !state.error && <div className="agent-preflight"><StartingAgent phase="Loading conversation…" /></div>}
         {state.loaded && state.items.length === 0 && !streaming && (
           <div className="chat-empty">
-            <div className="chat-empty-title">Give the agent a concrete outcome.</div>
-            <div className="chat-empty-desc">Start with what should change and how you’ll know it is done.</div>
+            <div className="chat-empty-title">Start from the worktree, not a blank chat.</div>
+            <div className="chat-empty-desc">Ask for an outcome you can verify in this repository and branch.</div>
             <div className="chat-starters" aria-label="Suggested prompts">
               {[
-                "Explain this codebase",
-                "Find and fix a bug",
-                "Build a focused feature",
+                "Map this worktree before changing it",
+                "Find a bug and open the diff",
+                "Build a focused change and verify it",
               ].map((prompt) => (
                 <button key={prompt} onClick={() => { setInput(prompt); requestAnimationFrame(() => inputRef.current?.focus()); }}>
                   <b>{prompt}</b><i aria-hidden="true">→</i>
@@ -273,11 +329,14 @@ export function ChatTab({ session }: ChatTabProps) {
           <button onClick={() => setUploadError("")} aria-label="Dismiss upload error">×</button>
         </div>
       )}
+      {modeError && <div className="composer-notice form-error" role="alert">{modeError}</div>}
 
       <ChatComposer
         input={input}
+        mode={composerMode}
         streaming={streaming}
         uploading={uploading}
+        hammersmithState={hammersmithState}
         inputRef={inputRef}
         fileInputRef={fileInputRef}
         onInput={setInput}
@@ -287,6 +346,7 @@ export function ChatTab({ session }: ChatTabProps) {
         onInsertNewline={insertNewline}
         onAbort={handleAbort}
         onQueue={handleQueue}
+        onModeChange={changeComposerMode}
         onSend={sendMessage}
       />
     </div>

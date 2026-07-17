@@ -1,4 +1,4 @@
-import type { User, Space, Session, GoalStatus, ChatMessage, GitSnapshot, Org } from "../types";
+import type { User, Space, Session, GoalStatus, ChatMessage, GitSnapshot, Org, ComposerMode, HammersmithCapability, HammersmithRun, HammersmithSettings } from "../types";
 
 const base = "";
 
@@ -121,7 +121,7 @@ export const api = {
     );
   },
 
-  sendMessagePOST: async (sessionId: string, prompt: string, isGoal: boolean) => {
+  sendMessagePOST: async (sessionId: string, prompt: string, mode: ComposerMode) => {
     return fetch(`/api/sessions/${sessionId}/message`, {
       method: "POST",
       credentials: "include",
@@ -129,7 +129,7 @@ export const api = {
         "Content-Type": "application/json",
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({ prompt, isGoal }),
+      body: JSON.stringify({ prompt, mode, isGoal: mode === "goal" }),
     });
   },
 
@@ -137,6 +137,16 @@ export const api = {
     get: () => fetchJSON<Record<string, string>>("/api/settings"),
     patch: (settings: Record<string, string>) =>
       fetchJSON("/api/settings", { method: "PATCH", body: JSON.stringify(settings) }),
+  },
+
+  hammersmith: {
+    capability: () => fetchJSON<HammersmithCapability>("/api/hammersmith/capability"),
+    settings: () => fetchJSON<HammersmithSettings>("/api/hammersmith/settings"),
+    saveSettings: (settings: Partial<HammersmithSettings>) =>
+      fetchJSON<HammersmithSettings>("/api/hammersmith/settings", { method: "PATCH", body: JSON.stringify(settings) }),
+    jobs: (sessionId: string) => fetchJSON<HammersmithRun[]>(`/api/sessions/${sessionId}/hammersmith/jobs`),
+    job: (jobId: string) => fetchJSON<HammersmithRun>(`/api/hammersmith/jobs/${jobId}`),
+    stop: (jobId: string) => fetchJSON<{ ok: boolean; stopped: boolean }>(`/api/hammersmith/jobs/${jobId}/stop`, { method: "POST" }),
   },
 
   git: {

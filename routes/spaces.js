@@ -9,6 +9,7 @@ import path from "path";
 import { rmSync } from "fs";
 import db from "../lib/db.mjs";
 import { assertOrgStorageCapacity, refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
+import { requireHammersmithLeaseAvailable } from "../lib/hammersmith-lease.mjs";
 const router = Router();
 
 function requireSpaceEditor(req, res, next) {
@@ -44,7 +45,7 @@ const upload = multer({
   })
 });
 
-router.post("/api/spaces/:spaceId/upload", requireAuth, requireSpaceAccess, requireSpaceEditor, requireSpaceStorageCapacity, upload.array("files", 20), (req, res) => {
+router.post("/api/spaces/:spaceId/upload", requireAuth, requireSpaceAccess, requireSpaceEditor, requireHammersmithLeaseAvailable, requireSpaceStorageCapacity, upload.array("files", 20), (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ err: "No files uploaded" });
   }
@@ -152,7 +153,7 @@ router.get("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res) =
 // switch/create branch, merge, push, pull) — all with --no-optional-locks and
 // the per-space write mutex. This file keeps only space CRUD.
 
-router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, requireSpaceEditor, async (req, res) => {
+router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, requireSpaceEditor, requireHammersmithLeaseAvailable, async (req, res) => {
   try {
     const output = await pullSpace(req.params.spaceId);
     return res.json({ output });
@@ -163,7 +164,7 @@ router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, requir
   }
 });
 
-router.delete("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, (req, res) => {
+router.delete("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, requireHammersmithLeaseAvailable, (req, res) => {
   if (req.spaceRole !== "owner") return res.status(403).json({ err: "Owner only" });
   deleteSpace(req.params.spaceId);
   return res.json({ ok: true });
