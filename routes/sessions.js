@@ -26,12 +26,11 @@ import {
 } from "../lib/billing.mjs";
 import { refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
 import { configuredModelCatalog, resolvePiModel } from "../lib/pi-model.mjs";
+import db from "../lib/db.mjs";
+import { hasRunningHammersmithJob } from "../lib/hammersmith-store.mjs";
+import { subscribeHammersmithJobs } from "../lib/hammersmith-events.mjs";
 
 const router = Router();
-
-// sseAuth in routes/spaces.js and routes/git.js. Without this, the /stream
-// SSE route 401s for every dev-token client, since EventSource can't send
-// the x-dev-token header requireAuth checks.
 function sseAuth(req, res, next) {
   const user = queryTokenAuth(req);
   if (user) {
@@ -41,8 +40,6 @@ function sseAuth(req, res, next) {
   }
   requireAuth(req, res, next);
 }
-
-// ── Session CRUD ──
 
 router.get("/api/spaces/:spaceId/sessions", requireAuth, requireSpaceAccess, (req, res) => {
   const includeArchived = req.query.includeArchived === "true" || req.query.includeArchived === "1";
@@ -135,7 +132,22 @@ function requestSubmission(req) {
   const id = typeof supplied === "string" && supplied.length > 0 && supplied.length <= 128
     ? supplied
     : randomUUID();
-  return { id, prompt: req.body?.prompt, isGoal: !!req.body?.isGoal };
+  const suppliedMode = req.body?.mode;
+  const mode = suppliedMode === undefined
+    ? (req.body?.isGoal ? "goal" : "message")
+    : suppliedMode;
+  if (!["message", "goal", "hammersmith"].includes(mode)) {
+    const error = new Error("Unknown or unavailable submission mode");
+    error.status = 400;
+    throw error;
+  }
+  return { id, prompt: req.body?.prompt, mode };
+}
+
+function resetOneShotMode(sessionId, mode) {
+  if (mode === "goal" || mode === "hammersmith") {
+    db.prepare("UPDATE sessions SET composer_mode = 'message', updated_at = datetime('now') WHERE id = ?").run(sessionId);
+  }
 }
 
 function existingSubmission(handle, id) {
@@ -149,14 +161,17 @@ router.get("/api/sessions/:sessionId", requireAuth, (req, res) => {
 
 router.patch("/api/sessions/:sessionId", requireAuth, (req, res) => {
   const session = ownSession(req, res);
-  if (session) res.json(updateSession(req.params.sessionId, req.body));
+  if (!session) return;
+  if (req.body?.composer_mode !== undefined) {
+    if (!["message", "goal", "hammersmith"].includes(req.body.composer_mode)) {
+      return res.status(400).json({ error: "Unknown or unavailable composer mode" });
+    }
+    db.prepare("UPDATE sessions SET composer_mode = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(req.body.composer_mode, session.id);
+  }
+  res.json(updateSession(req.params.sessionId, req.body));
 });
 
-// Switch the model and push it to the LIVE agent. Unlike a generic PATCH
-// (which only persists to the DB for the next spawn), this also sends pi's RPC
-// `set_model` command to a running agent so the change takes effect
-// immediately on the next LLM call. If no agent process is currently alive,
-// the DB write is enough — getAgent() will spawn with the new model on demand.
 router.post("/api/sessions/:sessionId/model", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
@@ -201,26 +216,18 @@ router.post("/api/sessions/:sessionId/archive", requireAuth, (req, res) => {
   res.json(archiveSession(session.id, !!archived));
 });
 
-// ── Messages (re-hydrated from pi JSONL on disk) ──
-
 router.get("/api/sessions/:sessionId/messages", requireAuth, (req, res) => {
   const session = ownSession(req, res);
   if (session) res.json(getMessagesFromDisk(session));
 });
 
-// ── Live event stream ──
-// Long-lived SSE subscription to a session's agent. The agent process lives in
-// the server-side AgentManager, so closing this connection (navigation, refresh)
-// does NOT stop the agent — it keeps running and can be re-attached.
-
 function sseSetup(res) {
   res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   if (typeof res.flushHeaders === "function") res.flushHeaders();
 }
-
 function writeSSE(res, ev) {
   if (res.destroyed || res.writableEnded) return;
   try {
@@ -228,6 +235,7 @@ function writeSSE(res, ev) {
     if (typeof res.flush === "function") res.flush();
   } catch {}
 }
+export const cleanupSseOnResponseClose = (res, cleanups) => res.once("close", () => cleanups.forEach((cleanup) => cleanup()));
 
 router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
   const session = ownSession(req, res);
@@ -256,21 +264,24 @@ router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
 
   // Subscribe; subscribe() immediately emits a `sync` snapshot.
   const unsub = handle.subscribe((ev) => writeSSE(res, ev));
+  const unsubHammersmith = subscribeHammersmithJobs(session.id, (ev) => writeSSE(res, ev));
 
   const ping = setInterval(() => writeSSE(res, { type: "ping" }), 15000);
-  req.on("close", () => {
-    clearInterval(ping);
-    unsub(); // detach this client only — agent keeps running
-  });
+  cleanupSseOnResponseClose(res, [
+    () => clearInterval(ping), unsub, unsubHammersmith, // detach client; agent keeps running
+  ]);
 });
-
 // ── Send a message (fire-and-forget; events flow over /stream) ──
 
 router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
-  const { id: submissionId, prompt, isGoal } = requestSubmission(req);
+  let submission;
+  try { submission = requestSubmission(req); } catch (error) { return res.status(error.status || 400).json({ error: error.message }); }
+  const { id: submissionId, prompt, mode } = submission;
   if (!prompt) return res.status(400).json({ error: "prompt required" });
+  if (mode === "hammersmith") return res.status(400).json({ error: "Hammersmith mode requires the delegation endpoint" });
+  if (hasRunningHammersmithJob(session.space_id)) return res.status(409).json({ error: "A Hammersmith job is modifying this Space" });
 
   if (!isPiAvailable()) return res.status(503).json({ error: "pi is not installed" });
   const duplicate = existingSubmission(getAgentIfActive(session.id), submissionId);
@@ -295,11 +306,12 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
   }
 
   const completion = handle
-    .sendPrompt(prompt, isGoal, submissionId)
+    .sendPrompt(prompt, mode, submissionId)
     .catch((err) => handle.broadcast({ type: "error", message: err.message }))
     .finally(() => reconcileHostedTurn(admission));
 
   void completion;
+  resetOneShotMode(session.id, mode);
   res.json({ ok: true, submission: handle.getSubmission(submissionId) });
 });
 
@@ -308,8 +320,12 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
 router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
-  const { id: submissionId, prompt, isGoal } = requestSubmission(req);
+  let submission;
+  try { submission = requestSubmission(req); } catch (error) { return res.status(error.status || 400).json({ error: error.message }); }
+  const { id: submissionId, prompt, mode } = submission;
   if (!prompt) return res.status(400).json({ error: "prompt required" });
+  if (mode === "hammersmith") return res.status(400).json({ error: "Hammersmith jobs cannot be queued behind chat" });
+  if (hasRunningHammersmithJob(session.space_id)) return res.status(409).json({ error: "A Hammersmith job is modifying this Space" });
   const activeHandle = getAgentIfActive(session.id);
   const duplicate = existingSubmission(activeHandle, submissionId);
   if (duplicate) return res.json({ ok: true, submission: duplicate, duplicate: true });
@@ -319,25 +335,27 @@ router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   const handle = activeHandle;
   if (handle?.streaming) {
     try {
-      handle.queueFollowUp(prompt, isGoal, submissionId)
+      handle.queueFollowUp(prompt, mode, submissionId)
         .catch((error) => handle.broadcast({ type: "error", message: error.message }))
         .finally(() => reconcileHostedTurn(admission));
     } catch (error) {
       releaseTokenReservation(admission.reservation?.id);
       return res.status(error.status || 409).json({
         error: error.message,
-        submission: { id: submissionId, prompt, isGoal, status: "failed", error: error.message },
+        submission: { id: submissionId, prompt, mode, isGoal: mode === "goal", status: "failed", error: error.message },
       });
     }
+    resetOneShotMode(session.id, mode);
     return res.json({ ok: true, queued: true, submission: handle.getSubmission(submissionId) });
   }
 
   // Not currently streaming — send directly.
   try {
     const h = handle || (await getAgent(session));
-    h.sendPrompt(prompt, isGoal, submissionId)
+    h.sendPrompt(prompt, mode, submissionId)
       .catch((err) => h.broadcast({ type: "error", message: err.message }))
       .finally(() => reconcileHostedTurn(admission));
+    resetOneShotMode(session.id, mode);
     res.json({ ok: true, submission: h.getSubmission(submissionId) });
   } catch (err) {
     releaseTokenReservation(admission.reservation?.id);

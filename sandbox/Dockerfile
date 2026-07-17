@@ -19,12 +19,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ripgrep \
     python3 \
+    python3-pip \
     make \
     g++ \
     ca-certificates \
     curl \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
+
+# The complete orchestrator and its workers/checks run inside this microVM.
+# Install the same immutable, locally vendored runtime as the server image.
+COPY vendor/hammersmith/hammersmith-0.1.0+296df004.tar.gz /tmp/hammersmith.tar.gz
+COPY vendor/hammersmith/hammersmith-entry.py /tmp/hammersmith-entry.py
+RUN echo "cababa315066df4efa12d59d3024421a577cd1eddc2e9829f987299cd86e42ff  /tmp/hammersmith.tar.gz" | sha256sum -c - && \
+    python3 -m pip install --break-system-packages --no-deps --no-build-isolation /tmp/hammersmith.tar.gz && \
+    install -m 0755 /tmp/hammersmith-entry.py /usr/local/bin/hammersmith && \
+    test "$(hammersmith --version)" = "hammersmith 0.1.0" && \
+    rm -f /tmp/hammersmith.tar.gz /tmp/hammersmith-entry.py
 
 WORKDIR /workspace
 
@@ -71,7 +82,7 @@ RUN mkdir -p /root/.pi/agent && echo '{\
   }\
 }' > /root/.pi/agent/models.json
 
-# Sanity: confirm pi is callable.
-RUN pi --version
+# Sanity: confirm both hosted execution tools are callable.
+RUN pi --version && hammersmith --version
 
 CMD ["sleep", "infinity"]

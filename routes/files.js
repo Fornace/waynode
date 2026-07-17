@@ -5,6 +5,7 @@ import { join, resolve, sep } from "path";
 import { createHash } from "crypto";
 import db from "../lib/db.mjs";
 import { assertOrgStorageCapacity, refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
+import { requireHammersmithLeaseAvailable } from "../lib/hammersmith-lease.mjs";
 
 const router = Router();
 const MAX_EDITABLE_FILE_BYTES = 1_000_000;
@@ -69,7 +70,7 @@ router.get("/api/spaces/:spaceId/files", requireAuth, requireSpaceAccess, (req, 
   }
 });
 
-router.put("/api/spaces/:spaceId/files", requireAuth, requireSpaceAccess, (req, res) => {
+router.put("/api/spaces/:spaceId/files", requireAuth, requireSpaceAccess, requireHammersmithLeaseAvailable, (req, res) => {
   if (req.spaceRole === "viewer") return res.status(403).json({ error: "Read-only" });
 
   const spacePath = getSpacePath(req.params.spaceId);

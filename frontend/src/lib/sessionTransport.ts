@@ -1,5 +1,5 @@
-import type { Block, ChatItem, ChatMessage, Submission } from "../types";
-import type { SubmissionDraft } from "./sessionSubmissions";
+import type { Block, ChatItem, ChatMessage, HammersmithRun, Submission } from "../types";
+import { submissionFromHammersmithRun, type SubmissionDraft } from "./sessionSubmissions";
 
 function authQuery() {
   const token = localStorage.getItem("waynode-dev-token") || "";
@@ -25,31 +25,39 @@ export async function submitDraft(
   kind: "message" | "queue",
   draft: SubmissionDraft,
 ): Promise<Submission> {
-  const response = await fetch(`/api/sessions/${sessionId}/${kind}`, {
+  const endpoint = draft.mode === "hammersmith"
+    ? `/api/sessions/${sessionId}/hammersmith`
+    : `/api/sessions/${sessionId}/${kind}`;
+  const response = await fetch(endpoint, {
     method: "POST",
     credentials: "include",
     headers: jsonHeaders(),
     body: JSON.stringify({
       prompt: draft.prompt,
+      mode: draft.mode,
       isGoal: draft.isGoal,
       submissionId: draft.id,
     }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new SubmissionError(body.error || "Submission failed", response.status, body);
-  return body.submission;
+  return { ...body.submission, ...(body.job ? { job: { ...body.job, freshness: "live" } } : {}) };
 }
 
 let historySequence = 0;
 
 export async function loadHistoryItems(sessionId: string): Promise<ChatItem[]> {
-  const response = await fetch(`/api/sessions/${sessionId}/messages`, {
-    credentials: "include",
-    headers: jsonHeaders(),
-  });
+  const [response, jobsResponse] = await Promise.all([
+    fetch(`/api/sessions/${sessionId}/messages`, {
+      credentials: "include", headers: jsonHeaders(),
+    }),
+    fetch(`/api/sessions/${sessionId}/hammersmith/jobs`, {
+      credentials: "include", headers: jsonHeaders(),
+    }),
+  ]);
   if (!response.ok) throw new Error("History failed");
   const messages = await response.json() as ChatMessage[];
-  return messages.map((message) => {
+  const items: ChatItem[] = messages.map((message): ChatItem => {
     const id = `history-${historySequence++}`;
     const sentAt = message.createdAt ?? message.created_at ?? message.timestamp ?? null;
     if (message.role !== "assistant") return { id, role: message.role, content: message.content, sentAt } as ChatItem;
@@ -58,6 +66,27 @@ export async function loadHistoryItems(sessionId: string): Promise<ChatItem[]> {
     blocks.push({ type: "text", text: message.content || "" });
     return { id, role: "assistant", blocks, done: true, sentAt };
   });
+  if (jobsResponse.ok) {
+    const jobs = await jobsResponse.json() as HammersmithRun[];
+    for (const job of jobs) {
+      const submission = submissionFromHammersmithRun({ ...job, freshness: "live" });
+      items.push({ id: submission.id, role: "user", content: submission.prompt, mode: "hammersmith", isGoal: false, submissionStatus: "completed", sentAt: job.createdAt });
+      items.push({ id: `hammersmith-${job.id}`, role: "hammersmith-run", initiatingItemId: submission.id, run: { ...job, freshness: "live" }, sentAt: job.createdAt });
+    }
+  }
+  return items.sort((a, b) => {
+    const delta = new Date(a.sentAt || 0).getTime() - new Date(b.sentAt || 0).getTime();
+    if (delta) return delta;
+    if (a.role === "hammersmith-run") return 1;
+    if (b.role === "hammersmith-run") return -1;
+    return 0;
+  });
+}
+
+export async function loadHammersmithRuns(sessionId: string): Promise<HammersmithRun[]> {
+  const response = await fetch(`/api/sessions/${sessionId}/hammersmith/jobs`, { credentials: "include", headers: jsonHeaders() });
+  if (!response.ok) throw new Error("Hammersmith status failed");
+  return response.json();
 }
 
 export function openSessionStream(sessionId: string) {

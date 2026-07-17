@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { AccountTokens } from "./AccountTokens";
+import { HammersmithSettings } from "./HammersmithSettings";
 
 interface AccountSettingsProps {
   onClose: () => void;
@@ -51,6 +52,7 @@ export function AccountSettings({ onClose, onDeleted }: AccountSettingsProps) {
         </div>
         <div className="settings-modal-body">
           <AccountTokens />
+          <HammersmithSettings />
           <div className="settings-section">
             <div className="settings-section-title">Account deletion</div>
             <p className="settings-hint">This permanently removes your profile, connected provider tokens, API tokens, personal settings, and personal workspaces. Shared organization work stays with another administrator.</p>

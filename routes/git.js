@@ -25,8 +25,10 @@ import { identityForUser } from "../lib/git-identity.mjs";
 import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
 import { refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
+import { requireHammersmithLeaseAvailable } from "../lib/hammersmith-lease.mjs";
 
 const router = Router();
+router.use("/api/spaces/:spaceId/git", requireHammersmithLeaseAvailable);
 
 function spacePath(req) {
   const space = getSpace(req.params.spaceId);

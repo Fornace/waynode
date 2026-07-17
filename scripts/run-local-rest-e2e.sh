@@ -94,16 +94,21 @@ public_ready=0
 public_host=$(node -e 'process.stdout.write(new URL(process.argv[1]).hostname)' "$PUBLIC_BASE_URL")
 [[ -n "$TUNNEL_PID" ]] && sleep 8
 for attempt in $(seq 1 90); do
-  resolve_args=()
-  if [[ -n "$TUNNEL_PID" ]]; then
-    public_ip=$(dig +short @1.1.1.1 A "$public_host" | head -1 || true)
-    [[ -n "$public_ip" ]] && resolve_args=(--resolve "$public_host:443:$public_ip")
-  fi
-  if [[ -z "$TUNNEL_PID" || ${#resolve_args[@]} -gt 0 ]] && \
-      curl --fail --silent --connect-timeout 3 --max-time 8 "${resolve_args[@]}" \
+  if [[ -z "$TUNNEL_PID" ]]; then
+    if curl --fail --silent --connect-timeout 3 --max-time 8 \
         "$PUBLIC_BASE_URL/api/health/live" >/dev/null 2>&1; then
-    public_ready=1
-    break
+      public_ready=1
+      break
+    fi
+  else
+    public_ip=$(dig +short @1.1.1.1 A "$public_host" | head -1 || true)
+    if [[ -n "$public_ip" ]] && \
+        curl --fail --silent --connect-timeout 3 --max-time 8 \
+          --resolve "$public_host:443:$public_ip" \
+          "$PUBLIC_BASE_URL/api/health/live" >/dev/null 2>&1; then
+      public_ready=1
+      break
+    fi
   fi
   if [[ -n "$TUNNEL_PID" ]] && ! kill -0 "$TUNNEL_PID" 2>/dev/null; then break; fi
   sleep 1

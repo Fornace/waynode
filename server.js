@@ -30,6 +30,7 @@ import apiTokenRoutes from "./routes/api-tokens.js";
 import billingRoutes, { webhookRouter as billingWebhookRoutes } from "./routes/billing.js";
 import appStoreRoutes from "./routes/app-store.js";
 import contentRoutes from "./routes/content.js";
+import hammersmithRoutes, { hammersmithCapabilityRouter } from "./routes/hammersmith.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -80,6 +81,10 @@ app.get("/api/health/ready", (req, res) => {
   const report = readinessReport();
   res.status(report.ready ? 200 : 503).json(publicReadinessReport(report));
 });
+
+// Intentionally public and mounted before the authenticated /api limiter.
+// It exposes only coarse install/readiness state and a validated monitor URL.
+app.use(hammersmithCapabilityRouter);
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -149,6 +154,7 @@ app.use(spacesRoutes);
 app.use(sessionsRoutes);
 app.use(secretsRoutes);
 app.use(settingsRoutes);
+app.use(hammersmithRoutes);
 app.use(filesRoutes);
 app.use(reposRoutes);
 app.use(adminRoutes);
