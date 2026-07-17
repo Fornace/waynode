@@ -202,8 +202,13 @@ try {
     env: { ...process.env, PI_CODING_AGENT_DIR: serverAgentDir, PI_TELEMETRY: "0" },
     timeout: 10_000,
   });
-  assert.equal(listModels.status, 0, `installed pi accepts the sparse model catalog: ${listModels.stderr.trim()}`);
-  assert.ok(listModels.stdout.includes("fornace-fast"), "installed pi lists a sparse model entry using documented defaults");
+  if (listModels.error?.code === "ENOENT") {
+    console.log("installed pi compatibility probe: skipped (pi is not installed)");
+  } else {
+    assert.ifError(listModels.error);
+    assert.equal(listModels.status, 0, `installed pi accepts the sparse model catalog: ${listModels.stderr.trim()}`);
+    assert.ok(listModels.stdout.includes("fornace-fast"), "installed pi lists a sparse model entry using documented defaults");
+  }
   console.log("self-host provider config: resource isolation and provider assertions passed");
 } finally {
   if (originalHome === undefined) delete process.env.HOME;
