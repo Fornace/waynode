@@ -29,15 +29,6 @@ export function buildAskPrompt(kind: "merge" | "rebase" | "push", ctx: { cur: st
   return `Push to remote was rejected (the remote has commits you don't). Run \`git pull --rebase\`, resolve any conflicts${fl}, then \`git push\` again. Summarize what happened.`;
 }
 
-export const STATUS_COLOR: Record<string, string> = {
-  modified: "var(--amber)",
-  added: "var(--green)",
-  deleted: "var(--red)",
-  untracked: "var(--accent)",
-  renamed: "#a78bfa",
-  copied: "#a78bfa",
-  conflict: "var(--red)",
-};
 // ───────────────────────────── Issue card ─────────────────────────────
 
 export function GitIssueCard({ issue }: { issue: GitIssue }) {
@@ -198,39 +189,6 @@ export function FileEditor({ space, path, onClose, onSaved }: { space: Space; pa
         </footer>
       </section>
       {confirmClose && <ConfirmDialog title="Discard unsaved changes?" description={`Changes to “${path}” have not been saved.`} confirmLabel="Discard changes" danger onCancel={() => setConfirmClose(false)} onConfirm={onClose} />}
-    </div>
-  );
-}
-
-export function DiffView({ text }: { text: string }) {
-  // Split into lines but keep the trailing newline state stable; React keys
-  // by index are fine here since the diff text is immutable for a given expand.
-  const lines = text.split("\n");
-  return (
-    <div className="git-diff-view">
-      {lines.map((line, i) => {
-        let cls = "diff-context";
-        let display = line;
-        if (/^(\+\+\+|---|diff |index )/.test(line)) {
-          cls = "diff-meta";
-        } else if (line.startsWith("@@")) {
-          cls = "diff-hunk";
-        } else if (line.startsWith("+") && !line.startsWith("+++")) {
-          cls = "diff-add";
-          display = line.slice(1);
-        } else if (line.startsWith("-") && !line.startsWith("---")) {
-          cls = "diff-del";
-          display = line.slice(1);
-        }
-        return (
-          <div key={i} className={`diff-line ${cls}`}>
-            <span className="diff-gutter">
-              {cls === "diff-add" ? "+" : cls === "diff-del" ? "-" : " "}
-            </span>
-            <span className="diff-text">{display || " "}</span>
-          </div>
-        );
-      })}
     </div>
   );
 }

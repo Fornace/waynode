@@ -3,7 +3,8 @@ import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import type { Space, GitSnapshot } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { STATUS_COLOR, buildAskPrompt, basename, dirname, CheckIcon, CloseIcon, DiffView, FileEditor, Pill, WarnIcon, type GitIssue } from "./GitSidebarShared";
+import { buildAskPrompt, basename, dirname, CheckIcon, CloseIcon, FileEditor, Pill, WarnIcon, type GitIssue } from "./GitSidebarShared";
+import { DiffView, GitStatusBadge } from "./GitReviewEvidence";
 
 // ───────────────────────────── Changes ─────────────────────────────
 
@@ -283,7 +284,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
                         onChange={() => toggle(f.path)}
                         aria-label={`${selected.has(f.path) ? "Deselect" : "Select"} ${f.path} for commit`}
                       />
-                      <span className="git-status-dot" style={{ background: STATUS_COLOR[f.status] }} title={f.status} aria-hidden="true" />
+                      <GitStatusBadge status={f.status} />
                       <button className="git-file-info" onClick={() => openEditor(f.path, f.status)} aria-label={`Open ${f.path} in editor`}>
                         <span className="git-file-name">{basename(f.path)}</span>
                         <span className="git-file-dir">{dirname(f.path)}</span>
@@ -318,7 +319,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
             </div>
             <section className="git-diff-pane" aria-live="polite" aria-label="Selected file diff">
               {expanded ? <>
-                <div className="git-diff-pane-head"><b>{basename(expanded)}</b><span>Unified diff</span></div>
+                <div className="git-diff-pane-head"><b>{basename(expanded)}</b><span>Old / new · unified diff</span></div>
                 {loadingDiff ? <div className="git-diff-loading" role="status">Loading diff…</div> : <DiffView text={diff} />}
               </> : <div className="git-diff-empty"><span>⌘</span><b>Select a file to inspect its diff</b><small>Review changes before you commit and push.</small></div>}
             </section>

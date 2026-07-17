@@ -5,6 +5,7 @@ import * as store from "../lib/sessionStore";
 import { RepoPicker } from "./RepoPicker";
 import { OrgSwitcher, SessionMenu, UserMenu } from "./SidebarMenus";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useSessionLifecycle } from "./SessionLifecycle";
 
 interface SidebarProps {
   spaces: Space[];
@@ -53,7 +54,6 @@ export function Sidebar({
   const [archivedBySpace, setArchivedBySpace] = useState<Record<string, Session[]>>({});
   const [showArchivedFor, setShowArchivedFor] = useState<Set<string>>(new Set());
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
-  const [busySessionId, setBusySessionId] = useState<string | null>(null);
   const [loadingSessionSpaces, setLoadingSessionSpaces] = useState<Set<string>>(new Set());
   const [confirmingLogout, setConfirmingLogout] = useState(false);
 
@@ -98,64 +98,21 @@ export function Sidebar({
     });
   };
 
-  // sessions share one working tree per space; "merge" here means safety-committing
-  // any uncommitted work in that shared tree before the session is archived/deleted —
-  // there is no per-session git branch to merge.
-  const ensureCommitted = async (spaceId: string, session: Session) => {
-    const snap = await api.git.status(spaceId);
-    if (!snap.hasUncommittedChanges || snap.files.length === 0) return;
-    await api.git.commit(spaceId, {
-      files: snap.files.map((f) => f.path),
-      summary: `Auto-commit before closing session: ${session.title}`,
-    });
-  };
-
-  const handleArchive = async (session: Session, archived: boolean) => {
-    setBusySessionId(session.id);
-    setOpenMenuFor(null);
-    try {
-      const updated = await api.sessions.archive(session.id, archived);
-      onSessionArchived(updated);
-      loadArchived(session.space_id);
-    } catch (err) {
-      setIssue({ message: (err as Error).message, retry: () => handleArchive(session, archived) });
-    } finally {
-      setBusySessionId(null);
-    }
-  };
-
-  const handleDelete = async (session: Session) => {
-    if (!confirm(`Delete session "${session.title}"? This cannot be undone.`)) return;
-    setBusySessionId(session.id);
-    setOpenMenuFor(null);
-    try {
-      await api.sessions.delete(session.id);
-      onSessionDeleted(session.id);
-      setArchivedBySpace((prev) => ({
-        ...prev,
-        [session.space_id]: (prev[session.space_id] || []).filter((s) => s.id !== session.id),
-      }));
-    } catch (err) {
-      setIssue({ message: (err as Error).message, retry: () => handleDelete(session) });
-    } finally {
-      setBusySessionId(null);
-    }
-  };
-
-  const handleMergeAnd = async (session: Session, action: "archive" | "delete") => {
-    setBusySessionId(session.id);
-    setOpenMenuFor(null);
-    try {
-      await ensureCommitted(session.space_id, session);
-      refreshGitStatus(session.space_id);
-    } catch (err) {
-      setIssue({ message: `The safety commit failed, so the session was not ${action === "archive" ? "archived" : "deleted"}: ${(err as Error).message}`, retry: () => handleMergeAnd(session, action) });
-      setBusySessionId(null);
-      return;
-    }
-    if (action === "archive") await handleArchive(session, true);
-    else await handleDelete(session);
-  };
+  const lifecycle = useSessionLifecycle({
+    onArchived: onSessionArchived,
+    onDeleted: (sessionId) => {
+      onSessionDeleted(sessionId);
+      setArchivedBySpace((previous) => Object.fromEntries(
+        Object.entries(previous).map(([spaceId, archived]) => [
+          spaceId,
+          archived.filter((session) => session.id !== sessionId),
+        ]),
+      ));
+    },
+    onRefreshGit: refreshGitStatus,
+    onRefreshArchived: loadArchived,
+    onIssue: (message, retry) => setIssue({ message, retry }),
+  });
 
   const handleClone = async (repoUrl: string, branch: string, authUser?: string, authToken?: string) => {
     const space = await api.spaces.create(repoUrl, branch, authUser, authToken, activeOrgId || undefined);
@@ -224,7 +181,7 @@ export function Sidebar({
   return (
     <>
       <div className="sidebar">
-        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} onSelect={onSelectOrg} onCreate={handleCreateOrg} onToggleSidebar={onToggleSidebar} />
+        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} onSelect={onSelectOrg} onCreate={handleCreateOrg} onOpenSettings={onOpenOrgSettings} onToggleSidebar={onToggleSidebar} />
 
         <div className="sidebar-content">
           <button type="button" className="new-space-btn" onClick={() => setShowPicker(true)}>
@@ -232,14 +189,7 @@ export function Sidebar({
             New worktree
           </button>
 
-          {orgs.length > 0 && (
-            <button type="button" className="new-space-btn sidebar-settings-btn" onClick={onOpenOrgSettings}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-              Organization settings
-            </button>
-          )}
-
-          <div style={{ height: 12 }} />
+          <div className="sidebar-section-label"><span>Worktrees</span><i aria-hidden="true" /></div>
 
           {spacesLoading ? <div className="sidebar-empty" role="status">Loading worktrees…</div> : spaces.length === 0 && (
             <div className="sidebar-empty">No worktrees yet. Use New worktree to clone a repository.</div>
@@ -261,8 +211,9 @@ export function Sidebar({
                   <span className={`space-chevron ${expanded ? "expanded" : ""}`}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                   </span>
-                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {space.repo_name}
+                  <span className="space-identity">
+                    <span className="space-name">{space.repo_name}</span>
+                    <code className="space-branch">{gitStatus[space.id]?.currentBranch || space.branch}</code>
                   </span>
                   {uncommittedCount > 0 && (
                     <span className="space-git-badge" title={`${uncommittedCount} uncommitted file${uncommittedCount === 1 ? "" : "s"}`}>
@@ -293,20 +244,20 @@ export function Sidebar({
                         <button
                           className="session-menu-btn"
                           onClick={(e) => { e.stopPropagation(); setOpenMenuFor(openMenuFor === session.id ? null : session.id); }}
-                          disabled={busySessionId === session.id}
+                          disabled={lifecycle.busySessionId === session.id}
                           title="Session actions"
                           aria-label={`Actions for ${session.title}`}
                         >
-                          {busySessionId === session.id ? "…" : "⋯"}
+                          {lifecycle.busySessionId === session.id ? "…" : "⋯"}
                         </button>
                         {openMenuFor === session.id && (
                           <SessionMenu
                             onClose={() => setOpenMenuFor(null)}
                             items={[
-                              { label: "Archive", onClick: () => handleArchive(session, true) },
-                              { label: "Merge & Archive", onClick: () => handleMergeAnd(session, "archive") },
-                              { label: "Merge & Delete", onClick: () => handleMergeAnd(session, "delete") },
-                              { label: "Delete", danger: true, onClick: () => handleDelete(session) },
+                              { label: "Archive session", onClick: () => lifecycle.archiveSession(session, true) },
+                              { label: "Commit changes & archive", onClick: () => lifecycle.requestLifecycle(session, "archive", true) },
+                              { label: "Commit changes & delete", danger: true, onClick: () => lifecycle.requestLifecycle(session, "delete", true) },
+                              { label: "Delete session", danger: true, onClick: () => lifecycle.requestLifecycle(session, "delete", false) },
                             ]}
                           />
                         )}
@@ -326,11 +277,11 @@ export function Sidebar({
                         <span className="session-item-title">{session.title}</span>
                         <button
                           className="session-unarchive-btn"
-                          onClick={() => handleArchive(session, false)}
-                          disabled={busySessionId === session.id}
+                          onClick={() => lifecycle.archiveSession(session, false)}
+                          disabled={lifecycle.busySessionId === session.id}
                           aria-label={`Unarchive ${session.title}`}
                         >
-                          {busySessionId === session.id ? "…" : "Unarchive"}
+                          {lifecycle.busySessionId === session.id ? "…" : "Unarchive"}
                         </button>
                       </div>
                     ))}
@@ -370,6 +321,8 @@ export function Sidebar({
         onCancel={() => setConfirmingLogout(false)}
         onConfirm={() => { setConfirmingLogout(false); onLogout(); }}
       />}
+
+      {lifecycle.dialog}
 
     </>
   );

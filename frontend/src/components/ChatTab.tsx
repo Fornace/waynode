@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { Session, GoalStatus } from "../types";
 import { MessageRow, StartingAgent } from "./ChatMessage";
-import { ChatComposer } from "./ChatComposer";
+import { ChatComposer, type ComposerMode } from "./ChatComposer";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 
@@ -12,7 +12,9 @@ interface ChatTabProps {
 export function ChatTab({ session }: ChatTabProps) {
   const state = store.useSessionChat(session.id);
   const [input, setInput] = useState("");
+  const [composerMode, setComposerMode] = useState<ComposerMode>("message");
   const [goal, setGoal] = useState<GoalStatus | null>(null);
+  const [goalError, setGoalError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [showJump, setShowJump] = useState(false);
@@ -74,7 +76,10 @@ export function ChatTab({ session }: ChatTabProps) {
     try {
       const { goal } = await api.sessions.getGoal(session.id);
       setGoal(goal);
-    } catch {}
+      setGoalError("");
+    } catch {
+      setGoalError("Goal status could not be refreshed. The last known status may be stale; the session and run are unchanged.");
+    }
   }, [session.id]);
 
   useEffect(() => {
@@ -127,7 +132,7 @@ export function ChatTab({ session }: ChatTabProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (streaming) handleQueue();
-      else sendMessage(false);
+      else sendMessage(composerMode === "goal");
     }
   };
 
@@ -199,6 +204,12 @@ export function ChatTab({ session }: ChatTabProps) {
           </span>
         </div>
       )}
+      {goalError && (
+        <div className="goal-recovery" role="alert">
+          <span>{goalError}</span>
+          <button type="button" onClick={refreshGoal}>Retry status</button>
+        </div>
+      )}
 
       {state.connection === "reconnecting" && (
         <div className="run-state-banner" role="status" aria-live="polite">
@@ -227,13 +238,13 @@ export function ChatTab({ session }: ChatTabProps) {
         {!state.loaded && !state.error && <div className="agent-preflight"><StartingAgent phase="Loading conversation…" /></div>}
         {state.loaded && state.items.length === 0 && !streaming && (
           <div className="chat-empty">
-            <div className="chat-empty-title">Give the agent a concrete outcome.</div>
-            <div className="chat-empty-desc">Start with what should change and how you’ll know it is done.</div>
+            <div className="chat-empty-title">Start from the worktree, not a blank chat.</div>
+            <div className="chat-empty-desc">Ask for an outcome you can verify in this repository and branch.</div>
             <div className="chat-starters" aria-label="Suggested prompts">
               {[
-                "Explain this codebase",
-                "Find and fix a bug",
-                "Build a focused feature",
+                "Map this worktree before changing it",
+                "Find a bug and open the diff",
+                "Build a focused change and verify it",
               ].map((prompt) => (
                 <button key={prompt} onClick={() => { setInput(prompt); requestAnimationFrame(() => inputRef.current?.focus()); }}>
                   <b>{prompt}</b><i aria-hidden="true">→</i>
@@ -276,6 +287,7 @@ export function ChatTab({ session }: ChatTabProps) {
 
       <ChatComposer
         input={input}
+        mode={composerMode}
         streaming={streaming}
         uploading={uploading}
         inputRef={inputRef}
@@ -287,6 +299,7 @@ export function ChatTab({ session }: ChatTabProps) {
         onInsertNewline={insertNewline}
         onAbort={handleAbort}
         onQueue={handleQueue}
+        onModeChange={setComposerMode}
         onSend={sendMessage}
       />
     </div>

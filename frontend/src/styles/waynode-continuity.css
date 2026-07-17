@@ -1,0 +1,72 @@
+.product-provenance {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  max-width: 900px;
+  margin: 42px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.product-provenance::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 15px;
+  right: 15px;
+  height: 1px;
+  background: linear-gradient(90deg, #5d7fca, rgba(93,127,202,.5) 72%, rgba(93,127,202,.16));
+}
+.product-provenance li { position: relative; display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding-right: 18px; }
+.product-provenance li > span {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #6f91d8;
+  border-radius: 50%;
+  color: #b8cdf8;
+  background: var(--product-bg);
+  font: 700 9px var(--mono);
+}
+.product-provenance div { min-width: 0; padding-top: 1px; }
+.product-provenance b,
+.product-provenance small { display: block; }
+.product-provenance b { color: var(--product-text); font-size: 12px; }
+.product-provenance small { margin-top: 3px; color: var(--product-tertiary); font-size: 10.5px; line-height: 1.35; }
+
+.product-capture-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--product-border);
+  color: var(--product-secondary);
+  font-size: 11px;
+}
+.product-capture-context span { font-weight: 720; letter-spacing: .08em; text-transform: uppercase; }
+.product-capture-context code { color: var(--product-tertiary); font: 10.5px var(--mono); }
+.product-continuity-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -20px 0 22px;
+  color: var(--product-tertiary);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+.product-continuity-note span { width: 7px; height: 7px; border: 1px solid #6f91d8; border-radius: 50%; box-shadow: 12px 0 0 -3px var(--product-bg), 12px 0 0 -2px #6f91d8; }
+
+@media (max-width: 720px) {
+  .product-provenance { grid-template-columns: 1fr 1fr; gap: 20px 0; }
+  .product-provenance::before { top: 14px; bottom: 14px; left: 14px; right: auto; width: 1px; height: auto; }
+  .product-provenance li { padding-right: 10px; }
+  .product-capture-context { align-items: flex-start; flex-direction: column; gap: 3px; }
+}
+
+@media (max-width: 380px) {
+  .product-provenance { grid-template-columns: 1fr; }
+}

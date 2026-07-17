@@ -1,3 +1,5 @@
+import { WaynodeMark } from "./Brand";
+
 interface StateSurfaceProps {
   title: string;
   description?: string;
@@ -17,6 +19,7 @@ export function StateSurface({ title, description, busy = false, tone = "neutral
       aria-busy={busy}
     >
       {busy && <span className="state-progress" aria-hidden="true" />}
+      {!busy && <span className="state-brand-mark" aria-hidden="true"><WaynodeMark size={28} /></span>}
       <h1>{title}</h1>
       {description && <p>{description}</p>}
       {(action || secondaryAction) && (

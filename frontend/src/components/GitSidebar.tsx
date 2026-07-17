@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { api } from "../api/client";
 import type { Space, GitSnapshot } from "../types";
 import { BranchesPanel } from "./GitBranchesPanel";
@@ -7,6 +7,7 @@ import { BranchIcon, CloseIcon, GitIssueCard, RefreshIcon, type GitIssue } from 
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import "./GitSidebarLayout.css";
 import "./GitSidebarActions.css";
+import "./GitReviewEvidence.css";
 
 interface GitSidebarProps {
   space: Space;
@@ -51,12 +52,39 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
   const [issue, setIssue] = useState<GitIssue | null>(null);
   const esRef = useRef<EventSource | null>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [compact, setCompact] = useState(() => window.matchMedia(REVIEW_OVERLAY_QUERY).matches);
   const [reviewWidth, setReviewWidth] = useState(savedReviewWidth);
   const reviewWidthRef = useRef(reviewWidth);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [resizing, setResizing] = useState(false);
   useEscapeToClose(onClose, panelRef, open && compact);
+
+  useLayoutEffect(() => {
+    if (!open || !compact || !panelRef.current) return;
+    const returnFocus = document.querySelector<HTMLElement>("[data-review-trigger]")
+      || document.activeElement as HTMLElement | null;
+    const parent = panelRef.current.parentElement;
+    if (!parent) return;
+    const background = [...parent.children].filter((node) => node !== panelRef.current && !node.classList.contains("git-overlay"));
+    const previous = background.map((node) => ({
+      node: node as HTMLElement,
+      inert: (node as HTMLElement).inert,
+      ariaHidden: node.getAttribute("aria-hidden"),
+    }));
+    previous.forEach(({ node }) => { node.inert = true; node.setAttribute("aria-hidden", "true"); });
+    const focusFrame = requestAnimationFrame(() => closeRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      previous.forEach(({ node, inert, ariaHidden }) => {
+        node.inert = inert;
+        if (ariaHidden === null) node.removeAttribute("aria-hidden");
+        else node.setAttribute("aria-hidden", ariaHidden);
+      });
+      requestAnimationFrame(() => returnFocus?.focus());
+    };
+  }, [open, compact]);
 
   useEffect(() => {
     const media = window.matchMedia(REVIEW_OVERLAY_QUERY);
@@ -123,6 +151,19 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
     persistWidth(next);
   };
 
+  const moveTab = (event: ReactKeyboardEvent<HTMLButtonElement>, current: number) => {
+    const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0
+      : event.key === "End" ? 1
+      : event.key === "ArrowRight" ? (current + 1) % 2
+      : (current - 1 + 2) % 2;
+    const nextTab: Tab = next === 0 ? "changes" : "branches";
+    setTab(nextTab);
+    tabRefs.current[next]?.focus();
+  };
+
   // ── Live data: only poll while open ──
   useEffect(() => {
     if (!open) return;
@@ -156,11 +197,13 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
 
   return (
     <>
+      {open && compact && <div className="git-overlay" aria-hidden="true" onClick={onClose} />}
       <aside
         ref={panelRef}
         className={`git-panel ${open ? "open" : ""} ${resizing ? "is-resizing" : ""}`}
         style={{ "--git-review-width": `${reviewWidth}px` } as CSSProperties}
-        role="complementary"
+        role={compact ? "dialog" : "complementary"}
+        aria-modal={open && compact ? true : undefined}
         aria-labelledby="git-review-title"
         aria-hidden={!open}
         inert={!open}
@@ -175,7 +218,7 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
           aria-valuemax={maxReviewWidth()}
           aria-valuenow={reviewWidth}
           aria-valuetext={`${reviewWidth} pixels wide`}
-          tabIndex={0}
+          tabIndex={compact ? -1 : 0}
           onPointerDown={(event) => {
             if (event.button !== 0) return;
             event.preventDefault();
@@ -203,7 +246,7 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
             <button className="git-icon-btn" onClick={refresh} title="Refresh" aria-label="Refresh Git status">
               <RefreshIcon spinning={loading} />
             </button>
-            <button className="git-icon-btn git-close-btn" onClick={onClose} title="Close" aria-label="Close Git review">
+            <button ref={closeRef} className="git-icon-btn git-close-btn" onClick={onClose} title="Close" aria-label="Close Git review">
               <CloseIcon />
             </button>
           </div>
@@ -219,10 +262,10 @@ export function GitSidebar({ space, sessionId, open, onClose }: GitSidebarProps)
         {issue && <GitIssueCard issue={issue} />}
 
         <nav className="git-tabs" role="tablist" aria-label="Git review sections">
-          <button id="git-changes-tab" role="tab" aria-selected={tab === "changes"} aria-controls="git-review-panel" className={`git-tab ${tab === "changes" ? "active" : ""}`} onClick={() => setTab("changes")}>
+          <button ref={(node) => { tabRefs.current[0] = node; }} id="git-changes-tab" role="tab" tabIndex={tab === "changes" ? 0 : -1} aria-selected={tab === "changes"} aria-controls="git-review-panel" className={`git-tab ${tab === "changes" ? "active" : ""}`} onKeyDown={(event) => moveTab(event, 0)} onClick={() => setTab("changes")}>
             Changes{snap ? ` (${snap.files.length})` : ""}
           </button>
-          <button id="git-branches-tab" role="tab" aria-selected={tab === "branches"} aria-controls="git-review-panel" className={`git-tab ${tab === "branches" ? "active" : ""}`} onClick={() => setTab("branches")}>
+          <button ref={(node) => { tabRefs.current[1] = node; }} id="git-branches-tab" role="tab" tabIndex={tab === "branches" ? 0 : -1} aria-selected={tab === "branches"} aria-controls="git-review-panel" className={`git-tab ${tab === "branches" ? "active" : ""}`} onKeyDown={(event) => moveTab(event, 1)} onClick={() => setTab("branches")}>
             Branches
           </button>
         </nav>
