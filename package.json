@@ -16,6 +16,7 @@
     "test:account-deletion": "node e2e/test-account-deletion.mjs",
     "test:billing": "node e2e/test-billing.mjs",
     "test:billing-reservations": "node e2e/test-billing-reservations.mjs",
+    "test:billing-hammersmith": "node e2e/test-billing-hammersmith.mjs",
     "test:app-store": "node e2e/test-app-store.mjs",
     "test:content": "node e2e/test-content.mjs",
     "test:public-trust": "node e2e/test-public-trust.mjs",
@@ -36,7 +37,7 @@
     "test:session-sse": "node e2e/test-session-sse.mjs",
     "test:hammersmith": "node e2e/test-hammersmith.mjs",
     "check:file-lengths": "node scripts/check-file-lengths.mjs",
-    "test": "npm run check:file-lengths && npm run test:deploy-contract && npm run test:public-trust && npm run test:provider && npm run test:session-store && npm run test:session-history && npm run test:session-sse && npm run test:hammersmith && npm run test:billing && npm run test:trial-eligibility && npm run test:billing-reservations && npm run test:terminal && npm run test:terminal-capability && npm run test:sandbox-terminal && npm run test:sandbox-queue && npm run test:agent-submissions && npm run test:sandbox-security && npm run test:hosted-git-credentials && npm run test:git-discard && npm run test:clone-policy && npm run test:space-authorization && npm run test:app-store && npm run test:auth && npm run test:oauth-tokens && npm run test:account-deletion && npm run test:content && npm run typecheck"
+    "test": "npm run check:file-lengths && npm run test:deploy-contract && npm run test:public-trust && npm run test:provider && npm run test:session-store && npm run test:session-history && npm run test:session-sse && npm run test:hammersmith && npm run test:billing && npm run test:trial-eligibility && npm run test:billing-reservations && npm run test:billing-hammersmith && npm run test:terminal && npm run test:terminal-capability && npm run test:sandbox-terminal && npm run test:sandbox-queue && npm run test:agent-submissions && npm run test:sandbox-security && npm run test:hosted-git-credentials && npm run test:git-discard && npm run test:clone-policy && npm run test:space-authorization && npm run test:app-store && npm run test:auth && npm run test:oauth-tokens && npm run test:account-deletion && npm run test:content && npm run typecheck"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.11",

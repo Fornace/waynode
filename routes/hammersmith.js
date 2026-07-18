@@ -4,9 +4,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { Router } from "express";
-import { requireAuth } from "../lib/auth.mjs";
+import { optionalAuth, requireAuth } from "../lib/auth.mjs";
 import {
-  billingEnabled, releaseTokenReservation, reserveTokenQuota, TURN_RESERVATION_TOKENS,
+  billingEnabled, hostedHammersmithEntitled, releaseTokenReservation, reserveTokenQuota,
+  TURN_RESERVATION_TOKENS,
 } from "../lib/billing.mjs";
 import { config } from "../lib/config.mjs";
 import {
@@ -21,6 +22,7 @@ import {
   publicHammersmithJob, sessionForHammersmith, setSettingsForUser, settingForUser,
   updateHammersmithJob,
 } from "../lib/hammersmith-store.mjs";
+import { listOrgs } from "../lib/orgs.mjs";
 import { isSandboxAvailable } from "../lib/pi-runner.mjs";
 import { hammersmithWorkerLlmEnv } from "../lib/sandbox-llm-key.mjs";
 
@@ -94,8 +96,16 @@ export function clearHammersmithCapabilityCache() {
   capabilityCache.clear();
 }
 
-capabilityRouter.get("/api/hammersmith/capability", async (_req, res) => {
-  res.json(await detectHammersmithCapability());
+capabilityRouter.get("/api/hammersmith/capability", optionalAuth, async (req, res) => {
+  const capability = await detectHammersmithCapability();
+  // Unauthenticated callers get exactly the historical payload. Authenticated
+  // callers additionally learn whether hosted runs need a plan and whether
+  // any of their orgs holds one. Credential presence is never reported here.
+  if (!req.user) return res.json(capability);
+  const hosted = billingEnabled
+    ? { billingRequired: true, entitled: listOrgs(req.user.id).some((org) => hostedHammersmithEntitled(org.id)) }
+    : { billingRequired: false, entitled: true };
+  res.json({ ...capability, hosted });
 });
 
 export function settingsFor(userId) {
@@ -142,6 +152,20 @@ export function validateHammersmithSettings(current, input, deployment = config.
 
 function monitorUrl(job, userId) {
   return `/api/hammersmith/jobs/${job.id}/monitor`;
+}
+
+/** Per-org $8.99/mo hosted-Hammersmith entitlement gate. Runs BEFORE the
+ *  credential check (hammersmithWorkerLlmEnv) and before budget reservation:
+ *  entitlement is the cheaper, revenue-relevant signal, so a non-entitled
+ *  org without a secret sees the 402 paywall instead of a 503 they cannot
+ *  act on. null admits the run, otherwise a 402 payload for the client. */
+export function hostedHammersmithAdmission(session, hostingMode) {
+  if (hostingMode !== "hosted" || !billingEnabled || !session?.org_id) return null;
+  if (hostedHammersmithEntitled(session.org_id)) return null;
+  return {
+    status: 402,
+    error: "Hosted Hammersmith requires the organization's Hammersmith plan ($8.99/month). Ask an organization admin to subscribe from Settings → Billing.",
+  };
 }
 
 function reserveHammersmithBudget(session, hostingMode, res) {
@@ -226,6 +250,11 @@ router.post("/api/sessions/:sessionId/hammersmith", requireAuth, async (req, res
     return res.status(409).json({ error: "This Space already has a mutating job in progress" });
   }
 
+  // Gate order is revenue-relevant: admission (402) must precede the credential
+  // check (503) so non-entitled orgs without a secret see the paywall message,
+  // not a generic 503. Both deny; nothing about credentials leaks.
+  const admissionGate = hostedHammersmithAdmission(session, userSettings.hostingMode);
+  if (admissionGate) return res.status(admissionGate.status).json({ error: admissionGate.error });
   if (userSettings.hostingMode === "hosted") {
     try { hammersmithWorkerLlmEnv(session); }
     catch (error) { return res.status(error.status || 503).json({ error: error.message }); }

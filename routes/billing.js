@@ -68,7 +68,7 @@ router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, async (req,
 
 router.post("/api/orgs/:orgId/billing/checkout", requireAuth, requireOrgAdmin, async (req, res) => {
   const { plan } = req.body || {};
-  if (!["starter", "pro", "team"].includes(plan)) return res.status(400).json({ error: "Invalid plan" });
+  if (!["starter", "pro", "team", "hammersmith"].includes(plan)) return res.status(400).json({ error: "Invalid plan" });
 
   try {
     const org = getOrg(req.params.orgId);
