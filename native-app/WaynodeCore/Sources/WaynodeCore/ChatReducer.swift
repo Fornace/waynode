@@ -22,17 +22,17 @@ import Foundation
 
 public struct ChatReducer: Sendable, Equatable {
     // The transcript — user, assistant, and system rows in order.
-    public private(set) var items: [ChatItem] = []
+    public internal(set) var items: [ChatItem] = []
     // messageId → items array index (only assistant items tracked here).
-    public private(set) var msgIndex: [String: Int] = [:]
+    public internal(set) var msgIndex: [String: Int] = [:]
     // toolCallId → location of the tool block inside items.
-    public private(set) var toolIndex: [String: ToolLocation] = [:]
+    public internal(set) var toolIndex: [String: ToolLocation] = [:]
 
     /// Monotonically increasing counter bumped on every content mutation.
     /// Used by SwiftUI views to detect streaming updates (where item count
     /// and IDs stay the same but content grows). Observing this drives
     /// auto-scroll-to-bottom during streaming.
-    public private(set) var revision: Int = 0
+    public internal(set) var revision: Int = 0
 
     /// Location of a tool block within the transcript.
     public struct ToolLocation: Hashable, Sendable {
@@ -54,54 +54,6 @@ public struct ChatReducer: Sendable, Equatable {
     public private(set) var currentAssistantId: String?
 
     public init() {}
-
-    // MARK: - History loading (before SSE starts)
-
-    /// Load persisted history from `/api/sessions/:id/messages`. Called once
-    /// before the SSE stream opens. History items are marked done/stable.
-    public mutating func loadHistory(_ history: [HistoryItem]) {
-        revision += 1
-        for h in history {
-            switch h.role {
-            case "user":
-                items.append(.user(.init(id: h.id, content: h.content ?? "", isGoal: h.isGoal ?? false, sentAt: h.sentAt)))
-            case "assistant":
-                // Server sends assistant text as `content` (NOT `text`), and
-                // optional reasoning as `thinking`. This mirrors the web
-                // client (sessionStore.ts loadHistory) exactly:
-                //   if (m.thinking) blocks.push({ type: "thinking", text: m.thinking });
-                //   blocks.push({ type: "text", text: m.content || "" });
-                var blocks: [Block] = []
-                if let th = h.thinking, !th.isEmpty { blocks.append(.thinking(.init(text: th))) }
-                if let txt = h.content, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
-                // Only add an assistant item if there's actual content.
-                // Skip pure tool-call turns (no text/thinking) — they were
-                // already filtered server-side, but guard defensively.
-                if !blocks.isEmpty {
-                    items.append(.assistant(.init(id: h.id, blocks: blocks, done: true, sentAt: h.sentAt)))
-                }
-            case "system":
-                items.append(.system(.init(id: h.id, content: h.content ?? "", key: h.key, sentAt: h.sentAt)))
-            default:
-                break
-            }
-        }
-    }
-
-    public struct HistoryItem: Sendable {
-        public var role: String
-        public var id: String
-        public var content: String?
-        public var isGoal: Bool?
-        public var text: String?
-        public var thinking: String?
-        public var key: String?
-        public var sentAt: Date?
-        public init(role: String, id: String, content: String? = nil, isGoal: Bool? = nil, text: String? = nil, thinking: String? = nil, key: String? = nil, sentAt: Date? = nil) {
-            self.role = role; self.id = id; self.content = content; self.isGoal = isGoal
-            self.text = text; self.thinking = thinking; self.key = key; self.sentAt = sentAt
-        }
-    }
 
     // MARK: - User message (optimistic, before sending)
 
@@ -217,6 +169,11 @@ public struct ChatReducer: Sendable, Equatable {
             if submission.status == .starting { statusText = "Starting agent…" }
             if submission.status == .running { statusText = "Agent working"; isStreaming = true }
             if [.completed, .failed, .cancelled].contains(submission.status) { statusText = nil }
+            return true
+
+        case .hammersmithRun(let submission, let run):
+            if let submission { reconcileSubmission(submission) }
+            upsertHammersmithRun(run)
             return true
 
         case .sync(let snapshot):

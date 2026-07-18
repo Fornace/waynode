@@ -53,6 +53,7 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
     case user(UserItem)
     case assistant(AssistantItem)
     case system(SystemItem)
+    case hammersmithRun(HammersmithRunItem)
 
     public struct UserItem: Hashable, Sendable, Identifiable {
         public var id: String
@@ -83,12 +84,21 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
             self.id = id; self.content = content; self.key = key; self.sentAt = sentAt
         }
     }
+    public struct HammersmithRunItem: Hashable, Sendable, Identifiable {
+        public var id: String
+        public var run: HammersmithRun
+        public var sentAt: Date?
+        public init(run: HammersmithRun, sentAt: Date? = Date()) {
+            self.id = run.id; self.run = run; self.sentAt = sentAt
+        }
+    }
 
     public var id: String {
         switch self {
         case .user(let i): return i.id
         case .assistant(let i): return i.id
         case .system(let i): return i.id
+        case .hammersmithRun(let i): return i.id
         }
     }
 
@@ -97,6 +107,7 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
         case .user(let i): i.sentAt
         case .assistant(let i): i.sentAt
         case .system(let i): i.sentAt
+        case .hammersmithRun(let i): i.sentAt
         }
     }
 
@@ -133,7 +144,7 @@ public struct Submission: Codable, Sendable, Hashable, Identifiable {
 }
 
 public struct SubmissionDraft: Sendable, Hashable {
-    public enum Kind: String, Sendable, Hashable { case message, queue }
+    public enum Kind: String, Sendable, Hashable { case message, queue, hammersmith }
     public var id: String
     public var prompt: String
     public var isGoal: Bool
@@ -172,6 +183,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case error(message: String)
         case status(text: String)
         case submission(Submission)
+        case hammersmithRun(submission: Submission?, run: HammersmithRun)
         case sync(snapshot: SyncSnapshot)
         case sessionRenamed(title: String)
         case ping
@@ -223,6 +235,19 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
             kind = .status(text: text)
         case "submission":
             kind = .submission(try c.decode(Submission.self, forKey: .submission))
+        case "hammersmith_run":
+            // Wire format: { type: "hammersmith_run", submission: { ...Submission
+            // fields..., job: { ...public job shape... } } }. The run lives on the
+            // submission object's `job` key; a missing job means the event is not
+            // actionable, so it decodes to .unknown like any unrecognised type.
+            struct JobWire: Decodable { let job: HammersmithRun? }
+            let submission = try c.decodeIfPresent(Submission.self, forKey: .submission)
+            let job = try c.decodeIfPresent(JobWire.self, forKey: .submission)?.job
+            if let job {
+                kind = .hammersmithRun(submission: submission, run: job)
+            } else {
+                kind = .unknown
+            }
         case "sync":
             // Server wire format: { type: "sync", streaming: Bool, partialText: String, tools: [...] }
             // We build a SyncSnapshot from the flat fields. partialText becomes an assistant item.
