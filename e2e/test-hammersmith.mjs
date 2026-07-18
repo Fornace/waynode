@@ -77,7 +77,7 @@ assert.equal(normalizeSubmissionMode(true), "goal", "legacy isGoal remains compa
 execFileSync("/bin/sh", ["-c", manifest.tasks[0].check], { cwd: repo, stdio: "pipe" });
 const pinnedRoot = join(root, "pinned-source");
 mkdirSync(pinnedRoot);
-const archive = join(process.cwd(), "vendor/hammersmith/hammersmith-0.1.0+296df004.tar.gz");
+const archive = join(process.cwd(), "vendor/hammersmith/hammersmith-0.1.0+8bec1dbb.tar.gz");
 execFileSync("tar", ["-xzf", archive, "-C", pinnedRoot]);
 const pinnedPythonPath = join(pinnedRoot, "hammersmith-0.1.0");
 const pinnedEntry = join(process.cwd(), "vendor/hammersmith/hammersmith-entry.py");
