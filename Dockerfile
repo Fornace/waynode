@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     python3 \
     python3-pip \
+    python3-setuptools \
     make \
     g++ \
     ca-certificates \
