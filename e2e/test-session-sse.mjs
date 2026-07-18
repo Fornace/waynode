@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { once } from "node:events";
-import { cleanupSseOnResponseClose } from "../routes/sessions.js";
+
+process.env.SESSION_SECRET = "test-session-value";
+process.env.ENCRYPTION_KEY = "0".repeat(64);
+
+const { cleanupSseOnResponseClose } = await import("../routes/sessions.js");
 
 const subscribers = new Set();
 const cleanupCounts = { ping: 0, agent: 0, hammersmith: 0 };
