@@ -48,6 +48,7 @@ public final class SessionStore {
     public var goalStatus: GoalStatus = GoalStatus()
     public var sessionMeta: Session?
     public var isPollingGoal: Bool = false
+    public var hammersmithCapability: HammersmithCapability?
 
     public var failedDraft: SubmissionDraft? { reducer.submissionState.failedDraft }
     public var isRunActive: Bool {
@@ -105,6 +106,9 @@ public final class SessionStore {
             for submission in state.submissions { reducer.reconcileSubmission(submission) }
             if state.active { startGoalPolling() }
         }
+
+        await refreshHammersmithJobs()
+        Task { await self.loadHammersmithCapability() }
 
         await connectStream()
     }

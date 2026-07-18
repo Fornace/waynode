@@ -8,6 +8,8 @@ import WaynodeCore
 
 struct ChatItemView: View {
     let item: ChatItem
+    var onStopHammersmith: ((String) -> Void)? = nil
+    @Environment(\.onStopHammersmith) private var envOnStopHammersmith
 
     var body: some View {
         switch item {
@@ -17,6 +19,8 @@ struct ChatItemView: View {
             AssistantMessageView(message: msg)
         case .system(let msg):
             SystemMessageView(message: msg)
+        case .hammersmithRun(let item):
+            HammersmithRunView(run: item.run, onStop: onStopHammersmith ?? envOnStopHammersmith)
         }
     }
 }
@@ -81,31 +85,7 @@ struct UserMessageView: View {
     }
 }
 
-/// Rounded-rect bubble with a slightly flattened bottom-right corner — the
-/// classic iMessage "tail" cue without drawing a full tail.
-struct UserBubbleShape: Shape {
-    var radius: CGFloat = 18
-
-    func path(in rect: CGRect) -> Path {
-        let r = rect
-        let tl = CGPoint(x: r.minX + radius, y: r.minY)
-        let tr = CGPoint(x: r.maxX - radius, y: r.minY)
-        let br = CGPoint(x: r.maxX, y: r.maxY)
-        let bl = CGPoint(x: r.minX + radius, y: r.maxY)
-        var p = Path()
-        p.move(to: CGPoint(x: r.minX, y: r.minY + radius))
-        p.addQuadCurve(to: tl, control: CGPoint(x: r.minX, y: r.minY))
-        p.addLine(to: tr)
-        p.addQuadCurve(to: CGPoint(x: r.maxX, y: r.minY + radius),
-                       control: CGPoint(x: r.maxX, y: r.minY))
-        p.addLine(to: br)
-        p.addLine(to: bl)
-        p.addQuadCurve(to: CGPoint(x: r.minX, y: r.maxY - radius),
-                       control: CGPoint(x: r.minX, y: r.maxY))
-        p.closeSubpath()
-        return p
-    }
-}
+// UserBubbleShape lives in HammersmithRunView.swift (line-cap manoeuvre).
 
 // MARK: - Assistant Message
 

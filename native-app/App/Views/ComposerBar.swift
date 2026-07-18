@@ -22,13 +22,19 @@ struct ComposerBar: View {
     let isAttaching: Bool
     let error: String?
     let isGoalActive: Bool
+    let hammersmithAvailable: Bool
     var isFocused: FocusState<Bool>.Binding
     var onAttach: () -> Void
     var onSend: (String, Bool) -> Void
+    var onSendHammersmith: (String) -> Void
     var onAbort: () -> Void
 
-    @State private var isGoalMode: Bool = false
+    private enum ComposerMode { case message, goal, hammersmith }
+    @State private var composerMode: ComposerMode = .message
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var isGoalMode: Bool { composerMode == .goal }
+    private var isHammersmithMode: Bool { composerMode == .hammersmith }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,6 +63,21 @@ struct ComposerBar: View {
                     GoalTensionGlyph(active: true, reduceMotion: reduceMotion)
                         .frame(width: 16, height: 16)
                     Text("Goal mode · Waynode keeps working until done")
+                        .font(.caption2)
+                    Spacer()
+                }
+                .foregroundStyle(.tint)
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            // Hammersmith-mode hint strip
+            if isHammersmithMode {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal")
+                        .font(.caption2)
+                    Text("Hammersmith · delegates this job to a verified swarm")
                         .font(.caption2)
                     Spacer()
                 }
@@ -106,7 +127,9 @@ struct ComposerBar: View {
 
                 Button {
                     Haptics.light()
-                    withAnimation(reduceMotion ? nil : .smooth) { isGoalMode.toggle() }
+                    withAnimation(reduceMotion ? nil : .smooth) {
+                        composerMode = isGoalMode ? .message : .goal
+                    }
                 } label: {
                     GoalTensionGlyph(active: isGoalMode, reduceMotion: reduceMotion)
                         .frame(width: 24, height: 24)
@@ -121,6 +144,29 @@ struct ComposerBar: View {
                 .accessibilityHint("Goal mode keeps working until the goal is complete")
                 .accessibilityIdentifier("composer.goal")
                 .frame(minWidth: 44, minHeight: 44)
+
+                if hammersmithAvailable {
+                    Button {
+                        Haptics.light()
+                        withAnimation(reduceMotion ? nil : .smooth) {
+                            composerMode = isHammersmithMode ? .message : .hammersmith
+                        }
+                    } label: {
+                        Image(systemName: isHammersmithMode ? "checkmark.seal.fill" : "checkmark.seal")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(isHammersmithMode ? Color.accentColor : Color.secondary)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                isHammersmithMode ? Color.accentColor.opacity(0.12) : Color.clear,
+                                in: Circle()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isHammersmithMode ? "Disable Hammersmith mode" : "Enable Hammersmith mode")
+                    .accessibilityHint("Hammersmith mode delegates this job to a verified swarm")
+                    .accessibilityIdentifier("composer.hammersmith")
+                    .frame(minWidth: 44, minHeight: 44)
+                }
 
                 // Send / Abort
                 sendOrAbortButton
@@ -150,7 +196,10 @@ struct ComposerBar: View {
         .animation(reduceMotion ? nil : .smooth, value: isSending)
         .animation(reduceMotion ? nil : .smooth, value: isRunActive)
         .animation(reduceMotion ? nil : .smooth, value: isGoalActive)
-        .animation(reduceMotion ? nil : .smooth, value: isGoalMode)
+        .animation(reduceMotion ? nil : .smooth, value: composerMode)
+        .onChange(of: hammersmithAvailable) { _, available in
+            if !available, isHammersmithMode { composerMode = .message }
+        }
     }
 
     // MARK: - Send / Abort
@@ -217,6 +266,7 @@ struct ComposerBar: View {
     private var placeholder: String {
         if isRunActive || isGoalActive { return "Add a follow-up…" }
         if isSending { return "Sending…" }
+        if isHammersmithMode { return "Describe the job…" }
         if isGoalMode { return "Describe the goal…" }
         return "Message"
     }
@@ -225,9 +275,14 @@ struct ComposerBar: View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         Haptics.light()
-        onSend(trimmed, isGoalMode)
-        if isGoalMode {
-            withAnimation(reduceMotion ? nil : .smooth) { isGoalMode = false }
+        if isHammersmithMode {
+            onSendHammersmith(trimmed)
+            withAnimation(reduceMotion ? nil : .smooth) { composerMode = .message }
+        } else {
+            onSend(trimmed, isGoalMode)
+            if isGoalMode {
+                withAnimation(reduceMotion ? nil : .smooth) { composerMode = .message }
+            }
         }
         // Keep focus so the keyboard stays open for the next message
         isFocused.wrappedValue = true

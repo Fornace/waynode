@@ -13,11 +13,20 @@ private struct EditMessageKey: EnvironmentKey {
     nonisolated(unsafe) static let defaultValue: ((String) -> Void)? = nil
 }
 
+private struct StopHammersmithKey: EnvironmentKey {
+    nonisolated(unsafe) static let defaultValue: ((String) -> Void)? = nil
+}
+
 extension EnvironmentValues {
     /// Set by ChatView; consumed by UserMessageView's context menu.
     var onEditMessage: ((String) -> Void)? {
         get { self[EditMessageKey.self] }
         set { self[EditMessageKey.self] = newValue }
+    }
+    /// Set by ChatView; consumed by HammersmithRunView's stop button.
+    var onStopHammersmith: ((String) -> Void)? {
+        get { self[StopHammersmithKey.self] }
+        set { self[StopHammersmithKey.self] = newValue }
     }
 }
 
@@ -88,6 +97,9 @@ struct ChatView: View {
                 composerText = text
                 composerFocused = true
             }
+            .environment(\.onStopHammersmith) { jobId in
+                Task { await store.stopHammersmith(jobId) }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ComposerBar(
                     text: $composerText,
@@ -96,6 +108,7 @@ struct ChatView: View {
                     isAttaching: isUploadingAttachments,
                     error: attachmentError ?? store.sendError,
                     isGoalActive: store.goalStatus.status == .active,
+                    hammersmithAvailable: store.hammersmithCapability?.available == true,
                     isFocused: $composerFocused,
                     onAttach: { showingAttachmentPicker = true },
                     onSend: { prompt, isGoal in
@@ -103,6 +116,17 @@ struct ChatView: View {
                             await store.sendMessage(prompt, isGoal: isGoal)
                             // Keep the user's draft when delivery fails so
                             // reconnecting never destroys work they typed.
+                            if store.sendError == nil {
+                                composerText = ""
+                                autoScroll = true
+                            } else {
+                                composerFocused = true
+                            }
+                        }
+                    },
+                    onSendHammersmith: { prompt in
+                        Task {
+                            await store.sendHammersmith(prompt)
                             if store.sendError == nil {
                                 composerText = ""
                                 autoScroll = true

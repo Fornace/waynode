@@ -46,6 +46,7 @@ extension SessionStore {
 
     public func retryFailedSubmission() async {
         guard var draft = reducer.submissionState.failedDraft else { return }
+        if draft.kind == .hammersmith { await submitHammersmith(draft); return }
         if shouldQueueSubmission { draft.kind = .queue }
         await submit(draft)
     }
