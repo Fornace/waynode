@@ -90,8 +90,13 @@ function assertPinnedLintClean(text, name) {
       env: { ...process.env, PYTHONPATH: pinnedPythonPath }, stdio: "pipe",
     });
   } catch (error) {
-    const lines = String(error.stdout || "").trim().split("\n").filter(Boolean);
-    assert.ok(lines.length > 0 && lines.every((line) => line.startsWith("lint: WARNING:")), "pinned lint has only advisory findings");
+    const stdout = String(error.stdout || "");
+    const stderr = String(error.stderr || "");
+    const lines = stdout.trim().split("\n").filter(Boolean);
+    assert.ok(
+      lines.length > 0 && lines.every((line) => line.startsWith("lint: WARNING:")),
+      `pinned lint has only advisory findings (status=${error.status} code=${error.code ?? "n/a"})\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+    );
   }
 }
 assertPinnedLintClean(manifestText, "short-manifest");
