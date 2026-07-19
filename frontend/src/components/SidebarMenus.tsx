@@ -8,10 +8,9 @@ interface OrgSwitcherProps {
   onSelect: (orgId: string) => void;
   onCreate: (name: string) => Promise<void>;
   onOpenSettings: () => void;
-  onToggleSidebar: () => void;
 }
 
-export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onOpenSettings, onToggleSidebar }: OrgSwitcherProps) {
+export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onOpenSettings }: OrgSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const [name, setName] = useState("");
@@ -64,7 +63,6 @@ export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onOpenSetti
         </button>}
       </div>}
     </div>
-    <button type="button" className="sidebar-collapse-btn icon-btn-ghost" onClick={onToggleSidebar} aria-label="Close worktree navigation">×</button>
   </div>;
 }
 

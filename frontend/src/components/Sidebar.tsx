@@ -39,7 +39,7 @@ interface SidebarProps {
 
 export function Sidebar({
   spaces, spacesLoading, sessions, activeSessionId, activeSpaceId,
-  onToggleSidebar, onSelectSession, onSpaceCreated, onSessionCreated, onSessionArchived, onSessionDeleted, onSpaceExpand,
+  onSelectSession, onSpaceCreated, onSessionCreated, onSessionArchived, onSessionDeleted, onSpaceExpand,
   githubConnected, gitlabConnected, githubAvailable, gitlabAvailable, isAdmin, onOpenAdmin, onOpenOrgSettings, onOpenAccountSettings,
   orgs, activeOrgId, onSelectOrg, onOrgCreated, user, onLogout,
 }: SidebarProps) {
@@ -181,7 +181,7 @@ export function Sidebar({
   return (
     <>
       <div className="sidebar">
-        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} onSelect={onSelectOrg} onCreate={handleCreateOrg} onOpenSettings={onOpenOrgSettings} onToggleSidebar={onToggleSidebar} />
+        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} onSelect={onSelectOrg} onCreate={handleCreateOrg} onOpenSettings={onOpenOrgSettings} />
 
         <div className="sidebar-content">
           <button type="button" className="new-space-btn" onClick={() => setShowPicker(true)}>
@@ -189,7 +189,7 @@ export function Sidebar({
             New worktree
           </button>
 
-          <div className="sidebar-section-label"><span>Worktrees</span><i aria-hidden="true" /></div>
+          <div className="sidebar-section-label"><span>Worktrees</span></div>
 
           {spacesLoading ? <div className="sidebar-empty" role="status">Loading worktrees…</div> : spaces.length === 0 && (
             <div className="sidebar-empty">No worktrees yet. Use New worktree to clone a repository.</div>
@@ -221,7 +221,7 @@ export function Sidebar({
                     </span>
                   )}
                   {space.session_count ? (
-                    <span style={{ fontSize: 10, color: "var(--text-faint)", background: "var(--bg-elevated)", padding: "1px 6px", borderRadius: "10px" }}>{space.session_count}</span>
+                    <span className="space-count">{space.session_count}</span>
                   ) : null}
                 </button>
                 {expanded && (
