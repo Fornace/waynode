@@ -30,9 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # The complete orchestrator and its workers/checks run inside this microVM.
 # Install the same immutable, locally vendored runtime as the server image.
-COPY vendor/hammersmith/hammersmith-0.1.0+8bec1dbb.tar.gz /tmp/hammersmith.tar.gz
+COPY vendor/hammersmith/hammersmith-0.1.0+1fcefd80.tar.gz /tmp/hammersmith.tar.gz
 COPY vendor/hammersmith/hammersmith-entry.py /tmp/hammersmith-entry.py
-RUN echo "0023a7b5ebbd13f02cb2528da252301f9c956c98e75843b76fc5dd59246da58a  /tmp/hammersmith.tar.gz" | sha256sum -c - && \
+RUN echo "d4a3fe2c0b9f3758b032cd71784187836ec420bde448ec14d0c4e5289ad75d49  /tmp/hammersmith.tar.gz" | sha256sum -c - && \
     python3 -m pip install --break-system-packages --no-deps --no-build-isolation /tmp/hammersmith.tar.gz && \
     install -m 0755 /tmp/hammersmith-entry.py /usr/local/bin/hammersmith && \
     test "$(hammersmith --version)" = "hammersmith 0.1.0" && \

@@ -1,16 +1,16 @@
 # Vendored Hammersmith runtime
 
 - Upstream: https://github.com/Fornace/hammersmith
-- Commit: `8bec1dbbb6b87a4f814521cc2a3ba76aafaaeb25`
+- Commit: `1fcefd80734aa87d56211b21aa9a9d2fccc75a35`
 - Package version: `0.1.0`
-- Source archive: `hammersmith-0.1.0+8bec1dbb.tar.gz`
+- Source archive: `hammersmith-0.1.0+1fcefd80.tar.gz`
 
 The archive is produced only from tracked files at the immutable commit:
 
 ```sh
 git archive --format=tar.gz --prefix=hammersmith-0.1.0/ \
-  -o hammersmith-0.1.0+8bec1dbb.tar.gz \
-  8bec1dbbb6b87a4f814521cc2a3ba76aafaaeb25 \
+  -o hammersmith-0.1.0+1fcefd80.tar.gz \
+  1fcefd80734aa87d56211b21aa9a9d2fccc75a35 \
   pyproject.toml README.md LICENSE.md NOTICE.md hammersmith
 ```
 
