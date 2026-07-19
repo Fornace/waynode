@@ -28,8 +28,8 @@ for (const [name, dockerfile] of [
   assert.match(dockerfile, /@earendil-works\/pi-coding-agent@0\.80\.7/);
   assert.match(dockerfile, /pi-codex-goal@0\.1\.36/);
   assert.match(dockerfile, /pi-lean-ctx@3\.9\.9/);
-  assert.match(dockerfile, /hammersmith-0\.1\.0\+1fcefd80\.tar\.gz/);
-  assert.match(dockerfile, /d4a3fe2c0b9f3758b032cd71784187836ec420bde448ec14d0c4e5289ad75d49/);
+  assert.match(dockerfile, /hammersmith-0\.1\.0\+86a8308d\.tar\.gz/);
+  assert.match(dockerfile, /1a8f44f26bf9d7cce0b7191c74fbfe8f2c3a96f7c01c0826c3ffba34964242c1/);
   assert.match(dockerfile, /hammersmith --version/);
   assert.match(dockerfile, /--no-build-isolation \/tmp\/hammersmith\.tar\.gz/);
   assert.doesNotMatch(dockerfile, /pip install(?:[^\n]*\s)hammersmith(?:\s|$)/);

@@ -30,9 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Pinned Hammersmith runtime. PyPI does not currently publish this package, so
 # both Waynode images install the reproducible tracked source archive instead.
-COPY vendor/hammersmith/hammersmith-0.1.0+1fcefd80.tar.gz /tmp/hammersmith.tar.gz
+COPY vendor/hammersmith/hammersmith-0.1.0+86a8308d.tar.gz /tmp/hammersmith.tar.gz
 COPY vendor/hammersmith/hammersmith-entry.py /tmp/hammersmith-entry.py
-RUN echo "d4a3fe2c0b9f3758b032cd71784187836ec420bde448ec14d0c4e5289ad75d49  /tmp/hammersmith.tar.gz" | sha256sum -c - && \
+RUN echo "1a8f44f26bf9d7cce0b7191c74fbfe8f2c3a96f7c01c0826c3ffba34964242c1  /tmp/hammersmith.tar.gz" | sha256sum -c - && \
     python3 -m pip install --break-system-packages --no-deps --no-build-isolation /tmp/hammersmith.tar.gz && \
     install -m 0755 /tmp/hammersmith-entry.py /usr/local/bin/hammersmith && \
     test "$(hammersmith --version)" = "hammersmith 0.1.0" && \
