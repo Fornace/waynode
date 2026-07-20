@@ -25,6 +25,11 @@ public actor SSEClient {
     private var task: Task<Void, Never>?
     private var continuation: AsyncStream<SSEEvent.Kind>.Continuation
 
+    /// Number of times the heartbeat watchdog has been reset. Observability
+    /// hook bumped on every received line, so a healthy-but-idle stream (SSE
+    /// comment keep-alives) cannot trip the 90s watchdog. Internal for tests.
+    private(set) var heartbeatResets: Int = 0
+
     /// The AsyncStream of decoded events. The store consumes this.
     public nonisolated func events() -> AsyncStream<SSEEvent.Kind> {
         eventStream
@@ -202,6 +207,23 @@ public actor SSEClient {
 
         onStateChange.yield(.connected)
 
+        try await consume(bytes.lines)
+        // Stream ended (server closed). Let the caller loop decide to reconnect.
+    }
+
+    /// Fold an async sequence of SSE wire lines into decoded events on the
+    /// continuation, resetting the heartbeat watchdog on EVERY received line.
+    /// Extracted from connectOnce() so the line-level behaviour — including
+    /// the handling of comment keep-alive lines (`: ka`) that carry no `data:`
+    /// payload — is unit-testable without a live URL session.
+    ///
+    /// Any received line (event data, a comment keep-alive, or a blank event
+    /// boundary) proves the connection is alive, so the watchdog is reset here
+    /// rather than only inside `if let event = parseEvent(...)`. The old code
+    /// reset solely on a successfully parsed event, which meant an idle-but-
+    /// healthy stream force-reconnected every 90s forever (and each reconnect
+    /// compounded the sync-duplicate bug).
+    func consume<S: AsyncSequence>(_ lines: S) async throws where S.Element == String {
         var buffer = ""
         var heartbeatTask = Task { [weak self] in
             // If no events for 90s, force-reconnect by invalidating the session.
@@ -210,22 +232,24 @@ public actor SSEClient {
                 await self?.forceReconnect()
             }
         }
-
         defer { heartbeatTask.cancel() }
 
-        for try await line in bytes.lines {
+        for try await line in lines {
             if Task.isCancelled { throw CancellationError() }
+
+            // Reset the watchdog on ANY received line — not only on a parsed
+            // event. Comment keep-alives parse to nil but still prove liveness.
+            heartbeatTask.cancel()
+            heartbeatTask = Task { [weak self] in
+                try? await sleep(seconds: 90)
+                if !Task.isCancelled { await self?.forceReconnect() }
+            }
+            heartbeatResets += 1
 
             if line.isEmpty {
                 // Event boundary — flush buffer if we have data.
                 if !buffer.isEmpty {
                     if let event = parseEvent(buffer) {
-                        // Reset heartbeat on any event.
-                        heartbeatTask.cancel()
-                        heartbeatTask = Task { [weak self] in
-                            try? await sleep(seconds: 90)
-                            if !Task.isCancelled { await self?.forceReconnect() }
-                        }
                         continuation.yield(event)
                     }
                     buffer = ""
@@ -234,7 +258,6 @@ public actor SSEClient {
             }
             buffer += line + "\n"
         }
-        // Stream ended (server closed). Let the caller loop decide to reconnect.
     }
 
     /// Parse the buffered lines of one SSE event into an SSEEvent.Kind.

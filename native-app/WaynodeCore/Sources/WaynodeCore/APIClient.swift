@@ -89,7 +89,13 @@ public actor APIClient {
         body: (some Encodable & Sendable)? = nil as EmptyBody?,
         query: [URLQueryItem]
     ) async throws -> Data {
-        var components = URLComponents(url: makeURL(path), resolvingAgainstBaseURL: false)!
+        // Guard instead of force-unwrapping: a malformed path could otherwise
+        // crash the process. URLComponents(url:resolvingAgainstBaseURL:) is
+        // effectively never nil for a URL(string:)-accepted URL, but a typed
+        // error is the correct defensive posture.
+        guard var components = URLComponents(url: makeURL(path), resolvingAgainstBaseURL: false) else {
+            throw APIError(statusCode: -1, message: "Invalid request URL")
+        }
         if !query.isEmpty { components.queryItems = query }
 
         var req = URLRequest(url: components.url ?? makeURL(path))
@@ -176,6 +182,22 @@ public actor APIClient {
         case error(String)
     }
 
+    /// Build the URLRequest for the clone-progress SSE. The token travels in
+    /// the Authorization header (NOT the query string) to keep it out of proxy
+    /// access logs — matching SSEClient's documented policy. The server's
+    /// `sseAuth` middleware (routes/spaces.js) accepts the header via
+    /// `requireAuth` → `resolveBearerUser` → `resolveApiToken` (verified in
+    /// lib/auth.mjs), so the header works on the clone-events route and the
+    /// query fallback is no longer needed. Pure (nonisolated) so it is
+    /// unit-testable without a live URL session.
+    public nonisolated func cloneProgressRequest(url: URL, token: String?) -> URLRequest {
+        var req = URLRequest(url: url)
+        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        return req
+    }
+
     /// Stream live clone progress for a space. The server's clone-events SSE
     /// replays buffered lines + terminal state (done/error), then streams live
     /// until the clone settles. If the clone already finished and the in-memory
@@ -186,13 +208,7 @@ public actor APIClient {
 
         return AsyncThrowingStream { continuation in
             let task = Task {
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
-                if let tok {
-                    components.queryItems = [URLQueryItem(name: "t", value: tok)]
-                }
-                var req = URLRequest(url: components.url ?? url)
-                req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+                let req = cloneProgressRequest(url: url, token: tok)
 
                 do {
                     let cfg = URLSessionConfiguration.ephemeral

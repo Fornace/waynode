@@ -14,10 +14,32 @@ extension SessionStore {
 
         do {
             let history = try await api.getMessages(sessionId)
-            if reducer.items.isEmpty {
-                reducer.loadHistory(history.map(ChatReducer.HistoryItem.init))
+            // Load history exactly once, INDEPENDENT of whether an optimistic
+            // submission has already appended a user row. Previously the gate
+            // `reducer.items.isEmpty` meant a send that beat GET /messages
+            // would skip the load while still marking didLoadHistory=true,
+            // hiding the entire prior transcript until re-open. We stage the
+            // persisted transcript in a throwaway reducer (reusing loadHistory)
+            // then splice it in FRONT of any in-flight optimistic items so the
+            // transcript order is preserved.
+            if !didLoadHistory {
+                var staged = ChatReducer()
+                staged.loadHistory(history.map(ChatReducer.HistoryItem.init))
+                if !staged.items.isEmpty {
+                    let offset = staged.items.count
+                    // Shift any streaming-item indices (msgIndex/toolIndex) by
+                    // the number of prepended rows so deltas keep landing on
+                    // the right item. During openStream these are typically
+                    // empty (SSE not connected yet), so this is usually a no-op.
+                    reducer.msgIndex = reducer.msgIndex.mapValues { $0 + offset }
+                    reducer.toolIndex = reducer.toolIndex.mapValues {
+                        ChatReducer.ToolLocation(itemIdx: $0.itemIdx + offset, blockIdx: $0.blockIdx)
+                    }
+                    reducer.items.insert(contentsOf: staged.items, at: 0)
+                    reducer.revision += 1
+                }
+                didLoadHistory = true
             }
-            didLoadHistory = true
             if let session = try? await api.getSession(sessionId) { sessionMeta = session }
         } catch {
             didLoadHistory = false
@@ -40,6 +62,14 @@ extension SessionStore {
         } else {
             reducer.discardFailedDraft()
             draft = SubmissionDraft(id: UUID().uuidString, prompt: trimmed, isGoal: isGoal, kind: kind)
+        }
+        // Archived sessions are read-only. Reject before any network attempt
+        // and route through the existing failedDraft path so the text is
+        // preserved for the composer. The server is being hardened to return
+        // 409 separately; this gate is defense-in-depth plus good UX.
+        if sessionMeta?.archived == true {
+            reject(draft, message: "This session is archived and can’t accept new messages")
+            return
         }
         await submit(draft)
     }
@@ -68,7 +98,16 @@ extension SessionStore {
     }
 
     private func submit(_ draft: SubmissionDraft) async {
-        guard !isSending else { return }
+        guard !isSending else {
+            // A previous submission is still in flight. Surface a busy
+            // rejection through the existing failedDraft path so the composer
+            // keeps the text instead of silently dropping it — the old
+            // `guard !isSending else { return }` left sendError==nil, and the
+            // caller clears the composer whenever sendError is nil, so the
+            // message vanished from composer, transcript, and failedDraft.
+            reject(draft, message: "A message is already being sent")
+            return
+        }
         isSending = true
         sendError = nil
         reducer.appendSubmission(draft)

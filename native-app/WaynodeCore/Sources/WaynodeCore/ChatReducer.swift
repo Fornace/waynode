@@ -289,9 +289,7 @@ public struct ChatReducer: Sendable, Equatable {
         for wire in snapshot.items {
             switch wire.role {
             case "assistant":
-                let mid = wire.id ?? UUID().uuidString
-                // Skip if we already have this message (avoid duplicates on reconnect).
-                if msgIndex[mid] != nil { continue }
+                // Build the block list for this wire item once.
                 var blocks: [Block] = []
                 if let txt = wire.text, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
                 if let th = wire.thinking, !th.isEmpty { blocks.append(.thinking(.init(text: th))) }
@@ -311,16 +309,25 @@ public struct ChatReducer: Sendable, Equatable {
                     }
                 }
                 let done = !snapshot.streaming
-                let idx = items.count
-                items.append(.assistant(.init(id: mid, blocks: blocks, done: done)))
-                msgIndex[mid] = idx
-                // Rebuild tool index for this message.
-                if case .assistant(let a) = items[idx] {
-                    for bi in a.blocks.indices {
-                        if case .tool(let tb) = a.blocks[bi] {
-                            toolIndex[tb.id] = ToolLocation(itemIdx: idx, blockIdx: bi)
-                        }
+                if let mid = wire.id {
+                    // Known id: dedup against existing messages on reconnect.
+                    if msgIndex[mid] != nil { continue }
+                    appendSyncedAssistant(id: mid, blocks: blocks, done: done)
+                } else if let idx = inFlightAssistantIndex() {
+                    // No id but an assistant item is still streaming: reconcile
+                    // the sync partial text into it instead of appending a
+                    // duplicate row. The server's partial-text WireItem omits
+                    // id (Chat.swift decoder hardcodes id:nil), so the old code
+                    // minted a random UUID that could never match msgIndex —
+                    // the dedup guard never fired and a second assistant row
+                    // appeared on every reconnect alongside the original.
+                    if let txt = wire.text, !txt.isEmpty {
+                        reconcileAssistantText(at: idx, with: txt)
                     }
+                } else {
+                    // No id and no in-flight assistant item: mint one (legacy
+                    // reconnect path where the client has nothing locally).
+                    appendSyncedAssistant(id: UUID().uuidString, blocks: blocks, done: done)
                 }
             case "user":
                 let mid = wire.id ?? UUID().uuidString
@@ -330,6 +337,48 @@ public struct ChatReducer: Sendable, Equatable {
                 items.append(.system(.init(id: mid, content: wire.content ?? "", key: nil)))
             default:
                 break
+            }
+        }
+    }
+
+    /// Index of the assistant item currently receiving a stream (the message
+    /// that is not yet done). Prefers currentAssistantId; falls back to the
+    /// last non-done assistant item.
+    private func inFlightAssistantIndex() -> Int? {
+        if let mid = currentAssistantId, let idx = msgIndex[mid],
+           case .assistant(let a) = items[idx], !a.done {
+            return idx
+        }
+        for i in stride(from: items.count - 1, through: 0, by: -1) {
+            if case .assistant(let a) = items[i], !a.done { return i }
+        }
+        return nil
+    }
+
+    /// Replace the streaming assistant item's text content with the sync
+    /// partial. The sync event carries the authoritative accumulated partial
+    /// for the current turn, so we overwrite (not append) the text block.
+    private mutating func reconcileAssistantText(at itemIdx: Int, with partial: String) {
+        guard case .assistant(var a) = items[itemIdx] else { return }
+        if let lastIdx = a.blocks.indices.last, case .text = a.blocks[lastIdx] {
+            a.blocks[lastIdx] = .text(.init(text: partial))
+        } else {
+            a.blocks.append(.text(.init(text: partial)))
+        }
+        items[itemIdx] = .assistant(a)
+    }
+
+    /// Append a reconstructed assistant item (from history/sync) and rebuild
+    /// the tool index for any tool blocks it carries.
+    private mutating func appendSyncedAssistant(id: String, blocks: [Block], done: Bool) {
+        let idx = items.count
+        items.append(.assistant(.init(id: id, blocks: blocks, done: done)))
+        msgIndex[id] = idx
+        if case .assistant(let a) = items[idx] {
+            for bi in a.blocks.indices {
+                if case .tool(let tb) = a.blocks[bi] {
+                    toolIndex[tb.id] = ToolLocation(itemIdx: idx, blockIdx: bi)
+                }
             }
         }
     }
