@@ -196,7 +196,7 @@
 
 /* ── Changes ── */
 .git-changes { display: flex; flex-direction: column; height: 100%; }
-.git-changes-count { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px; }
+.git-changes-count { font-size: 13px; font-weight: 600; color: var(--text-dim); letter-spacing: 0; }
 .git-mini-btn {
   font-size: 12px;
   padding: 5px 10px;
@@ -241,7 +241,7 @@
   cursor: default;
 }
 .git-file-row.selected { background: rgba(59, 130, 246, 0.08); }
-.git-file-row.active { background: rgba(89, 135, 239, 0.16); box-shadow: inset 2px 0 0 var(--accent); }
+.git-file-row.active { background: rgba(74, 124, 229, 0.28); box-shadow: none; }
 .git-file-row input[type="checkbox"] { accent-color: var(--accent); flex-shrink: 0; }
 .git-status-dot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;

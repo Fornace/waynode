@@ -16,6 +16,7 @@ export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onOpenSetti
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const activeOrg = orgs.find((org) => org.id === activeOrgId);
 
   useEffect(() => {
@@ -28,7 +29,12 @@ export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onOpenSetti
       }
     };
     document.addEventListener("mousedown", closeOutside);
-    return () => document.removeEventListener("mousedown", closeOutside);
+    return () => {
+      document.removeEventListener("mousedown", closeOutside);
+      // Restore focus to the trigger when the menu closes so it doesn't fall
+      // to <body> after the focused menu item unmounts (APG menu-button).
+      if (document.activeElement === document.body) triggerRef.current?.focus();
+    };
   }, [open]);
 
   const create = async () => {
@@ -47,7 +53,7 @@ export function OrgSwitcher({ orgs, activeOrgId, onSelect, onCreate, onOpenSetti
 
   return <div className="sidebar-header" onKeyDown={(event) => { if (event.key === "Escape" && open) { event.preventDefault(); setOpen(false); setShowInput(false); } }}>
     <div ref={ref} style={{ flex: 1, position: "relative" }}>
-      <button type="button" className="menu-trigger-row" style={{ fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 8, width: "100%", letterSpacing: "-0.3px", color: "var(--text)" }} onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="menu" aria-label="Choose organization">
+      <button type="button" ref={triggerRef} className="menu-trigger-row" style={{ fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 8, width: "100%", letterSpacing: "-0.3px", color: "var(--text)" }} onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="menu" aria-label="Choose organization">
         <WaynodeMark size={20} /><span>{activeOrg?.name || "Waynode"}</span><span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>▾</span>
       </button>
       {open && <div className="send-dropdown" role="menu" aria-label="Organizations" style={{ position: "absolute", top: "100%", bottom: "auto", left: 0, marginTop: 4 }}>
@@ -77,16 +83,22 @@ interface UserMenuProps {
 export function UserMenu({ user, isAdmin, onOpenAdmin, onOpenAccountSettings, onLogout }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     ref.current?.querySelector<HTMLElement>(".send-dropdown button")?.focus();
     const closeOutside = (event: MouseEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", closeOutside);
-    return () => document.removeEventListener("mousedown", closeOutside);
+    return () => {
+      document.removeEventListener("mousedown", closeOutside);
+      // Restore focus to the trigger when the menu closes so it doesn't fall
+      // to <body> after the focused menu item unmounts (APG menu-button).
+      if (document.activeElement === document.body) triggerRef.current?.focus();
+    };
   }, [open]);
   const run = (action: () => void) => { setOpen(false); action(); };
   return <div ref={ref} className="sidebar-footer" style={{ position: "relative" }} onKeyDown={(event) => { if (event.key === "Escape" && open) { event.preventDefault(); setOpen(false); } }}>
-    <button type="button" className="menu-trigger-row" onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, textAlign: "left" }} aria-expanded={open} aria-haspopup="menu" aria-label="Open account menu">
+    <button type="button" ref={triggerRef} className="menu-trigger-row" onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, textAlign: "left" }} aria-expanded={open} aria-haspopup="menu" aria-label="Open account menu">
       {user.avatar_url && <img className="user-avatar" src={user.avatar_url} alt="" />}<span className="user-name">{user.name}</span>
     </button>
     {open && <div className="send-dropdown" role="menu" aria-label="Account" style={{ position: "absolute", bottom: "100%", left: 0, marginBottom: 4 }}>
@@ -102,13 +114,23 @@ interface SessionMenuItem { label: string; onClick: () => void; danger?: boolean
 
 export function SessionMenu({ items, onClose }: { items: SessionMenuItem[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    // Capture the element that opened this menu (e.g. the trigger button) so
+    // focus can be returned to it when the menu unmounts instead of <body>.
+    triggerRef.current = document.activeElement as HTMLElement | null;
     ref.current?.querySelector<HTMLElement>("button")?.focus();
     const closeOutside = (event: MouseEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) onClose(); };
     const closeEscape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); onClose(); } };
     document.addEventListener("mousedown", closeOutside);
     document.addEventListener("keydown", closeEscape);
-    return () => { document.removeEventListener("mousedown", closeOutside); document.removeEventListener("keydown", closeEscape); };
+    return () => {
+      document.removeEventListener("mousedown", closeOutside);
+      document.removeEventListener("keydown", closeEscape);
+      // Restore focus to the trigger when the menu unmounts (APG menu-button /
+      // useEscapeToClose focus-restore pattern).
+      triggerRef.current?.focus();
+    };
   }, [onClose]);
   return <div className="send-dropdown session-menu" role="menu" aria-label="Session actions" ref={ref} onClick={(event) => event.stopPropagation()}>
     {items.map((item) => <button role="menuitem" key={item.label} className="send-dropdown-item" style={item.danger ? { color: "var(--red)" } : undefined} onClick={() => { item.onClick(); onClose(); }}>{item.label}</button>)}

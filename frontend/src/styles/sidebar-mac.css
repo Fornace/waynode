@@ -120,6 +120,7 @@
 .session-item:hover { background: rgba(255, 255, 255, 0.05); }
 .session-item.active { background: rgba(74, 124, 229, 0.28); color: var(--text); }
 .session-item.active::before { display: none; }
+.session-item.active::after { display: none; }
 
 /* Session ⋯: hover-reveal on pointer devices, quietly present on touch. */
 .session-menu-btn { font-size: 13px; padding: 2px 5px; }

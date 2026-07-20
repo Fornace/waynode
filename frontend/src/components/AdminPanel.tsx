@@ -108,6 +108,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                 <div className="admin-actions">
                   <select
                     className="model-select"
+                    aria-label={`Role for ${u.name}`}
                     value={u.role}
                     onChange={(e) => updateRole(u.id, e.target.value)}
                   >

@@ -115,14 +115,13 @@
   font-size: 14.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.2s ease;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.2);
+  transition: background 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
   border: 1px solid rgba(0,0,0,0.1);
 }
 
 .connect-btn:hover {
   background: var(--accent-hover);
-  transform: translateY(-1px);
 }
 
 .repo-search-wrap {
@@ -210,23 +209,19 @@
 }
 
 .repo-group-count {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-faint);
-  background: var(--bg-elevated);
-  padding: 1px 6px;
-  border-radius: 8px;
 }
 
 .repo-item {
   padding: 8px 16px;
   cursor: pointer;
   transition: background 0.1s;
-  border-left: 2px solid transparent;
 }
 
 .repo-item:hover {
-  background: var(--bg-hover);
-  border-left-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .repo-item-main {
@@ -317,7 +312,7 @@
 
 .form-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), inset 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2), inset 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .form-input::placeholder {
@@ -353,11 +348,11 @@
   color: #fff;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease;
   margin-top: 12px;
   border: 1px solid rgba(0,0,0,0.1);
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
 .repo-url-clone-btn:hover:not(:disabled) {

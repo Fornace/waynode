@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { RepoGroup } from "../types";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { GitHubIcon, GitLabIcon, SearchIcon } from "./RepoProviderIcons";
@@ -32,6 +32,21 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected,
   // Layer 1: Esc closes this picker; focus trapped so the terminal behind it
   // stops receiving keystrokes while the picker is open.
   useEscapeToClose(onClose, overlayRef);
+
+  // APG roving-tabIndex tabs (ported from GitSidebar.tsx moveTab). Visible
+  // tabs depend on which hosted-git providers are available on this install.
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabs: { key: Tab; label: ReactNode }[] = [
+    ...(githubAvailable ? [{ key: "github" as Tab, label: <><GitHubIcon /> GitHub</> }] : []),
+    ...(gitlabAvailable ? [{ key: "gitlab" as Tab, label: <><GitLabIcon /> GitLab</> }] : []),
+    { key: "url" as Tab, label: <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> URL</> },
+  ];
+  const moveTab = (event: ReactKeyboardEvent<HTMLButtonElement>, current: number) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : event.key === "ArrowRight" ? (current + 1) % tabs.length : (current - 1 + tabs.length) % tabs.length;
+    setTab(tabs[next].key); tabRefs.current[next]?.focus();
+  };
 
   useEffect(() => {
     if (tab === "github" && githubConnected) loadGithub();
@@ -147,34 +162,13 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected,
 
         <div className="repo-picker-tabs">
           <div className="tabs" role="tablist" aria-label="Repository source">
-            {githubAvailable && <button
-              type="button"
-              className={`tab-btn ${tab === "github" ? "active" : ""}`}
-              onClick={() => setTab("github")}
-              role="tab" aria-selected={tab === "github"}
-            >
-              <GitHubIcon /> GitHub
-            </button>}
-            {gitlabAvailable && <button
-              type="button"
-              className={`tab-btn ${tab === "gitlab" ? "active" : ""}`}
-              onClick={() => setTab("gitlab")}
-              role="tab" aria-selected={tab === "gitlab"}
-            >
-              <GitLabIcon /> GitLab
-            </button>}
-            <button
-              type="button"
-              className={`tab-btn ${tab === "url" ? "active" : ""}`}
-              onClick={() => setTab("url")}
-              role="tab" aria-selected={tab === "url"}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> 
-              URL
-            </button>
+            {tabs.map((t, i) => (
+              <button key={t.key} type="button" ref={(node) => { tabRefs.current[i] = node; }} role="tab" id={`repo-tab-${t.key}`} aria-selected={tab === t.key} aria-controls="repo-picker-panel" tabIndex={tab === t.key ? 0 : -1} className={`tab-btn ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key)} onKeyDown={(event) => moveTab(event, i)}>{t.label}</button>
+            ))}
           </div>
         </div>
 
+        <div id="repo-picker-panel" role="tabpanel" aria-labelledby={`repo-tab-${tab}`} tabIndex={0}>
         {error && <div className="repo-picker-error" role="alert"><span>{error}</span><button type="button" onClick={retryCurrent}>Try again</button></div>}
 
         {tab !== "url" && (
@@ -328,6 +322,7 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected,
             </button>
           </form>
         )}
+        </div>
       </div>
     </div>
   );

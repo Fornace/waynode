@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Org } from "../types";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { OrgBilling, type BillingInfo } from "./OrgBilling";
@@ -13,44 +13,49 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
   const [baseline, setBaseline] = useState<Record<string, string>>({});
   const [members, setMembers] = useState<any[]>([]);
   const [modelOptions, setModelOptions] = useState<{ id: string; name: string }[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false), [dirty, setDirty] = useState(false);
   const [nameInput, setNameInput] = useState(org.name);
   const [nameSaving, setNameSaving] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
-  const [inviteCopied, setInviteCopied] = useState(false);
-  const [inviteError, setInviteError] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false), [inviteError, setInviteError] = useState("");
   const [billingEnabled, setBillingEnabled] = useState(false);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
-  const [billingBusy, setBillingBusy] = useState<string | null>(null);
-  const [billingError, setBillingError] = useState("");
+  const [billingBusy, setBillingBusy] = useState<string | null>(null), [billingError, setBillingError] = useState("");
   const [billingLoading, setBillingLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false), [deleteError, setDeleteError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState("");
   const requestClose = useCallback(() => {
     if (!dirty || window.confirm("Discard unsaved organization settings?")) onClose();
   }, [dirty, onClose]);
   useEscapeToClose(requestClose);
 
+  // APG roving-tabIndex tabs (ported from GitSidebar.tsx moveTab).
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabs: { key: typeof tab; label: string }[] = [{ key: "general", label: "General" }, ...(canEdit ? [{ key: "integrations" as const, label: "Integrations" }] : []), { key: "members", label: "Members" }, ...(billingEnabled && isAdmin ? [{ key: "billing" as const, label: "Billing" }] : [])];
+  const moveTab = (event: ReactKeyboardEvent<HTMLButtonElement>, current: number) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : event.key === "ArrowRight" ? (current + 1) % tabs.length : (current - 1 + tabs.length) % tabs.length;
+    setTab(tabs[next].key); tabRefs.current[next]?.focus();
+  };
+
   useEffect(() => { setNameInput(org.name); }, [org.name]);
-  useEffect(() => {
+  const loadOrgData = useCallback(() => {
+    setLoading(true);
+    setLoadError("");
     Promise.all([
       fetch(`/api/orgs/${org.id}/settings`, { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
       fetch(`/api/orgs/${org.id}/members`, { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
       fetch("/api/models", { headers: getAuthHeaders(), credentials: "include" }).then(r => r.json()),
     ]).then(([s, m, modelData]) => {
-      setSettings(s);
-      setBaseline(s);
-      setMembers(m);
-      setModelOptions(modelData.models || []);
-    });
+      setSettings(s); setBaseline(s); setMembers(m); setModelOptions(modelData.models || []);
+    }).catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load organization settings."))
+      .finally(() => setLoading(false));
   }, [org.id]);
-  useEffect(() => {
-    fetch("/api/billing/enabled").then(r => r.json()).then(d => setBillingEnabled(!!d.enabled)).catch(() => setBillingEnabled(false));
-  }, []);
-  useEffect(() => {
-    if (!billingEnabled || !isAdmin) return;
+  useEffect(() => { loadOrgData(); }, [loadOrgData]);
+  useEffect(() => { fetch("/api/billing/enabled").then(r => r.json()).then(d => setBillingEnabled(!!d.enabled)).catch(() => setBillingEnabled(false)); }, []);
+  const loadBilling = useCallback(() => {
     setBillingLoading(true);
     setBillingError("");
     fetch(`/api/orgs/${org.id}/billing`, { headers: getAuthHeaders(), credentials: "include" })
@@ -59,6 +64,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
       .catch(error => setBillingError(error instanceof Error ? error.message : "Could not load billing"))
       .finally(() => setBillingLoading(false));
   }, [org.id, billingEnabled, isAdmin]);
+  useEffect(() => { if (billingEnabled && isAdmin) loadBilling(); }, [loadBilling]);
   const startCheckout = async (plan: string) => {
     setBillingError("");
     setBillingBusy(plan);
@@ -141,6 +147,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
     const name = nameInput.trim();
     if (!name || name === org.name) return;
     setNameSaving(true);
+    setActionError("");
     try {
       const res = await fetch(`/api/orgs/${org.id}`, {
         method: "PATCH",
@@ -148,7 +155,10 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
         body: JSON.stringify({ name }),
       });
       const updated = await res.json();
+      if (!res.ok) throw new Error(updated.error || "Could not rename the organization.");
       onRenamed(updated);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "Could not rename the organization.");
     } finally {
       setNameSaving(false);
     }
@@ -197,17 +207,15 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
           <button className="btn-secondary" onClick={requestClose}>← Back</button>
         </div>
         <div className="tabs" style={{ marginTop: 14 }} role="tablist" aria-label="Organization settings sections">
-          <button role="tab" aria-selected={tab === "general"} className={`tab-btn ${tab === "general" ? "active" : ""}`} onClick={() => setTab("general")}>General</button>
-          {canEdit && <button role="tab" aria-selected={tab === "integrations"} className={`tab-btn ${tab === "integrations" ? "active" : ""}`} onClick={() => setTab("integrations")}>Integrations</button>}
-          <button role="tab" aria-selected={tab === "members"} className={`tab-btn ${tab === "members" ? "active" : ""}`} onClick={() => setTab("members")}>Members</button>
-          {billingEnabled && isAdmin && (
-            <button role="tab" aria-selected={tab === "billing"} className={`tab-btn ${tab === "billing" ? "active" : ""}`} onClick={() => setTab("billing")}>Billing</button>
-          )}
+          {tabs.map((t, i) => (
+            <button key={t.key} ref={(node) => { tabRefs.current[i] = node; }} role="tab" id={`org-tab-${t.key}`} aria-selected={tab === t.key} aria-controls="org-settings-panel" tabIndex={tab === t.key ? 0 : -1} className={`tab-btn ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key)} onKeyDown={(event) => moveTab(event, i)}>{t.label}</button>
+          ))}
         </div>
       </div>
 
-      <div className="settings-body">
+      <div className="settings-body" id="org-settings-panel" role="tabpanel" aria-labelledby={`org-tab-${tab}`} tabIndex={0}>
         {actionError && <div className="workspace-error settings-inline-error" role="alert"><span>Action failed</span><p>{actionError}</p><button type="button" onClick={() => setActionError("")}>Dismiss</button></div>}
+        {loadError && <div className="workspace-error settings-inline-error" role="alert"><span>Couldn’t load settings</span><p>{loadError}</p><button type="button" onClick={loadOrgData}>Try again</button></div>}
         {tab === "general" && (
           <div className="settings-section">
             <div className="settings-section-title">Identity</div>
@@ -294,34 +302,25 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
                   <div className="field-row-head">
                     <span className="field-row-label">Obsidian CouchDB Remote URL</span>
                   </div>
-                  <input
-                    className="form-input"
-                    placeholder="http://couchdb:5984/obsidian-org"
-                    value={settings.obsidian_url || ""}
-                    onChange={(e) => { setSettings({ ...settings, obsidian_url: e.target.value }); setDirty(true); }}
-                  />
+                  <input className="form-input" aria-label="Obsidian CouchDB remote URL"
+                    placeholder="http://couchdb:5984/obsidian-org" value={settings.obsidian_url || ""}
+                    onChange={(e) => { setSettings({ ...settings, obsidian_url: e.target.value }); setDirty(true); }} />
                 </div>
                 <div className="field-row">
                   <div className="field-row-head">
                     <span className="field-row-label">Honcho Server URL</span>
                   </div>
-                  <input
-                    className="form-input"
-                    placeholder="http://honcho:7432"
-                    value={settings.honcho_url || ""}
-                    onChange={(e) => { setSettings({ ...settings, honcho_url: e.target.value }); setDirty(true); }}
-                  />
+                  <input className="form-input" aria-label="Honcho server URL"
+                    placeholder="http://honcho:7432" value={settings.honcho_url || ""}
+                    onChange={(e) => { setSettings({ ...settings, honcho_url: e.target.value }); setDirty(true); }} />
                 </div>
                 <div className="field-row">
                   <div className="field-row-head">
                     <span className="field-row-label">Honcho Workspace</span>
                   </div>
-                  <input
-                    className="form-input"
-                    placeholder="default"
-                    value={settings.honcho_workspace || ""}
-                    onChange={(e) => { setSettings({ ...settings, honcho_workspace: e.target.value }); setDirty(true); }}
-                  />
+                  <input className="form-input" aria-label="Honcho workspace"
+                    placeholder="default" value={settings.honcho_workspace || ""}
+                    onChange={(e) => { setSettings({ ...settings, honcho_workspace: e.target.value }); setDirty(true); }} />
                 </div>
               </div>
             </div>
@@ -338,7 +337,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
                 </div>
                 {!isAdmin ? <span className="field-row-hint">Only organization admins can create invites.</span> : inviteUrl ? (
                   <div style={{ display: "flex", gap: 8 }}>
-                    <input className="form-input" readOnly value={inviteUrl} onClick={(e) => (e.target as HTMLInputElement).select()} />
+                    <input className="form-input" readOnly aria-label="Organization invite link" value={inviteUrl} onClick={(e) => (e.target as HTMLInputElement).select()} />
                     <button className="btn-secondary" onClick={copyInvite}>{inviteCopied ? "Copied!" : "Copy"}</button>
                   </div>
                 ) : (
@@ -349,9 +348,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
             </div>
 
             <div className="settings-section-title" style={{ marginTop: 16 }}>Members · {members.length}</div>
-            {members.length === 0 ? (
-              <div className="kv-empty">No members yet.</div>
-            ) : (
+            {loading ? <div className="kv-empty" role="status">Loading members…</div> : loadError ? null : members.length === 0 ? <div className="kv-empty">No members yet.</div> : (
               <div className="kv-list">
                 {members.map(m => (
                   <div key={m.id} className="kv-row">
@@ -380,7 +377,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
         )}
 
         {tab === "billing" && billingLoading && <div className="kv-empty">Loading billing…</div>}
-        {tab === "billing" && billingError && !billing && <div className="workspace-error" role="alert"><span>Billing unavailable</span><p>{billingError}</p></div>}
+        {tab === "billing" && billingError && !billing && <div className="workspace-error" role="alert"><span>Billing unavailable</span><p>{billingError}</p><button type="button" onClick={loadBilling}>Try again</button></div>}
         {tab === "billing" && billing && (
           <OrgBilling billing={billing} busy={billingBusy} error={billingError} onCheckout={startCheckout} onOpenPortal={openPortal} />
         )}

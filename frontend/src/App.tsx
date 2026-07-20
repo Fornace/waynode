@@ -30,7 +30,7 @@ export function AppContent() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [orgsLoading, setOrgsLoading] = useState(true);
-  const [spacesLoading, setSpacesLoading] = useState(false);
+  const [spacesLoading, setSpacesLoading] = useState(true);
   const { spaceSeg, sessionSeg } = useParams<{ spaceSeg?: string; sessionSeg?: string }>();
   const urlSpaceShort = parseSlugSegment(spaceSeg);
   const urlSessionShort = parseSlugSegment(sessionSeg);
@@ -144,6 +144,25 @@ export function AppContent() {
       const session = await api.sessions.create(space.id, { title: "First task" });
       handleSessionCreated(session);
       handleSelectSession(session, space);
+
+      const PROG = "clone-progress";
+      store.injectProgress(session.id, PROG, `Cloning \`${repoUrl}\` from branch \`${branch || "main"}\`…`);
+      const es = api.spaces.cloneStream(space.id);
+      es.onmessage = (ev) => {
+        try {
+          const m = JSON.parse(ev.data);
+          if (m.type === "progress") store.injectProgress(session.id, PROG, `Cloning… ${m.line}`);
+          else if (m.type === "done") { store.injectProgress(session.id, PROG, `Cloned \`${space.repo_name}\`. The worktree is ready.`); es.close(); }
+          else if (m.type === "error") { store.injectProgress(session.id, PROG, `✗ Clone failed: ${m.error || "unknown error"}`); es.close(); }
+        } catch {
+          store.injectProgress(session.id, PROG, "Clone progress could not be read. The clone may still be running.");
+          es.close();
+        }
+      };
+      es.onerror = () => {
+        store.injectProgress(session.id, PROG, "Clone progress disconnected. The clone may still be running; refresh the worktree before retrying.");
+        es.close();
+      };
     } catch (error) {
       setOnboardingError(error instanceof Error ? error.message : "Could not create that worktree.");
       throw error;

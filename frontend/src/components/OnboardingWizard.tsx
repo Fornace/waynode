@@ -25,6 +25,7 @@ export function OnboardingWizard({ githubConnected, gitlabConnected, cloning, er
   const hammersmithState = capabilityError ? "request-error"
     : !capability ? "checking"
       : capability.available ? "ready" : capability.state || "unsupported";
+  const environmentReady = hammersmithState === "ready" && githubConnected;
 
   const checkHammersmith = async () => {
     setCapability(null);
@@ -61,6 +62,9 @@ export function OnboardingWizard({ githubConnected, gitlabConnected, cloning, er
         {!complete ? <>
           <h1 id="onboarding-title">Get the workspace ready</h1>
           <p className="onboarding-intro">Prepare verified delegation and GitHub access, then clone the repository for this durable worktree.</p>
+          {environmentReady ? (
+            <div className="onboarding-env-ready">Environment ready — Hammersmith and GitHub are connected.</div>
+          ) : (
           <div className="onboarding-guides">
             <article className="onboarding-guide" aria-labelledby="hammersmith-guide-title">
               <img src={hammersmithSetup} alt="" />
@@ -101,6 +105,7 @@ export function OnboardingWizard({ githubConnected, gitlabConnected, cloning, er
               </details>
             </article>
           </div>
+          )}
 
           {connected.length > 0 && <div className="onboarding-connected">Connected: {connected.join(" · ")}</div>}
           <form className="onboarding-form" onSubmit={clone}>
