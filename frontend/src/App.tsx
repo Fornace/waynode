@@ -17,12 +17,10 @@ import { api } from "./api/client";
 import * as store from "./lib/sessionStore";
 import { slugWithId, parseSlugSegment } from "./lib/slugs";
 import type { Space, Session, Org } from "./types";
-
 function getAuthHeaders(): Record<string, string> {
   const devToken = localStorage.getItem("waynode-dev-token");
   return devToken ? { "x-dev-token": devToken } : {};
 }
-
 export function AppContent() {
   const { user, availableProviders, terminalCapability, loading, error: authError, retry: retryAuth, logout } = useAuth();
   const [orgs, setOrgs] = useState<Org[]>([]);
@@ -49,7 +47,6 @@ export function AppContent() {
   const [onboardingError, setOnboardingError] = useState("");
   const [onboardingCloning, setOnboardingCloning] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
-
   useEffect(() => {
     if (!user) {
       setOrgs([]);
@@ -84,7 +81,6 @@ export function AppContent() {
         .catch((error) => setWorkspaceError(error instanceof Error ? error.message : "Could not load organizations."))
         .finally(() => setOrgsLoading(false));
   }, [user]);
-
   const loadSpaces = useCallback(async () => {
     if (!activeOrgId) return;
     setSpacesLoading(true);
@@ -100,11 +96,9 @@ export function AppContent() {
       setSpacesLoading(false);
     }
   }, [activeOrgId]);
-
   useEffect(() => {
     if (user && activeOrgId) loadSpaces();
   }, [user, activeOrgId, loadSpaces]);
-
   const refreshRepoStatus = () => {
     fetch("/api/repos/status", { headers: getAuthHeaders(), credentials: "include" })
       .then((r) => r.json())

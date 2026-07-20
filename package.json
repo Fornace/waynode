@@ -36,8 +36,15 @@
     "test:session-history": "node e2e/test-session-history.mjs",
     "test:session-sse": "node e2e/test-session-sse.mjs",
     "test:hammersmith": "node e2e/test-hammersmith.mjs",
+    "test:session-lifecycle": "node e2e/test-session-lifecycle.mjs",
+    "test:stream-reconnect": "node e2e/test-session-stream-reconnect.mjs",
+    "test:billing-edges": "node e2e/test-billing-edges.mjs",
+    "test:design-language": "node e2e/test-design-language.mjs",
+    "test:onboarding-states": "node e2e/test-onboarding-states.mjs",
+    "test:a11y-contract": "node e2e/test-a11y-contract.mjs",
+    "test:composer-behaviors": "node e2e/test-composer-behaviors.mjs",
     "check:file-lengths": "node scripts/check-file-lengths.mjs",
-    "test": "npm run check:file-lengths && npm run test:deploy-contract && npm run test:public-trust && npm run test:provider && npm run test:session-store && npm run test:session-history && npm run test:session-sse && npm run test:hammersmith && npm run test:billing && npm run test:trial-eligibility && npm run test:billing-reservations && npm run test:billing-hammersmith && npm run test:terminal && npm run test:terminal-capability && npm run test:sandbox-terminal && npm run test:sandbox-queue && npm run test:agent-submissions && npm run test:sandbox-security && npm run test:hosted-git-credentials && npm run test:git-discard && npm run test:clone-policy && npm run test:space-authorization && npm run test:app-store && npm run test:auth && npm run test:oauth-tokens && npm run test:account-deletion && npm run test:content && npm run typecheck"
+    "test": "npm run check:file-lengths && npm run test:auth && npm run test:oauth-tokens && npm run test:deploy-contract && npm run test:account-deletion && npm run test:billing && npm run test:billing-reservations && npm run test:billing-hammersmith && npm run test:app-store && npm run test:content && npm run test:public-trust && npm run test:terminal && npm run test:terminal-capability && npm run test:sandbox-terminal && npm run test:sandbox-queue && npm run test:agent-submissions && npm run test:sandbox-security && npm run test:hosted-git-credentials && npm run test:git-discard && npm run test:clone-policy && npm run test:space-authorization && npm run test:trial-eligibility && npm run test:provider && npm run test:session-store && npm run test:session-history && npm run test:session-sse && npm run test:hammersmith && npm run test:session-lifecycle && npm run test:stream-reconnect && npm run test:billing-edges && npm run test:design-language && npm run test:onboarding-states && npm run test:a11y-contract && npm run test:composer-behaviors && npm run typecheck"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.11",

@@ -1,5 +1,4 @@
 import Foundation
-
 // MARK: - ChatReducer
 //
 // A pure value type that folds SSE events into a transcript. No I/O, no
@@ -19,7 +18,6 @@ import Foundation
 //   • error stores a terminal error for the turn.
 //   • Duplicate message_start for the same messageId is ignored (server retry).
 //   • Events for unknown messageIds (late tool_delta) are dropped silently.
-
 public struct ChatReducer: Sendable, Equatable {
     // The transcript — user, assistant, and system rows in order.
     public internal(set) var items: [ChatItem] = []
@@ -27,32 +25,27 @@ public struct ChatReducer: Sendable, Equatable {
     public internal(set) var msgIndex: [String: Int] = [:]
     // toolCallId → location of the tool block inside items.
     public internal(set) var toolIndex: [String: ToolLocation] = [:]
-
     /// Monotonically increasing counter bumped on every content mutation.
     /// Used by SwiftUI views to detect streaming updates (where item count
     /// and IDs stay the same but content grows). Observing this drives
     /// auto-scroll-to-bottom during streaming.
     public internal(set) var revision: Int = 0
-
     /// Location of a tool block within the transcript.
     public struct ToolLocation: Hashable, Sendable {
         public var itemIdx: Int
         public var blockIdx: Int
     }
-
     // Transient turn state
     public private(set) var isStreaming: Bool = false
     public private(set) var statusText: String?
     public private(set) var lastError: String?
     public private(set) var turnEnded: Bool = false
     public private(set) var submissionState = ChatSubmissionState()
-
     // The id of the assistant message currently receiving deltas. Cleared on
     // message_end. Used to resolve text_delta events that omit messageId
     // (defensive: the server always sends it, but the web client falls back
     // to "last assistant message").
     public private(set) var currentAssistantId: String?
-
     public init() {}
 
     // MARK: - User message (optimistic, before sending)
