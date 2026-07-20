@@ -154,14 +154,32 @@ public actor WSClient {
         (outputStream, outputContinuation) = AsyncStream.makeStream(of: TerminalMessage.self)
     }
 
-    public func connect() {
-        guard state == .disconnected || isFailure else { return }
-        transition(to: .connecting)
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+    /// Build the WebSocket transport request for `url`: rewrite the scheme
+    /// (https→wss, http→ws) and attach the bearer header. Returns nil instead
+    /// of force-unwrapping when URLComponents cannot decompose the URL, so a
+    /// malformed terminal URL becomes a clean connect failure rather than a
+    /// crash. Static + nonisolated so it is unit-testable without an instance.
+    public static func terminalRequest(for url: URL, token: String?) -> URLRequest? {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
         if components.scheme == "https" { components.scheme = "wss" }
         else if components.scheme == "http" { components.scheme = "ws" }
         var request = URLRequest(url: components.url ?? url)
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        return request
+    }
+
+    public func connect() {
+        guard state == .disconnected || isFailure else { return }
+        transition(to: .connecting)
+        // Guard-let the request build instead of the old
+        // `URLComponents(url: url, resolvingAgainstBaseURL: false)!` so a
+        // non-decomposable terminal URL surfaces as a clean failure state.
+        guard let request = Self.terminalRequest(for: url, token: token) else {
+            transition(to: .failed("Invalid terminal URL"))
+            return
+        }
 
         let transport = transportFactory(request)
         self.transport = transport
