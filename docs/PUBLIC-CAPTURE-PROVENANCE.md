@@ -1,40 +1,46 @@
-# Public product capture provenance
+# Public product capture provenance — retirement note
 
-The landing-page images are captures of the production-built Waynode React
-application, not composited mockups. They use a temporary local server and a
-temporary Git repository so no production user, repository, token, or URL is
-present in public assets.
+The raster landing-page captures described by this document were **retired in
+the flagship release** and deleted from `frontend/public/marketing/`. The
+landing no longer shows screenshots. It teaches with explanatory pure-CSS/SVG
+frames — mockups that explain rather than imitate, per the Public web section
+of `docs/CRAFT_DIRECTION.md`.
 
-## Seeded state
+## What replaced the captures
+
+One continuous narrative — the life of a single job — in five frames:
+composer with the `message | goal | hammersmith` tri-selector, a verified
+Hammersmith run with plain-text check counts, the session beside its review
+inspector and one simplified diff, the same session on desktop and phone
+outlines, and the deployment facts.
+
+The seeded cast documented below lives on inside those frames:
 
 - Organization: `Waynode Lab`
 - Repository: `example/checkout-service`
 - Branch: `main`
 - Session: `Recover checkout retries`
-- User instruction: make checkout retries idempotent and add timeout coverage
-- Worktree: three tracked files changed after a real initial Git commit
-- Review: the source diff is loaded through Waynode's Git API and inspector
+- Job: make checkout retries idempotent and add timeout coverage
+- Worktree: three changed files
 
-The assistant transcript is fixed seeded content. That keeps the capture
-deterministic; it is not presented as a live run or a benchmark result. Every
-visible repository, branch, file count, changed file, and diff comes from the
-same temporary worktree.
+## Historical record
 
-## Assets
+Before retirement, the landing used real captures of the production-built
+React app, taken against a temporary local server and a temporary Git
+repository so no production user, repository, token, or URL appeared in
+public assets. The assistant transcript was fixed seeded content — never
+presented as a live run or a benchmark.
 
-| Asset | Viewport | Product state |
+| Retired asset | Viewport | Product state |
 |---|---:|---|
 | `worktree-session-desktop.png` | 1440 × 900 | Session, repository identity, and three-file Review affordance |
 | `worktree-session-phone.png` | 390 × 844 | The same session in the compact web workbench |
 | `worktree-review-tablet.png` | 768 × 1024 | Full-screen Review with one of the three real diffs open |
+| `screenshot-chat.png`, `screenshot-spaces.png`, `screenshot-terminal.png` | — | Earlier marketing captures, unused at retirement |
 
-The capture gate asserts that every viewport has no page-level horizontal
-overflow. `e2e/test-content.mjs` prevents a landing change from referencing a
-missing image and keeps public plan cards out of the page.
+## If raster captures ever return
 
-## Recapture requirements
-
-Any replacement must:
+Any future public capture must follow the original recapture requirements:
 
 1. Build the current frontend first.
 2. Use an isolated non-production repository and account.

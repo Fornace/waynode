@@ -8,6 +8,11 @@ Docker image requires Stripe or these tiers.
 All numbers below are a starting proposal for human review. They are not
 final — this file exists so the reasoning is legible, not just a table.
 
+Framing: self-hosted Waynode is free and open-source under the MIT license —
+you bring your own model keys and infrastructure, and no part of this pricing
+applies. Hosted Waynode Cloud is the convenience option: the same open-source
+stack, operated for you, with usage quotas and Stripe billing attached.
+
 ## Hosted activation boundary
 
 Billing is disabled by default, including if a self-hosted operator happens
@@ -139,6 +144,20 @@ gets N concurrent, Starter/Pro get fewer" is a policy this app would need to
 add, not something that exists. Listed as directionally buildable, not
 currently enforced.
 
+### Hammersmith verified-swarm tier — $8.99/mo (LIVE)
+
+Alongside the three team tiers, hosted offers a standalone **Hammersmith**
+plan (`PLANS.hammersmith` in `lib/billing-state.mjs`): **$8.99/mo, 5,000,000
+tokens, 2 GB storage, 1 seat**. It unlocks managed Hammersmith verified-swarm
+runs for one organization's sessions on hosted — send a message in
+hammersmith mode and it is executed as a job description whose tasks pass
+only when their executed checks exit 0. This tier is **live**: the Stripe
+product and recurring monthly price exist in live mode
+(`STRIPE_PRICE_HAMMERSMITH`, created 2026-07-19; see the Stripe ops section
+of `docs/MISSION-REPORT-PHASE-2.md`), checkout and webhooks resolve it, and
+`hostedHammersmithEntitled()` gates the send path. Self-hosted installs never
+see it — billing stays disabled without `WAYNODE_DEPLOYMENT=hosted`.
+
 ### Margin math (worst case: 100% token quota utilized, at standard/list rate)
 
 ```
@@ -248,20 +267,34 @@ therefore remains disabled until it has a reservation/metering implementation.
 
 ## 6. What still needs a human / isn't built
 
-- Create the actual Stripe account + 3 recurring monthly Prices for
-  Starter/Pro/Team, and a webhook endpoint pointed at
-  `https://waynode.fornace.net/api/billing/webhook`.
-- Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-  `STRIPE_PRICE_STARTER/PRO/TEAM` in the hosted deployment's env — never in
-  the self-host `.env.example` as anything but blank.
-- Add DB-backed token reservations and durable per-session meter cursors. Chat
-  now preflights active/trialing state and included usage, but a concurrent or
-  in-flight turn can still overshoot before its end-of-turn meter is recorded.
+- ~~Create the actual Stripe account + 3 recurring monthly Prices for
+  Starter/Pro/Team~~ **COMPLETED 2026-07-19** — live-mode Stripe has the
+  three core prices configured, plus the Hammersmith product and its $8.99/mo
+  recurring price (`STRIPE_PRICE_HAMMERSMITH`); webhooks resolve all four.
+  See `docs/MISSION-REPORT-PHASE-2.md` (Stripe ops). Remaining human item in
+  this area: point the webhook endpoint at
+  `https://waynode.fornace.net/api/billing/webhook` if not already wired, and
+  keep the signing secret current.
+- ~~Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `STRIPE_PRICE_STARTER/PRO/TEAM` in the hosted deployment's env~~
+  **COMPLETED** on the deploy host (root-owned `.env`, mode `0600`) —
+  including `STRIPE_PRICE_HAMMERSMITH`. Never set these in the self-host
+  `.env.example` as anything but blank.
+- ~~Add DB-backed token reservations~~ **COMPLETED** —
+  `reserveTokenQuota()` in `lib/billing-state.mjs` now holds an atomic,
+  TTL-expiring reservation per in-flight turn in the
+  `token_quota_reservations` table, so concurrent turns can no longer
+  overshoot the included quota before their end-of-turn meter lands. Still
+  open: durable per-session meter cursors (the RPC path diffs an in-memory
+  per-handle token total), so a server restart mid-turn can under-count that
+  turn's usage.
 - Decide whether/when to add Stripe metered billing for token overage (§3).
+  Not built — heavy users who exhaust the included quota currently stop,
+  rather than paying metered overage.
 - Priority queueing and concurrency-cap differentiators (§3 footnotes) are
   sold in the tier table but not implemented in `lib/agent-manager.mjs` —
   build before or shortly after launch, or drop them from the tier copy.
 - Re-verify pricing before launch: the Qwen3.7 Max promo rate expires
   2026-07-22 and DashScope's own page was last updated 2026-06-26 — reconfirm
-  the standard rate hasn't also changed by the time Stripe products are
-  actually created.
+  the standard rate hasn't also changed by the time more Stripe products are
+  created.
