@@ -11,37 +11,20 @@ let _idSeq = 0;
 const uid = () => `c${Date.now()}-${_idSeq++}`;
 const eventSentAt = (event: any) => event.createdAt ?? event.created_at ?? event.timestamp ?? new Date().toISOString();
 interface SessionState {
-  items: ChatItem[];
-  streaming: boolean;
-  error: string | null;
-  status: string | null;
-  loaded: boolean;
-  connection: "connecting" | "connected" | "reconnecting" | "disconnected";
-  queuedCount: number;
-  activeStatus: SubmissionStatus | null;
-  failedDraft: SubmissionDraft | null;
+  items: ChatItem[]; streaming: boolean; error: string | null; status: string | null;
+  loaded: boolean; connection: "connecting" | "connected" | "reconnecting" | "disconnected";
+  queuedCount: number; activeStatus: SubmissionStatus | null; failedDraft: SubmissionDraft | null;
 }
 interface SessionEntry {
-  state: SessionState;
-  listeners: Set<() => void>;
-  es: EventSource | null;
-  viewers: number;
+  state: SessionState; listeners: Set<() => void>; es: EventSource | null; viewers: number;
   closeTimer: ReturnType<typeof setTimeout> | null;
   msgIndex: Map<string, number>; // messageId -> items index
-  connectionFailures: number;
-  runPoll: ReturnType<typeof setInterval> | null;
-  runPollFailures: number;
+  connectionFailures: number; runPoll: ReturnType<typeof setInterval> | null;
+  runPollFailures: number; historyPromise: Promise<void> | null;
 }
 const EMPTY: SessionState = {
-  items: [],
-  streaming: false,
-  error: null,
-  status: null,
-  loaded: false,
-  connection: "connecting",
-  queuedCount: 0,
-  activeStatus: null,
-  failedDraft: null,
+  items: [], streaming: false, error: null, status: null, loaded: false,
+  connection: "connecting", queuedCount: 0, activeStatus: null, failedDraft: null,
 };
 const entries = new Map<string, SessionEntry>();
 const renameListeners = new Set<(sessionId: string, title: string) => void>();
@@ -49,15 +32,9 @@ function getEntry(sessionId: string): SessionEntry {
   let e = entries.get(sessionId);
   if (!e) {
     e = {
-      state: { ...EMPTY, items: [] },
-      listeners: new Set(),
-      es: null,
-      viewers: 0,
-      closeTimer: null,
-      msgIndex: new Map(),
-      connectionFailures: 0,
-      runPoll: null,
-      runPollFailures: 0,
+      state: { ...EMPTY, items: [] }, listeners: new Set(), es: null, viewers: 0,
+      closeTimer: null, msgIndex: new Map(), connectionFailures: 0,
+      runPoll: null, runPollFailures: 0, historyPromise: null,
     };
     entries.set(sessionId, e);
   }
@@ -66,6 +43,20 @@ function getEntry(sessionId: string): SessionEntry {
 function emit(e: SessionEntry) {
   e.state = { ...e.state };
   for (const l of e.listeners) l();
+}
+// Stable content signature for dedup: id is a per-load transient (historySequence), so dedup by role+text/time.
+function contentKey(item: ChatItem): string {
+  if (item.role === "assistant") return `a:${item.sentAt ?? ""}:${item.blocks.map((b) => b.type === "text" || b.type === "thinking" ? b.text : "").join("|")}`;
+  if (item.role === "hammersmith-run") return `h:${item.run.id}`;
+  if (item.role === "system") return `s:${item.key ?? ""}:${item.content}`;
+  return `u:${item.sentAt ?? ""}:${item.content}`;
+}
+// Rebuild msgIndex from the merged items array so prepended history doesn't drop streaming bubbles.
+function rebuildMsgIndex(e: SessionEntry) {
+  e.msgIndex = new Map();
+  e.state.items.forEach((item, idx) => {
+    if (item.role === "assistant" && !item.done) e.msgIndex.set(item.id, idx);
+  });
 }
 function ensureAssistant(e: SessionEntry, messageId: string, sentAt = new Date().toISOString()): number {
   const idx = e.msgIndex.get(messageId);
@@ -88,21 +79,15 @@ function updateAssistant(e: SessionEntry, messageId: string, fn: (blocks: Block[
 }
 function submissionView(e: SessionEntry): SubmissionView {
   return {
-    items: e.state.items,
-    failedDraft: e.state.failedDraft,
-    queuedCount: e.state.queuedCount,
-    activeStatus: e.state.activeStatus,
+    items: e.state.items, failedDraft: e.state.failedDraft,
+    queuedCount: e.state.queuedCount, activeStatus: e.state.activeStatus,
   };
 }
 function applySubmission(e: SessionEntry, submission: Submission, accepted = true, kind: "message" | "queue" = "message") {
-  const next = reconcileSubmission(submissionView(e), submission, { accepted, kind });
-  Object.assign(e.state, next);
+  Object.assign(e.state, reconcileSubmission(submissionView(e), submission, { accepted, kind }));
   if (["starting", "running"].includes(submission.status)) e.state.streaming = true;
-  if (submission.status === "failed") {
-    e.state.error = submission.error || "Your message wasn’t delivered. Your draft is ready to retry.";
-  } else if (["queued", "starting", "running", "completed"].includes(submission.status)) {
-    e.state.error = null;
-  }
+  if (submission.status === "failed") e.state.error = submission.error || "Your message wasn’t delivered. Your draft is ready to retry.";
+  else if (["queued", "starting", "running", "completed"].includes(submission.status)) e.state.error = null;
 }
 function applyRuns(e: SessionEntry, runs: HammersmithRun[], freshness: HammersmithRun["freshness"] = "live") {
   for (const run of runs) {
@@ -130,12 +115,19 @@ function ensureRunPolling(sessionId: string) {
       e.state.items = e.state.items.map((item) => item.role === "hammersmith-run" && item.run.lifecycle === "running"
         ? { ...item, run: { ...item.run, freshness } } : item);
       emit(e);
+      // Bug 6: stop the interval after a bounded number of consecutive failures.
+      if (e.runPollFailures >= 3 && e.runPoll) { clearInterval(e.runPoll); e.runPoll = null; }
     }
   };
   void poll();
   e.runPoll = setInterval(poll, 2500);
 }
-function applyEvent(e: SessionEntry, ev: any) {
+function applyDelta(e: SessionEntry, ev: any, fn: (blocks: Block[]) => Block[]) {
+  ensureAssistant(e, ev.messageId, eventSentAt(ev));
+  updateAssistant(e, ev.messageId, fn);
+  emit(e);
+}
+function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
   switch (ev.type) {
     case "ping":
       return;
@@ -154,6 +146,16 @@ function applyEvent(e: SessionEntry, ev: any) {
           const id = `sync-${uid()}`;
           ensureAssistant(e, id, eventSentAt(ev));
           updateAssistant(e, id, (b) => appendText(b, ev.partialText));
+        } else {
+          const items = e.state.items.slice();
+          const msg = items[liveIdx];
+          if (msg.role === "assistant") {
+            const replacement: Block = { type: "text", text: ev.partialText };
+            const hadText = msg.blocks.some((b) => b.type === "text");
+            const blocks = hadText ? msg.blocks.map((b) => b.type === "text" ? replacement : b) : [...msg.blocks, replacement];
+            items[liveIdx] = { ...msg, blocks };
+            e.state.items = items;
+          }
         }
       }
       emit(e);
@@ -178,70 +180,61 @@ function applyEvent(e: SessionEntry, ev: any) {
       }
       emit(e);
       return;
-    case "message_start":
-      ensureAssistant(e, ev.messageId, eventSentAt(ev));
+    case "message_start": {
+      // Bug 4: adopt the first real messageId for a sync-created bubble (re-key msgIndex + restamp id).
+      const adopt = !e.msgIndex.has(ev.messageId) && [...e.msgIndex.entries()].find(([k, i]) =>
+        k.startsWith("sync-") && e.state.items[i]?.role === "assistant" && !e.state.items[i]!.done);
+      if (adopt) {
+        const [oldKey, idx] = adopt;
+        e.msgIndex.delete(oldKey);
+        e.msgIndex.set(ev.messageId, idx);
+        const items = e.state.items.slice();
+        items[idx] = { ...items[idx], id: ev.messageId, sentAt: eventSentAt(ev) };
+        e.state.items = items;
+      } else {
+        ensureAssistant(e, ev.messageId, eventSentAt(ev));
+      }
       emit(e);
       return;
+    }
     case "text_delta":
-      ensureAssistant(e, ev.messageId, eventSentAt(ev));
-      updateAssistant(e, ev.messageId, (b) => appendText(b, ev.delta || ""));
-      emit(e);
+      applyDelta(e, ev, (b) => appendText(b, ev.delta || ""));
       return;
     case "thinking_delta":
-      ensureAssistant(e, ev.messageId, eventSentAt(ev));
-      updateAssistant(e, ev.messageId, (b) => appendThinking(b, ev.delta || ""));
-      emit(e);
+      applyDelta(e, ev, (b) => appendThinking(b, ev.delta || ""));
       return;
     case "tool_start":
-      ensureAssistant(e, ev.messageId, eventSentAt(ev));
-      updateAssistant(e, ev.messageId, (b) =>
-        appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args })
-      );
-      emit(e);
+      applyDelta(e, ev, (b) => appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args }));
       return;
     case "tool_delta":
-      ensureAssistant(e, ev.messageId);
-      updateAssistant(e, ev.messageId, (b) =>
-        setToolOutput(b, ev.toolCallId, ev.text || "", "running")
-      );
-      emit(e);
+      applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", "running"));
       return;
     case "tool_end":
-      updateAssistant(e, ev.messageId, (b) =>
-        setToolOutput(b, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done")
-      );
-      emit(e);
+      applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done"));
       return;
     case "status":
-      e.state.status = ev.text || null;
-      emit(e);
-      return;
+      e.state.status = ev.text || null; emit(e); return;
     case "end":
       e.state.streaming = e.state.queuedCount > 0;
       e.state.status = null;
-      e.state.items = e.state.items.map((m) =>
-        m.role === "assistant" && !m.done ? { ...m, done: true } : m
-      );
-      emit(e);
-      return;
+      e.state.items = e.state.items.map((m) => m.role === "assistant" && !m.done ? { ...m, done: true } : m);
+      // Bug 7: if the last viewer left mid-turn, schedule the SSE close now that streaming ended.
+      if (e.viewers <= 0) scheduleClose(sessionId);
+      emit(e); return;
     case "error":
       e.state.streaming = false;
       e.state.error = "The agent stopped unexpectedly. Your conversation is preserved.";
-      emit(e);
-      return;
+      if (e.viewers <= 0) scheduleClose(sessionId);
+      emit(e); return;
     case "session_renamed":
       for (const l of renameListeners) l(/* sessionId via closure not available */ "", ev.title);
-      emit(e);
-      return;
+      emit(e); return;
   }
 }
 function openStream(sessionId: string) {
   const e = getEntry(sessionId);
   if (e.es) return;
-  if (e.closeTimer) {
-    clearTimeout(e.closeTimer);
-    e.closeTimer = null;
-  }
+  if (e.closeTimer) { clearTimeout(e.closeTimer); e.closeTimer = null; }
   const es = openSessionStream(sessionId);
   e.state.connection = e.connectionFailures > 0 ? "reconnecting" : "connecting";
   emit(e);
@@ -249,11 +242,8 @@ function openStream(sessionId: string) {
   es.onmessage = (msg) => {
     try {
       const ev = JSON.parse(msg.data);
-      if (ev.type === "session_renamed") {
-        for (const l of renameListeners) l(sessionId, ev.title);
-        return;
-      }
-      applyEvent(e, ev);
+      if (ev.type === "session_renamed") { for (const l of renameListeners) l(sessionId, ev.title); return; }
+      applyEvent(sessionId, e, ev);
     } catch {}
   };
   es.onerror = () => {
@@ -267,10 +257,7 @@ function scheduleClose(sessionId: string) {
   const e = getEntry(sessionId);
   if (e.closeTimer) clearTimeout(e.closeTimer);
   e.closeTimer = setTimeout(() => {
-    if (e.viewers <= 0 && !e.state.streaming) {
-      e.es?.close();
-      e.es = null;
-    }
+    if (e.viewers <= 0 && !e.state.streaming) { e.es?.close(); e.es = null; }
     e.closeTimer = null;
   }, 30000);
 }
@@ -284,23 +271,38 @@ export function acquire(sessionId: string) {
 export function release(sessionId: string) {
   const e = getEntry(sessionId);
   e.viewers = Math.max(0, e.viewers - 1);
-  if (e.viewers <= 0 && !e.state.streaming) scheduleClose(sessionId);
+  if (e.viewers <= 0) {
+    if (!e.state.streaming) scheduleClose(sessionId);
+    // Bug 6: no viewers → stop burning requests on the Hammersmith run poller.
+    if (e.runPoll) { clearInterval(e.runPoll); e.runPoll = null; }
+  }
 }
 async function loadHistory(sessionId: string) {
   const e = getEntry(sessionId);
-  try {
-    const diskItems = await loadHistoryItems(sessionId);
-    const liveIds = new Set(e.state.items.map((item) => item.id));
-    e.state.items = [...diskItems.filter((item) => !liveIds.has(item.id)), ...e.state.items];
-    e.msgIndex.clear();
-    e.state.loaded = true;
-    emit(e);
-    if (diskItems.some((item) => item.role === "hammersmith-run" && item.run.lifecycle === "running")) ensureRunPolling(sessionId);
-  } catch {
-    e.state.loaded = true;
-    e.state.error = "Couldn’t load this conversation. Your saved messages are unchanged.";
-    emit(e);
-  }
+  // Bug 1: in-flight guard so a StrictMode double-mount / fast A→B→A switch never starts two loads.
+  if (e.historyPromise) return e.historyPromise;
+  const promise = (async () => {
+    try {
+      const diskItems = await loadHistoryItems(sessionId);
+      // Bug 1 (content-key dedup): history-N ids are per-load transient; dedup by stable signature.
+      const live = new Set(e.state.items.map(contentKey));
+      const fresh = diskItems.filter((item) => !live.has(contentKey(item)));
+      e.state.items = [...fresh, ...e.state.items];
+      // Bug 2: rebuild msgIndex from the merged items so prepended history doesn't drop streaming bubbles.
+      rebuildMsgIndex(e);
+      e.state.loaded = true;
+      emit(e);
+      if (diskItems.some((item) => item.role === "hammersmith-run" && item.run.lifecycle === "running")) ensureRunPolling(sessionId);
+    } catch {
+      // Bug 5: leave loaded=false so retry() can refetch after a healed network.
+      e.state.error = "Couldn’t load this conversation. Your saved messages are unchanged.";
+      emit(e);
+    } finally {
+      e.historyPromise = null;
+    }
+  })();
+  e.historyPromise = promise;
+  return promise;
 }
 export function subscribe(sessionId: string, listener: () => void) {
   const e = getEntry(sessionId);

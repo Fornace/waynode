@@ -13,7 +13,7 @@ import {
 } from "../lib/sessions.mjs";
 import { isPiAvailable } from "../lib/pi-runner.mjs";
 import { readGoalStatus } from "../lib/pi-runner.mjs";
-import { getAgent, getAgentIfActive } from "../lib/agent-manager.mjs";
+import { getAgent, getAgentIfActive, stopAgent } from "../lib/agent-manager.mjs";
 import { config } from "../lib/config.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { getOrgSetting } from "../lib/orgs.mjs";
@@ -86,9 +86,7 @@ function ownSession(req, res) {
 
 // Self-hosted deployments never enforce Waynode Cloud plans. In hosted mode,
 // gate a new model turn before the agent starts so expired trials and dunning
-// accounts cannot keep consuming provider spend. Usage is metered at turn end;
-// this preflight deliberately protects the next turn rather than pretending to
-// predict its token cost.
+// accounts cannot keep consuming provider spend.
 function canUseHostedWorkspace(session, res) {
   if (!billingEnabled) return true;
   const space = getSpace(session.space_id);
@@ -205,6 +203,8 @@ router.post("/api/sessions/:sessionId/model", requireAuth, async (req, res) => {
 router.delete("/api/sessions/:sessionId", requireAuth, (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
+  // Stop agent + settle metering BEFORE deleting the row.
+  stopAgent(session.id, session);
   deleteSession(req.params.sessionId);
   res.json({ ok: true });
 });
@@ -276,6 +276,7 @@ router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
 router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
+  if (session.archived) return res.status(409).json({ error: "Session is archived" });
   let submission;
   try { submission = requestSubmission(req); } catch (error) { return res.status(error.status || 400).json({ error: error.message }); }
   const { id: submissionId, prompt, mode } = submission;
@@ -320,6 +321,7 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
 router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
+  if (session.archived) return res.status(409).json({ error: "Session is archived" });
   let submission;
   try { submission = requestSubmission(req); } catch (error) { return res.status(error.status || 400).json({ error: error.message }); }
   const { id: submissionId, prompt, mode } = submission;

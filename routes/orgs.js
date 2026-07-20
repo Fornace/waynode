@@ -78,7 +78,13 @@ router.delete("/api/orgs/:orgId", requireAuth, async (req, res) => {
 
   if (billingEnabled) {
     const sub = getSubscription(orgId);
-    if (["active", "trialing", "past_due", "unpaid"].includes(sub.status) && sub.stripe_subscription_id) {
+    // Attempt Stripe cancellation whenever a subscription id is recorded,
+    // regardless of local status. The status may have drifted (e.g.
+    // unrecognized_price) while the subscription remains live in Stripe;
+    // skipping cancel here orphans a subscription that keeps billing.
+    // cancelSubscription tolerates an already-canceled/404 so a drifted row
+    // never blocks deletion.
+    if (sub.stripe_subscription_id) {
       try {
         await cancelSubscription(orgId);
       } catch (e) {

@@ -56,6 +56,7 @@ export function Sidebar({
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
   const [loadingSessionSpaces, setLoadingSessionSpaces] = useState<Set<string>>(new Set());
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [creatingSession, setCreatingSession] = useState(false);
 
   const refreshGitStatus = (spaceId: string): void => {
     api.git.status(spaceId).then((snap) => {
@@ -158,12 +159,16 @@ export function Sidebar({
   };
 
   const handleNewSession = async (spaceId: string): Promise<void> => {
+    if (creatingSession) return;
+    setCreatingSession(true);
     try {
       const session = await api.sessions.create(spaceId);
       onSessionCreated(session);
       onSelectSession(session);
     } catch (err) {
       setIssue({ message: (err as Error).message, retry: () => handleNewSession(spaceId) });
+    } finally {
+      setCreatingSession(false);
     }
   };
 
@@ -263,7 +268,7 @@ export function Sidebar({
                         )}
                       </div>
                     ))}
-                    <button type="button" className="new-session-btn" onClick={() => handleNewSession(space.id)}>
+                    <button type="button" className="new-session-btn" onClick={() => handleNewSession(space.id)} disabled={creatingSession}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                       New Session
                     </button>

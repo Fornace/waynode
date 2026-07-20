@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, memo, type RefObject } from "react";
 import type { ChatItem, Block, ToolStatus } from "../types";
 import { WaynodeMark } from "./Brand";
 import { MarkdownDocument } from "./MarkdownDocument";
@@ -11,7 +11,7 @@ interface MessageRowProps {
   onQuote?: (markdown: string) => void;
 }
 
-export function MessageRow({ item, streaming, phase, onQuote }: MessageRowProps) {
+export function MessageRowImpl({ item, streaming, phase, onQuote }: MessageRowProps) {
   if (item.role === "hammersmith-run") return <HammersmithRunWidget run={item.run} />;
   if (item.role === "system") return <SystemEvent content={item.content} sentAt={item.sentAt} />;
 
@@ -35,6 +35,8 @@ export function MessageRow({ item, streaming, phase, onQuote }: MessageRowProps)
 
   return <AssistantTurn item={item} streaming={streaming} phase={phase} onQuote={onQuote} />;
 }
+
+export const MessageRow = memo(MessageRowImpl);
 
 function submissionLabel(status: NonNullable<Extract<ChatItem, { role: "user" }>["submissionStatus"]>) {
   return status === "sending" ? "Sending" : status === "queued" ? "Queued"
@@ -130,7 +132,8 @@ function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "t
   const elapsed = block.startedAt ? formatElapsed((block.endedAt || now) - block.startedAt) : "";
 
   const copy = async () => {
-    await navigator.clipboard.writeText(output);
+    const ok = await copyToClipboard(output);
+    if (!ok) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
@@ -197,8 +200,8 @@ function TurnActions({ bodyRef, markdown, onQuote, showRaw, onToggleRaw }: {
     <details className="turn-actions" ref={menuRef} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary aria-label="Answer actions" title="Answer actions">•••</summary>
       <div className="turn-actions-menu">
-        <button type="button" onClick={() => run("Copied", () => navigator.clipboard.writeText(bodyRef.current?.innerText || markdown))}>{copied === "Copied" ? "Copied" : "Copy"}</button>
-        <button type="button" onClick={() => run("Markdown copied", () => navigator.clipboard.writeText(markdown))}>{copied === "Markdown copied" ? "Markdown copied" : "Copy as Markdown"}</button>
+        <button type="button" onClick={() => run("Copied", async () => { await copyToClipboard(bodyRef.current?.innerText || markdown); })}>{copied === "Copied" ? "Copied" : "Copy"}</button>
+        <button type="button" onClick={() => run("Markdown copied", async () => { await copyToClipboard(markdown); })}>{copied === "Markdown copied" ? "Markdown copied" : "Copy as Markdown"}</button>
         <button type="button" onClick={() => run("", select)}>Select text</button>
         {onQuote && <button type="button" onClick={() => run("", () => onQuote(markdown))}>Quote in reply</button>}
         <button type="button" onClick={() => run("", onToggleRaw)}>{showRaw ? "Hide raw Markdown" : "View raw Markdown"}</button>
@@ -215,8 +218,10 @@ function UserContent({ content }: { content: string }) {
   const prefix = content.slice(0, marker);
   const attachmentText = content.slice(marker + 1, end);
   const separator = attachmentText.indexOf(":");
-  const files = separator >= 0 ? attachmentText.slice(separator + 1).split(",").map((file) => file.trim()) : [];
-  return <>{prefix}{files.length > 0 && <div className="msg-attachments">{files.map((file) => <span key={file} className="msg-attachment-pill"><AttachmentIcon />{file}</span>)}</div>}</>;
+  const suffix = content.slice(end + 1);
+  if (separator < 0) return <>{content}</>;
+  const files = attachmentText.slice(separator + 1).split(",").map((file) => file.trim()).filter(Boolean);
+  return <>{prefix}{files.length > 0 && <div className="msg-attachments">{files.map((file) => <span key={file} className="msg-attachment-pill"><AttachmentIcon />{file}</span>)}</div>}{suffix}</>;
 }
 
 function SystemEvent({ content, sentAt }: { content: string; sentAt: string | null }) {
@@ -300,6 +305,26 @@ function SystemStatusIcon({ tone }: { tone: string }) {
 
 function DisclosureChevron() {
   return <svg className="disclosure-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 6l3 3 3-3" /></svg>;
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    return true;
+  } catch { return false; }
 }
 
 function AttachmentIcon() {
