@@ -40,7 +40,7 @@
 
 /* ── Branches ── */
 .git-branches { display: flex; flex-direction: column; height: 100%; }
-.git-branches-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px; }
+.git-branches-label { font-size: 11px; color: var(--text-dim); letter-spacing: 0; }
 .git-branches-cur { font-size: 14px; font-weight: 600; }
 .git-branch-controls { display: flex; gap: 8px; padding: 4px 16px 12px; }
 .git-branch-controls .git-input { flex: 1; }
@@ -59,7 +59,7 @@
 .git-branch-section { margin-bottom: 12px; }
 .git-branch-section h4 {
   font-size: 11px; color: var(--text-dim);
-  text-transform: uppercase; letter-spacing: 0.5px;
+  letter-spacing: 0;
   padding: 4px 8px; margin-bottom: 2px;
 }
 .git-branch-row {
@@ -76,7 +76,7 @@
 .git-remote-tag {
   font-size: 9px; padding: 1px 5px; border-radius: 4px;
   background: var(--bg-elevated); color: var(--text-faint);
-  text-transform: uppercase; letter-spacing: 0.3px; font-family: var(--font);
+  letter-spacing: 0; font-family: var(--font);
 }
 .git-branch-row-date { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
 

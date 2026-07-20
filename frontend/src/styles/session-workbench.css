@@ -6,7 +6,7 @@
   --border: rgba(255,255,255,.09);
   --text: rgba(255,255,255,.92);
   --text-dim: rgba(255,255,255,.60);
-  --text-faint: rgba(255,255,255,.38);
+  --text-faint: rgba(255,255,255,.55);
   --green: #22c55e;
   height: 100dvh;
 }
@@ -24,8 +24,8 @@
 .session-run-state.is-active { color: #93b7ff; }.session-run-state.is-attention { color: var(--amber); }.session-run-state.is-error { color: var(--red); }
 .review-button { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: transparent; font-size: 12px; font-weight: 650; }
 .review-button:hover,.review-button.active { color: var(--text); background: var(--bg-hover); }.review-button.active { border-color: rgba(59,130,246,.48); }
-.review-button b { display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; color: white; background: var(--accent); font-size: 10px; }
-.review-button i { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; color: #fff; background: var(--red); font-style: normal; font-size: 10px; }
+.review-button b { color: var(--text-faint); font-size: 11px; font-weight: 500; }
+.review-button i { color: var(--red); font-size: 11px; font-weight: 500; font-style: normal; }
 .session-menu-wrap { position: relative; }
 .session-command-menu { position: absolute; z-index: 30; top: calc(100% + 7px); right: 0; width: 240px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); box-shadow: var(--shadow-lg); }
 .session-command-menu label { display: grid; gap: 5px; padding: 7px 8px 9px; color: var(--text-faint); font-size: 11px; }

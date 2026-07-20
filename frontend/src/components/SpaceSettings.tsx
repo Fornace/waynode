@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Space } from "../types";
 import { api } from "../api/client";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
@@ -23,6 +23,16 @@ export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
     if (!agentsDirty || window.confirm(`Discard unsaved AGENTS.md changes for ${space.repo_name}?`)) onClose();
   }, [agentsDirty, onClose, space.repo_name]);
   useEscapeToClose(requestClose, overlayRef);
+
+  // APG roving-tabIndex tabs (ported from GitSidebar.tsx moveTab).
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabs: { key: typeof tab; label: string }[] = [{ key: "agents", label: "AGENTS.md" }, { key: "secrets", label: "Secrets" }];
+  const moveTab = (event: ReactKeyboardEvent<HTMLButtonElement>, current: number) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : event.key === "ArrowRight" ? (current + 1) % tabs.length : (current - 1 + tabs.length) % tabs.length;
+    setTab(tabs[next].key); tabRefs.current[next]?.focus();
+  };
 
   useEffect(() => {
     Promise.all([
@@ -91,12 +101,13 @@ export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
         <div className="settings-modal-head">
           <h1 className="modal-title" id="space-settings-title" style={{ margin: 0 }}>{space.repo_name} Settings</h1>
           <div className="tabs" role="tablist" aria-label="Worktree settings sections">
-            <button role="tab" aria-selected={tab === "agents"} className={`tab-btn ${tab === "agents" ? "active" : ""}`} onClick={() => setTab("agents")}>AGENTS.md</button>
-            <button role="tab" aria-selected={tab === "secrets"} className={`tab-btn ${tab === "secrets" ? "active" : ""}`} onClick={() => setTab("secrets")}>Secrets</button>
+            {tabs.map((t, i) => (
+              <button key={t.key} ref={(node) => { tabRefs.current[i] = node; }} role="tab" id={`space-tab-${t.key}`} aria-selected={tab === t.key} aria-controls="space-settings-panel" tabIndex={tab === t.key ? 0 : -1} className={`tab-btn ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key)} onKeyDown={(event) => moveTab(event, i)}>{t.label}</button>
+            ))}
           </div>
         </div>
 
-        <div className="settings-modal-body">
+        <div className="settings-modal-body" id="space-settings-panel" role="tabpanel" aria-labelledby={`space-tab-${tab}`} tabIndex={0}>
           {error && <div className="form-error" role="alert">{error}</div>}
           {loading ? (
             <div className="kv-empty">Loading…</div>
@@ -108,6 +119,7 @@ export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
               </div>
               <textarea
                 className="form-input agents-editor"
+                aria-label="AGENTS.md editor"
                 value={agentsContent}
                 onChange={(e) => { setAgentsContent(e.target.value); setAgentsDirty(true); }}
                 placeholder="# AGENTS.md — pi reads this on every session"
