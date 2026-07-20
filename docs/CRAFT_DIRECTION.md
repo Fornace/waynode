@@ -39,18 +39,22 @@ Every temporary surface has an obvious escape. Sheets and dialogs show a platfor
 
 ## Public web
 
-The public site is five sections, in this order:
+The public site is one continuous narrative — the life of a single real job through the product — told in **explanatory frames**, not screenshots. Mockups must explain, not imitate: meaning over fidelity; recognizable as the real product, simplified until the idea reads instantly; every frame teaches what Waynode does. Frames are pure CSS/SVG: no raster images anywhere on the page, no external hotlinks, no faux browser/phone chrome with fake traffic lights — device frames are bare geometric outlines. Every interactive-looking element inside a frame is inert (aria-hidden, no focusable mock controls).
 
-1. Hero: **“Leave the laptop. Not the worktree.”** One sentence explaining durable repository, agent, terminal, and diff; primary “Start 15-day hosted trial,” secondary “Self-host Waynode.” Show a measured, real product capture with repo, branch, active run, and changed files.
-2. Continuity: a real three-frame sequence—start on Mac, status on iPhone, review on iPad—using the same seeded worktree/session.
-3. Review: one legible real diff and the statement “The worktree is the product.”
-4. Deployment: Cloud and self-hosted as equal, factual choices; capability differences are explicit.
-5. Footer with GitHub, guides, agent-readable content, and sign-in. Public plan
+Five beats, in this order:
+
+1. Hero + composer frame: **"Leave the laptop. Not the worktree."** One sentence on the durable repository, server-resident agent, and Git evidence; primary "Start 15-day hosted trial," secondary "Self-host Waynode." Below it, the composer with the send-mode tri-selector `message | goal | hammersmith` (hammersmith selected): the message is a job description for a verified swarm.
+2. Verified-run frame: a Hammersmith run as quiet sidebar rows with plain-text check counts, one flat rounded-rect active row, and a thin progress hairline. Delegated work returns verified by executed checks, not by a reassuring message.
+3. Evidence frame: the session beside its review inspector — three changed files and one simplified diff in system mono. "Done" is a diff you can inspect before you commit. The worktree is the product.
+4. Handoff frame: the same session drawn twice — wide desktop outline and narrow phone outline, identical quiet rows — naming the native iOS/macOS client. Close the laptop, open the phone, nothing to reconstruct.
+5. Deployment: Cloud (15-day trial; Starter $39 / Pro $99 / Team $249 per month; Hammersmith verified-swarm tier $8.99/mo) and self-hosted (free, MIT, your keys) as equal, factual choices, plus the install command and a link to the pricing doc. Footer with GitHub, guides, agent-readable content, and sign-in. Public plan
    cards stay removed; hosted billing remains inside organization settings.
 
-Remove the marquee, generic competitor comparison, fabricated phone UI, miniature illegible terminal, repeated CTA sections, “Most popular,” and any App Store billing or hosted-terminal claim not enabled in production. No focusable mock controls. Real captures may be annotated, never composited into fake chrome. On narrow screens replace wide screenshots with purpose-made crops, not shrink-to-fit.
+On viewports above 1024px a persistent left rail (~200px, fixed) echoes the app's sidebar: quiet rows labeling the five beats, the active row carrying the flat blue rounded-rect as the visitor scrolls. At or below 1024px the rail collapses away. The rail is part of the page's structure, not decoration.
 
-Login is a separate, calm surface—not embedded at the end of marketing. Show mark, “Sign in to Waynode,” GitHub/GitLab providers actually enabled, a short statement that work stays on the configured server, and a subdued server chooser for self-hosting. Dev-token login is development-only and absent from production UI.
+Remove the marquee, generic competitor comparison, miniature illegible terminal, repeated CTA sections, "Most popular," and any App Store billing or hosted-terminal claim not enabled in production. Motion is functional and slow (a blinking caret, checks flipping running → passed); everything is reachable and meaningful with Reduce Motion on.
+
+Login is a separate, calm surface—not embedded at the end of marketing. Show mark, "Sign in to Waynode," GitHub/GitLab providers actually enabled, a short statement that work stays on the configured server, and a subdued server chooser for self-hosting. Dev-token login is development-only and absent from production UI.
 
 ## Authenticated web
 
@@ -119,5 +123,5 @@ A surface passes craft review only with observable evidence:
 - A generated-content fixture contains 10k messages, a 10k-word answer, incomplete streaming Markdown, nested lists, wide table, links, 500-line code, attachments, reasoning, running/success/error tools, and Unicode. Selection, copy/Markdown copy, quote, share, collapse, scroll anchoring, restoration, and VoiceOver all work.
 - State stories demonstrate every row in the state model, including 60-second network loss, duplicate/reordered events, auth expiry, concurrent-session lock, clone failure, conflict, rejected push, terminal unavailable/drop/exit, quota, and app kill. Each shows truthful persistence and a successful recovery path.
 - Keyboard-only web/Mac and VoiceOver iPhone/iPad complete the canonical loop with visible focus and named controls. WCAG AA contrast holds; touch targets meet 44pt; Reduce Motion/Transparency produce no loss of meaning.
-- Public claims are checked against enabled production capabilities. Captures contain seeded data, not test clutter, and every visible control works.
+- Public claims are checked against enabled production capabilities. The landing's explanatory frames are pure CSS/SVG with inert controls and the seeded cast; any future raster capture follows the retired recapture requirements in `docs/PUBLIC-CAPTURE-PROVENANCE.md`.
 - Review rejects any screen that substitutes polish for state truth, adds decoration without hierarchy, hides recovery, exposes raw implementation copy, or diverges in meaning across platforms.

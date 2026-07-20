@@ -1,7 +1,7 @@
 /** Content hub regression test: articles, markdown twins, llms.txt, negotiation. */
 import assert from "node:assert/strict";
 import express from "express";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || "content-test";
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -14,22 +14,31 @@ const server = app.listen(0);
 const base = `http://localhost:${server.address().port}`;
 const root = new URL("../", import.meta.url);
 
-const captureAssets = [
-  "frontend/public/marketing/worktree-session-desktop.png",
-  "frontend/public/marketing/worktree-session-phone.png",
-  "frontend/public/marketing/worktree-review-tablet.png",
-];
-
-for (const asset of captureAssets) {
-  const url = new URL(asset, root);
-  assert.ok(existsSync(url), `missing public product capture: ${asset}`);
-  assert.ok(statSync(url).size > 10_000, `public product capture is unexpectedly small: ${asset}`);
-}
-
+// Explanatory-frames contract (flagship doctrine): the landing teaches with
+// pure CSS/SVG frames — no raster captures, no hotlinked images.
 const landingSource = readFileSync(new URL("frontend/src/pages/LandingPage.tsx", root), "utf8");
-for (const asset of captureAssets) {
-  assert.ok(landingSource.includes(`/${asset.replace("frontend/public/", "")}`), `landing does not use ${asset}`);
+for (const raster of [".png", ".jpg", ".jpeg", ".webp", ".gif"]) {
+  assert.ok(!landingSource.includes(raster), `landing references raster image: ${raster}`);
 }
+assert.ok(!landingSource.includes('src="http'), "landing must not hotlink images");
+
+for (const frame of ["frame-tri-selector", "frame-verified-run", "frame-handoff"]) {
+  assert.ok(landingSource.includes(frame), `landing missing explanatory frame: ${frame}`);
+}
+for (const href of ["/privacy", "/terms", "/security", "/support", "/status"]) {
+  assert.ok(landingSource.includes(`href="${href}"`), `landing footer missing ${href}`);
+}
+
+const marketingDir = new URL("frontend/public/marketing/", root);
+if (existsSync(marketingDir)) {
+  const totalBytes = readdirSync(marketingDir, { recursive: true })
+    .reduce((sum, name) => {
+      const file = new URL(name, marketingDir);
+      return statSync(file).isFile() ? sum + statSync(file).size : sum;
+    }, 0);
+  assert.ok(totalBytes < 200_000, `public marketing assets exceed budget: ${totalBytes} bytes`);
+}
+
 assert.ok(!landingSource.includes("product-pricing"), "public plan cards must stay out of the landing page");
 assert.ok(!landingSource.includes("Most popular"), "landing must not invent a preferred hosted plan");
 
@@ -79,7 +88,7 @@ try {
     checked++;
   }
 
-  console.log(`content hub: captures present, core endpoints ok, ${checked} article(s) round-tripped`);
+  console.log(`content hub: explanatory frames verified (no raster, budget ok), core endpoints ok, ${checked} article(s) round-tripped`);
 } finally {
   server.close();
 }
