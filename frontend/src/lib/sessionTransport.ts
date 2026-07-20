@@ -75,7 +75,9 @@ export async function loadHistoryItems(sessionId: string): Promise<ChatItem[]> {
     }
   }
   return items.sort((a, b) => {
-    const delta = new Date(a.sentAt || 0).getTime() - new Date(b.sentAt || 0).getTime();
+    // Bug 8: null timestamps must keep disk order — do not let them bubble to the top via epoch fallback.
+    if (a.sentAt == null || b.sentAt == null) return 0;
+    const delta = new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
     if (delta) return delta;
     if (a.role === "hammersmith-run") return 1;
     if (b.role === "hammersmith-run") return -1;

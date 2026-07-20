@@ -124,7 +124,14 @@ export function AppContent() {
   };
 
   const handleSessionArchived = (session: Session) => {
-    setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
+    // Upsert: when unarchiving, the session may not be in the loaded list
+    // (e.g. it was only visible via "Show archived" or loaded in a different
+    // space view). Insert it so it appears immediately without a full reload.
+    setSessions((prev) =>
+      prev.some((s) => s.id === session.id)
+        ? prev.map((s) => (s.id === session.id ? session : s))
+        : [...prev, session]
+    );
   };
 
   const handleSessionDeleted = (sessionId: string) => {

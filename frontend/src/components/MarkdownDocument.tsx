@@ -57,7 +57,8 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   const collapsible = lineCount > 24;
 
   const copy = async () => {
-    await navigator.clipboard.writeText(code);
+    const ok = await copyToClipboard(code);
+    if (!ok) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
@@ -80,4 +81,24 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       )}
     </figure>
   );
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    return true;
+  } catch { return false; }
 }

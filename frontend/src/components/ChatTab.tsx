@@ -4,6 +4,7 @@ import { MessageRow, StartingAgent } from "./ChatMessage";
 import { ChatComposer } from "./ChatComposer";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
+import * as drafts from "../lib/sessionDrafts";
 import { ComposerModePersistence } from "../lib/composerModePersistence";
 
 interface ChatTabProps {
@@ -12,7 +13,7 @@ interface ChatTabProps {
 
 export function ChatTab({ session }: ChatTabProps) {
   const state = store.useSessionChat(session.id);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() => drafts.get(session.id) || "");
   const initialMode = ["message", "goal", "hammersmith"].includes(session.composer_mode || "") ? session.composer_mode as ComposerMode : "message";
   const [composerMode, setComposerMode] = useState<ComposerMode>(initialMode);
   const [modeError, setModeError] = useState("");
@@ -29,6 +30,9 @@ export function ChatTab({ session }: ChatTabProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modeSaveRef = useRef(new ComposerModePersistence());
+  const submitInFlight = useRef(false);
+  const restoredDraftId = useRef<string | null>(null);
+  const userPickedMode = useRef(false);
 
   // ── Acquire the session stream on mount; release on unmount. ──
   // The stream lives in the module-scoped store, so navigating away does NOT
@@ -110,17 +114,30 @@ export function ChatTab({ session }: ChatTabProps) {
   }, [refreshGoal, state.streaming]);
 
   useEffect(() => {
-    if (state.failedDraft && !input.trim()) {
-      setInput(state.failedDraft.prompt);
-      setComposerMode(state.failedDraft.mode ?? (state.failedDraft.isGoal ? "goal" : "message"));
-    }
-  }, [state.failedDraft, input]);
+    const failed = state.failedDraft;
+    if (!failed) { restoredDraftId.current = null; return; }
+    if (restoredDraftId.current === failed.id) return;
+    restoredDraftId.current = failed.id;
+    setInput(failed.prompt);
+    setComposerMode(failed.mode ?? (failed.isGoal ? "goal" : "message"));
+  }, [state.failedDraft]);
+
+  useEffect(() => { drafts.set(session.id, input); }, [session.id, input]);
+
+  useEffect(() => {
+    if (userPickedMode.current) { userPickedMode.current = false; return; }
+    const next = ["message", "goal", "hammersmith"].includes(session.composer_mode || "") ? session.composer_mode as ComposerMode : "message";
+    setComposerMode(next);
+  }, [session.composer_mode]);
 
   const streaming = state.streaming || ["sending", "starting", "running"].includes(state.activeStatus || "");
 
   const sendMessage = async (mode: ComposerMode) => {
-    if (!input.trim() || streaming) return;
+    if (submitInFlight.current || !input.trim() || streaming) return;
     const prompt = input.trim();
+    submitInFlight.current = true;
+    setInput("");
+    drafts.clear(session.id);
     // The user just sent — they want to watch the reply, so pin to bottom even
     // if they had scrolled up to read, and shrink the composer back to 1 row.
     stickToBottom.current = true;
@@ -129,19 +146,29 @@ export function ChatTab({ session }: ChatTabProps) {
       if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }
       bottomRef.current?.scrollIntoView({ block: "end" });
     });
-    await modeSaveRef.current.beforeSubmit();
-    const accepted = await store.send(session.id, prompt, mode);
-    if (!accepted) return;
-    setInput("");
-    if (mode !== "message") setComposerMode("message");
-    if (mode === "goal") refreshGoal();
+    try {
+      await modeSaveRef.current.beforeSubmit();
+      const accepted = await store.send(session.id, prompt, mode);
+      if (!accepted) return;
+      if (mode !== "message") setComposerMode("message");
+      if (mode === "goal") refreshGoal();
+    } finally {
+      submitInFlight.current = false;
+    }
   };
 
   const handleQueue = async () => {
-    if (!input.trim() || !streaming) return;
+    if (submitInFlight.current || !input.trim() || !streaming) return;
     const prompt = input.trim();
-    const accepted = await store.queue(session.id, prompt);
-    if (accepted) setInput("");
+    submitInFlight.current = true;
+    setInput("");
+    drafts.clear(session.id);
+    try {
+      const accepted = await store.queue(session.id, prompt);
+      if (!accepted) return;
+    } finally {
+      submitInFlight.current = false;
+    }
   };
 
   const handleAbort = async () => {
@@ -149,10 +176,12 @@ export function ChatTab({ session }: ChatTabProps) {
   };
 
   const handleRetry = async () => {
-    if (await store.retry(session.id)) setInput("");
+    if (await store.retry(session.id)) { setInput(""); drafts.clear(session.id); }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") { e.preventDefault(); inputRef.current?.blur(); return; }
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     // Desktop: Enter submits (send, or queue if streaming); Shift+Enter is a
     // newline. Mobile: Enter keeps submitting (the soft keyboard's primary
     // action); multi-line input is reached via the newline affordance on the
@@ -165,12 +194,12 @@ export function ChatTab({ session }: ChatTabProps) {
     }
   };
 
-  const autosize = () => {
+  const autosize = useCallback(() => {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
-  };
+  }, []);
 
   const jumpToLatest = () => {
     stickToBottom.current = true;
@@ -178,11 +207,11 @@ export function ChatTab({ session }: ChatTabProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   };
 
-  const quoteInReply = (markdown: string) => {
+  const quoteInReply = useCallback((markdown: string) => {
     const quote = markdown.split("\n").map((line) => `> ${line}`).join("\n");
     setInput((current) => `${current.trim() ? `${current.trim()}\n\n` : ""}${quote}\n\n`);
     requestAnimationFrame(() => { autosize(); inputRef.current?.focus(); });
-  };
+  }, [autosize]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -225,11 +254,13 @@ export function ChatTab({ session }: ChatTabProps) {
   };
 
   const changeComposerMode = (mode: ComposerMode) => {
+    userPickedMode.current = true;
     const previous = composerMode;
     setComposerMode(mode);
     setModeError("");
     const save = modeSaveRef.current.save(() => api.sessions.patch(session.id, { composer_mode: mode }));
     save.catch(() => {
+      userPickedMode.current = false;
       setComposerMode((current) => current === mode ? previous : current);
       setModeError("The send mode could not be saved. Try again.");
     });
@@ -278,7 +309,7 @@ export function ChatTab({ session }: ChatTabProps) {
         </div>
       )}
 
-      <div className="chat-messages" ref={messagesRef} aria-label="Session conversation" aria-busy={streaming}>
+      <div className="chat-messages" ref={messagesRef} role="log" aria-label="Session conversation" aria-live="polite" aria-busy={streaming}>
         <div className="chat-lane">
         {!state.loaded && !state.error && <div className="agent-preflight"><StartingAgent phase="Loading conversation…" /></div>}
         {state.loaded && state.items.length === 0 && !streaming && (
@@ -309,7 +340,7 @@ export function ChatTab({ session }: ChatTabProps) {
             // message would re-show the active generation state
             // whenever ANY turn (even a later, unrelated one) is streaming.
             streaming={streaming && idx === state.items.length - 1}
-            phase={state.status}
+            phase={streaming && idx === state.items.length - 1 ? state.status : null}
             onQuote={quoteInReply}
           />
         ))}

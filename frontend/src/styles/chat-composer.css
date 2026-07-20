@@ -185,9 +185,11 @@
 @media (max-width: 768px) {
   .composer { padding: 10px 12px; padding-bottom: calc(12px + var(--safe-bottom)); }
   .composer-inner { border-radius: 10px; }
+  .composer-input { font-size: 16px; }
   .attach-btn, .send-group, .send-btn, .newline-btn, .queue-btn { min-height: 44px; }
   .attach-btn { width: 44px; height: 44px; }
   .send-group { height: 44px; }
+  .newline-btn { min-width: 44px; }
   .send-btn { padding-inline: 11px; }
 }
 
