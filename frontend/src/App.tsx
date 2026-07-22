@@ -340,6 +340,7 @@ export function AppContent() {
         onSessionArchived={handleSessionArchived}
         onSessionDeleted={handleSessionDeleted}
         onSpaceExpand={handleSpaceExpand}
+        onSpaceDeleted={(id) => setSpaces((prev) => prev.filter((s) => s.id !== id))}
         githubConnected={githubConnected}
         gitlabConnected={gitlabConnected}
         githubAvailable={availableProviders.github}

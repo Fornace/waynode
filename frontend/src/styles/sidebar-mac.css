@@ -70,14 +70,45 @@
 /* Rows: breathing room, 7px radius, flat fills. */
 .space-group { margin-bottom: 2px; }
 .space-item {
-  gap: 8px;
+  display: flex;
+  align-items: center;
   margin-bottom: 1px;
-  padding: 7px 9px;
   border-radius: 7px;
+  transition: background 0.15s ease;
+}
+/* Inner open button fills the row. */
+.space-item-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 4px 7px 9px;
+  border: 0;
+  background: none;
+  color: inherit;
   font-size: 13px;
   font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+  text-align: left;
 }
+/* Space ⋯ menu button: hover-reveal. */
+.space-menu-btn {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.space-item:hover .space-menu-btn { opacity: 0.6; }
+.space-menu-btn:hover { opacity: 1 !important; background: rgba(255, 255, 255, 0.08); }
+@media (hover: none) { .space-menu-btn { opacity: 0.45; } }
 /* Typographic hierarchy: repo name bright, branch muted. */
 .space-item .space-name {
   color: var(--text);

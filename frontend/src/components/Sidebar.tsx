@@ -20,6 +20,7 @@ interface SidebarProps {
   onSessionCreated: (session: Session) => void;
   onSessionArchived: (session: Session) => void;
   onSessionDeleted: (sessionId: string) => void;
+  onSpaceDeleted: (spaceId: string) => void;
   onSpaceExpand: (spaceId: string) => Promise<void>;
   githubConnected: boolean;
   gitlabConnected: boolean;
@@ -39,7 +40,7 @@ interface SidebarProps {
 
 export function Sidebar({
   spaces, spacesLoading, sessions, activeSessionId, activeSpaceId,
-  onSelectSession, onSpaceCreated, onSessionCreated, onSessionArchived, onSessionDeleted, onSpaceExpand,
+  onSelectSession, onSpaceCreated, onSessionCreated, onSessionArchived, onSessionDeleted, onSpaceDeleted, onSpaceExpand,
   githubConnected, gitlabConnected, githubAvailable, gitlabAvailable, isAdmin, onOpenAdmin, onOpenOrgSettings, onOpenAccountSettings,
   orgs, activeOrgId, onSelectOrg, onOrgCreated, user, onLogout,
 }: SidebarProps) {
@@ -54,6 +55,9 @@ export function Sidebar({
   const [archivedBySpace, setArchivedBySpace] = useState<Record<string, Session[]>>({});
   const [showArchivedFor, setShowArchivedFor] = useState<Set<string>>(new Set());
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+  const [openSpaceMenuFor, setOpenSpaceMenuFor] = useState<string | null>(null);
+  const [pullingSpace, setPullingSpace] = useState<string | null>(null);
+  const [confirmingDeleteSpace, setConfirmingDeleteSpace] = useState<Space | null>(null);
   const [loadingSessionSpaces, setLoadingSessionSpaces] = useState<Set<string>>(new Set());
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
@@ -172,6 +176,27 @@ export function Sidebar({
     }
   };
 
+  const handlePull = async (spaceId: string): Promise<void> => {
+    setPullingSpace(spaceId);
+    try {
+      await api.spaces.pull(spaceId);
+      refreshGitStatus(spaceId);
+    } catch (err) {
+      setIssue({ message: `Pull failed: ${(err as Error).message}`, retry: () => handlePull(spaceId) });
+    } finally {
+      setPullingSpace(null);
+    }
+  };
+
+  const handleDeleteSpace = async (space: Space): Promise<void> => {
+    try {
+      await api.spaces.delete(space.id);
+      onSpaceDeleted(space.id);
+    } catch (err) {
+      setIssue({ message: `Could not delete worktree: ${(err as Error).message}` });
+    }
+  };
+
   const handleCreateOrg = async (name: string) => {
     try {
       const org = await api.orgs.create(name);
@@ -208,27 +233,46 @@ export function Sidebar({
             const showingArchived = showArchivedFor.has(space.id);
             return (
               <div key={space.id} className="space-group">
-                <button type="button"
-                  className={`space-item ${activeSpaceId === space.id ? "active" : ""}`}
-                  onClick={() => toggleSpace(space.id)}
-                  aria-expanded={expanded}
-                >
-                  <span className={`space-chevron ${expanded ? "expanded" : ""}`}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                  </span>
-                  <span className="space-identity">
-                    <span className="space-name">{space.repo_name}</span>
-                    <code className="space-branch">{gitStatus[space.id]?.currentBranch || space.branch}</code>
-                  </span>
-                  {uncommittedCount > 0 && (
-                    <span className="space-git-badge" title={`${uncommittedCount} uncommitted file${uncommittedCount === 1 ? "" : "s"}`}>
-                      {uncommittedCount} changed
+                <div className={`space-item ${activeSpaceId === space.id ? "active" : ""}`}>
+                  <button type="button"
+                    className="space-item-open"
+                    onClick={() => toggleSpace(space.id)}
+                    aria-expanded={expanded}
+                  >
+                    <span className={`space-chevron ${expanded ? "expanded" : ""}`}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                     </span>
+                    <span className="space-identity">
+                      <span className="space-name">{space.repo_name}</span>
+                      <code className="space-branch">{gitStatus[space.id]?.currentBranch || space.branch}</code>
+                    </span>
+                    {uncommittedCount > 0 && (
+                      <span className="space-git-badge" title={`${uncommittedCount} uncommitted file${uncommittedCount === 1 ? "" : "s"}`}>
+                        {uncommittedCount} changed
+                      </span>
+                    )}
+                    {space.session_count ? (
+                      <span className="space-count">{space.session_count}</span>
+                    ) : null}
+                  </button>
+                  <button
+                    className="space-menu-btn"
+                    onClick={(e) => { e.stopPropagation(); setOpenSpaceMenuFor(openSpaceMenuFor === space.id ? null : space.id); }}
+                    title="Worktree actions"
+                    aria-label={`Actions for ${space.repo_name}`}
+                  >
+                    {pullingSpace === space.id ? "…" : "⋯"}
+                  </button>
+                  {openSpaceMenuFor === space.id && (
+                    <SessionMenu
+                      onClose={() => setOpenSpaceMenuFor(null)}
+                      items={[
+                        { label: "Pull latest", onClick: () => { setOpenSpaceMenuFor(null); handlePull(space.id); } },
+                        { label: "Delete worktree", danger: true, onClick: () => { setOpenSpaceMenuFor(null); setConfirmingDeleteSpace(space); } },
+                      ]}
+                    />
                   )}
-                  {space.session_count ? (
-                    <span className="space-count">{space.session_count}</span>
-                  ) : null}
-                </button>
+                </div>
                 {expanded && (
                   <div className="space-sessions">
                     {loadingSessionSpaces.has(space.id) && <div className="sidebar-session-state" role="status">Loading sessions…</div>}
@@ -325,6 +369,14 @@ export function Sidebar({
         confirmLabel="Log out"
         onCancel={() => setConfirmingLogout(false)}
         onConfirm={() => { setConfirmingLogout(false); onLogout(); }}
+      />}
+
+      {confirmingDeleteSpace && <ConfirmDialog
+        title={`Delete "${confirmingDeleteSpace.repo_name}"?`}
+        description="This permanently removes the worktree directory and all its sessions from this server. This cannot be undone."
+        confirmLabel="Delete worktree"
+        onCancel={() => setConfirmingDeleteSpace(null)}
+        onConfirm={() => { const space = confirmingDeleteSpace; setConfirmingDeleteSpace(null); handleDeleteSpace(space); }}
       />}
 
       {lifecycle.dialog}
