@@ -60,17 +60,6 @@ export function ChatComposer(props: ChatComposerProps) {
     <div className="composer">
       <div className="composer-inner">
         <input type="file" multiple ref={fileInputRef} onChange={onFileUpload} hidden />
-        <textarea
-          ref={inputRef}
-          className="composer-input"
-          placeholder={streaming ? "Add a follow-up…" : mode === "goal" ? "Describe the goal…" : mode === "hammersmith" ? "Describe the job for the swarm…" : "Message the agent…"}
-          value={input}
-          onChange={(event) => { onInput(event.target.value); onAutosize(); }}
-          onKeyDown={onKeyDown}
-          rows={1}
-          aria-label={INPUT_NAMES[mode]}
-          aria-describedby="composer-selected-hint"
-        />
         <div className={`composer-modes ${visibleModes.length === 2 ? "two-modes" : ""}`} role="radiogroup" aria-label="Send mode" aria-describedby="composer-selected-hint" onKeyDown={moveRadio}>
           {visibleModes.map((item, index) => {
             const disabled = streaming || (item.mode === "hammersmith" && hammersmithDisabled);
@@ -88,6 +77,17 @@ export function ChatComposer(props: ChatComposerProps) {
             );
           })}
         </div>
+        <textarea
+          ref={inputRef}
+          className="composer-input"
+          placeholder={streaming ? "Add a follow-up…" : mode === "goal" ? "Describe the goal…" : mode === "hammersmith" ? "Describe the job for the swarm…" : "Message the agent…"}
+          value={input}
+          onChange={(event) => { onInput(event.target.value); onAutosize(); }}
+          onKeyDown={onKeyDown}
+          rows={1}
+          aria-label={INPUT_NAMES[mode]}
+          aria-describedby="composer-selected-hint"
+        />
         <p className="composer-mode-note" id="composer-selected-hint">
           {selected.hint}
           {hammersmithState === "checking" && " Checking Hammersmith…"}

@@ -38,6 +38,19 @@ struct ComposerBar: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Mode Picker
+            Picker("Send Mode", selection: $composerMode) {
+                Text("Chat").tag(ComposerMode.message)
+                Text("Goal").tag(ComposerMode.goal)
+                if hammersmithAvailable {
+                    Text("Swarm").tag(ComposerMode.hammersmith)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 4)
+
             // Error banner (conditional)
             if let error {
                 HStack(spacing: 6) {
@@ -124,49 +137,6 @@ struct ComposerBar: View {
                     .accessibilityLabel("Message")
                     .accessibilityHint("Type a message for the coding agent")
                     .accessibilityIdentifier("composer.input")
-
-                Button {
-                    Haptics.light()
-                    withAnimation(reduceMotion ? nil : .smooth) {
-                        composerMode = isGoalMode ? .message : .goal
-                    }
-                } label: {
-                    GoalTensionGlyph(active: isGoalMode, reduceMotion: reduceMotion)
-                        .frame(width: 24, height: 24)
-                        .frame(width: 32, height: 32)
-                        .background(
-                            isGoalMode ? Color.accentColor.opacity(0.12) : Color.clear,
-                            in: Circle()
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isGoalMode ? "Disable goal mode" : "Enable goal mode")
-                .accessibilityHint("Goal mode keeps working until the goal is complete")
-                .accessibilityIdentifier("composer.goal")
-                .frame(minWidth: 44, minHeight: 44)
-
-                if hammersmithAvailable {
-                    Button {
-                        Haptics.light()
-                        withAnimation(reduceMotion ? nil : .smooth) {
-                            composerMode = isHammersmithMode ? .message : .hammersmith
-                        }
-                    } label: {
-                        Image(systemName: isHammersmithMode ? "checkmark.seal.fill" : "checkmark.seal")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(isHammersmithMode ? Color.accentColor : Color.secondary)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                isHammersmithMode ? Color.accentColor.opacity(0.12) : Color.clear,
-                                in: Circle()
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isHammersmithMode ? "Disable Hammersmith mode" : "Enable Hammersmith mode")
-                    .accessibilityHint("Hammersmith mode delegates this job to a verified swarm")
-                    .accessibilityIdentifier("composer.hammersmith")
-                    .frame(minWidth: 44, minHeight: 44)
-                }
 
                 // Send / Abort
                 sendOrAbortButton
