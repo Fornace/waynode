@@ -82,7 +82,7 @@ export function OrgBilling({ billing, busy, error, onCheckout, onOpenPortal }: O
       <div className="settings-section-title">Plans</div>
       {error && <div className="field-row-hint" role="alert" style={{ color: "var(--red)", marginBottom: 10 }}>{error}</div>}
       <div className="plan-grid">
-        {(["starter", "pro", "team"] as const).map((planId) => {
+        {(["starter", "pro", "team", "hammersmith"] as const).map((planId) => {
           const plan = billing.plans[planId];
           if (!plan) return null;
           const isCurrent = billing.plan === planId;
