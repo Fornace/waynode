@@ -58,6 +58,7 @@ function discardAll(confirmation = "DISCARD ALL TRACKED CHANGES") {
 }
 
 spawnSync("git", ["init", "-q", repo]);
+spawnSync("git", ["-C", repo, "config", "core.hooksPath", "/dev/null"]);
 writeFileSync(file("tracked.txt"), "baseline\n");
 writeFileSync(file("deleted.txt"), "deleted baseline\n");
 writeFileSync(file("rename-old.txt"), "rename baseline\n");

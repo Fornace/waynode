@@ -88,6 +88,11 @@ router.post("/api/spaces", requireAuth, async (req, res) => {
   }
   const member = isOrgMember(orgId, req.user.id);
   if (!member || member.role === "viewer") return res.status(403).json({ err: "Editor required" });
+  if (orgId) {
+    await refreshOrgStorageUsage(orgId).catch((err) => {
+      console.error("[spaces] Failed to refresh storage usage before checking capacity:", err.message);
+    });
+  }
   try {
     assertOrgStorageCapacity(orgId);
   } catch (error) {
@@ -108,6 +113,9 @@ router.post("/api/spaces", requireAuth, async (req, res) => {
         try { deleteSpace(space.id); } catch {}
       }
       finishClone(space.id, e.message);
+      if (orgId) {
+        refreshOrgStorageUsage(orgId).catch(() => {});
+      }
     }
   })();
   return res.json({ ...space, cloning: true });
@@ -166,7 +174,12 @@ router.post("/api/spaces/:spaceId/pull", requireAuth, requireSpaceAccess, requir
 
 router.delete("/api/spaces/:spaceId", requireAuth, requireSpaceAccess, requireHammersmithLeaseAvailable, (req, res) => {
   if (req.spaceRole !== "owner") return res.status(403).json({ err: "Owner only" });
+  const space = getSpace(req.params.spaceId);
+  const orgId = space?.org_id;
   deleteSpace(req.params.spaceId);
+  if (orgId) {
+    refreshOrgStorageUsage(orgId);
+  }
   return res.json({ ok: true });
 });
 
