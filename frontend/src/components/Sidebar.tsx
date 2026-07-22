@@ -231,9 +231,10 @@ export function Sidebar({
             const uncommittedCount = gitStatus[space.id]?.files.length || 0;
             const archivedSessions = archivedBySpace[space.id] || [];
             const showingArchived = showArchivedFor.has(space.id);
+            const hasActiveSession = spaceSessions.some((s) => s.id === activeSessionId);
             return (
               <div key={space.id} className="space-group">
-                <div className={`space-item ${activeSpaceId === space.id ? "active" : ""}`}>
+                <div className={`space-item ${activeSpaceId === space.id && !hasActiveSession ? "active" : ""} ${activeSpaceId === space.id ? "current" : ""}`}>
                   <button type="button"
                     className="space-item-open"
                     onClick={() => toggleSpace(space.id)}
@@ -248,7 +249,7 @@ export function Sidebar({
                     </span>
                     {uncommittedCount > 0 && (
                       <span className="space-git-badge" title={`${uncommittedCount} uncommitted file${uncommittedCount === 1 ? "" : "s"}`}>
-                        {uncommittedCount} changed
+                        <span className="space-git-dot" />{uncommittedCount}
                       </span>
                     )}
                     {space.session_count ? (
