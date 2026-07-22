@@ -1,15 +1,11 @@
 /* ══ Waynode Sidebar — macOS Source List ════════════════════════════════════
-   Apple HIG source-list pattern (macOS / iOS). Imported LAST in index.css.
-   Wins by source order over all other sidebar rules.
+   Apple HIG source-list pattern. Imported LAST in index.css — wins by source
+   order. Every rule here is a COMPLETE reset+rebuild of the sidebar element
+   so no base-shell/workspace-identity/sidebar-dialogs/authenticated-states
+   property leaks through (no double padding, no phantom gaps, no inset
+   shadows from the old gradient-selection era). */
 
-   Principles: translucent vibrancy material, full-width rounded selection in
-   the accent color, comfortable row heights, plain system typography, plain
-   text counts, subtle disclosure indicators. No gloss, no lifts, no gradient
-   fills, no decorative borders. */
-
-/* ── Panel material: dark vibrancy ────────────────────────────────────────
-   Slightly lighter than the near-black body so the sidebar reads as a layer.
-   The blur saturates content tinting behind it. */
+/* ── Panel material ─────────────────────────────────────────────────────── */
 .sidebar {
   background: #1c1c20;
   backdrop-filter: blur(30px) saturate(1.4);
@@ -35,6 +31,7 @@
 /* ── Section label ──────────────────────────────────────────────────────── */
 .sidebar-section-label {
   margin: 16px 10px 3px;
+  padding: 0;
   gap: 0;
   color: var(--text-dim);
   font-size: 11px;
@@ -42,10 +39,11 @@
   letter-spacing: 0.01em;
   text-transform: none;
   opacity: 0.5;
+  display: block;
 }
 .sidebar-section-label i { display: none; }
 
-/* ── Primary action: subtle toolbar button ──────────────────────────────── */
+/* ── Primary action ─────────────────────────────────────────────────────── */
 .new-space-btn {
   margin: 4px 2px 2px;
   width: calc(100% - 4px);
@@ -58,46 +56,67 @@
   font-size: 13px;
   font-weight: 550;
   letter-spacing: -0.08px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 7px;
+  cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
+  transform: none;
 }
-.new-space-btn svg { color: var(--accent); }
+.new-space-btn svg { color: var(--accent); flex-shrink: 0; }
 .new-space-btn:hover {
   background: rgba(255, 255, 255, 0.09);
   border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  transform: none;
 }
-.new-space-btn:active { background: rgba(255, 255, 255, 0.06); }
+.new-space-btn:hover svg { color: var(--accent); }
+.new-space-btn:active { background: rgba(255, 255, 255, 0.06); transform: none; }
 
-/* ── Worktree rows ────────────────────────────────────────────────────────
-   position:relative anchors the ⋯ dropdown to the row, not a distant parent. */
+/* ══ Worktree rows — full reset ════════════════════════════════════════════
+   The outer .space-item is a positioning wrapper ONLY. No padding, no gap,
+   no font properties — those live on the inner .space-item-open button so
+   the click target and the visual row are the same element. */
 .space-group { margin-bottom: 1px; }
 
 .space-item {
   position: relative;
   display: flex;
   align-items: center;
+  gap: 0;
   margin: 0 2px;
+  padding: 0;
+  border: 0;
   border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+  width: calc(100% - 4px);
+  text-align: left;
   transition: background 0.1s ease;
 }
 
+/* Inner button: the actual row — padding, gap, font all live here. */
 .space-item-open {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 1;
   min-width: 0;
-  padding: 6px 4px 6px 7px;
+  padding: 6px 6px 6px 7px;
   border: 0;
   background: none;
-  color: inherit;
+  color: var(--text);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 520;
   cursor: pointer;
   text-align: left;
 }
 
-/* ⋯ menu: hover-reveal. */
+/* ⋯ menu: hover-reveal, sits at the right edge. */
 .space-menu-btn {
   flex-shrink: 0;
   padding: 4px 6px;
@@ -115,56 +134,69 @@
 .space-menu-btn:hover { opacity: 1 !important; background: rgba(255, 255, 255, 0.1); }
 @media (hover: none) { .space-menu-btn { opacity: 0.35; } }
 
-.space-identity { flex: 1; min-width: 0; display: grid; gap: 0; }
-
+/* Identity: name + branch stacked. */
+.space-identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.25;
+}
 .space-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text);
   font-weight: 520;
   letter-spacing: -0.08px;
   font-size: 13px;
-  line-height: 1.35;
 }
 .space-branch {
-  color: #8b96a6;
-  font-size: 10.5px;
-  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #75829a;
+  font-size: 10px;
   font-family: var(--mono);
+  line-height: 1.4;
 }
 
-/* Hover: subtle wash. */
+/* Hover: subtle wash on the whole row. */
 .space-item:hover { background: rgba(255, 255, 255, 0.045); }
 
-/* "current": expanded workspace with an active session — no fill, just
-   slightly brighter name so the eye knows where it is. */
+/* "current": expanded workspace with an active session. */
 .space-item.current .space-name { color: #fff; font-weight: 540; }
 .space-item.current .space-chevron { opacity: 0.55; }
 
-/* Active: canonical accent fill — only when the workspace itself is focused
-   (no child session active), prevents double-active. */
+/* Active: canonical accent fill, pure white text. */
 .space-item.active {
   background: rgba(74, 124, 229, 0.28);
+  box-shadow: none;
 }
 .space-item.active .space-name { color: #fff; font-weight: 560; }
-.space-item.active .space-branch { color: rgba(199, 218, 255, 0.65); }
+.space-item.active .space-branch { color: rgba(199, 218, 255, 0.6); }
 
 /* Chevron: subtle disclosure indicator. */
 .space-chevron {
   width: 12px;
+  height: 12px;
+  flex-shrink: 0;
   color: var(--text-dim);
   opacity: 0.3;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: opacity 0.1s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  flex-shrink: 0;
 }
 .space-chevron.expanded { transform: rotate(90deg); }
 .space-item:hover .space-chevron { opacity: 0.55; }
 .space-item.active .space-chevron { opacity: 0.6; }
 
-/* Counts: plain text, right-aligned, macOS Mail-style. */
+/* Counts: plain faint text, right-aligned. */
 .space-count {
   flex-shrink: 0;
+  margin-left: 4px;
   color: var(--text-dim);
   font-size: 11px;
   font-weight: 500;
@@ -173,32 +205,32 @@
 .space-item.current .space-count { opacity: 0.6; }
 .space-item.active .space-count { color: rgba(220, 232, 255, 0.6); opacity: 0.8; }
 
-/* Git-changes: plain amber count, no chrome. */
+/* Git-changes: amber dot only — clean, scannable, tooltip has the count. */
 .space-git-badge {
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
   display: flex;
   align-items: center;
-  gap: 3px;
-  color: #f0b35a;
-  font-size: 11px;
-  font-weight: 500;
-  flex-shrink: 0;
-  opacity: 0.85;
 }
 .space-git-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: #f0b35a;
   flex-shrink: 0;
 }
 
-/* ── Sessions (nested) ────────────────────────────────────────────────────
-   Indented with a hairline guide for scanability. */
+/* ══ Sessions (nested) — full reset ════════════════════════════════════════ */
 .space-sessions {
-  margin: 1px 0 3px 20px;
+  margin: 1px 0 3px 19px;
   border-left: 0;
-  padding-left: 10px;
   border-left: 1px solid rgba(255, 255, 255, 0.05);
+  padding-left: 9px;
+  position: relative;
 }
 .space-sessions::before { display: none; }
 
@@ -206,18 +238,24 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
-  padding: 5px 8px;
+  padding: 5px 6px;
+  border: 0;
   border-radius: 5px;
+  background: none;
+  box-shadow: none;
   font-size: 12.5px;
   font-weight: 400;
   color: var(--text-dim);
+  cursor: pointer;
   transition: background 0.1s ease, color 0.1s ease;
+  white-space: nowrap;
 }
 .session-item:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); }
 .session-item.active {
   background: rgba(74, 124, 229, 0.28);
+  box-shadow: none;
   color: #fff;
 }
 .session-item.active::before { display: none; }
@@ -226,6 +264,7 @@
 .session-item-open {
   flex: 1;
   min-width: 0;
+  padding: 0;
   border: 0;
   background: none;
   color: inherit;
@@ -241,12 +280,13 @@
 /* Session ⋯ menu: hover-reveal. */
 .session-menu-btn {
   flex-shrink: 0;
-  font-size: 13px;
-  padding: 3px 6px;
+  padding: 3px 5px;
+  margin-left: 2px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 4px;
   background: transparent;
   color: var(--text-dim);
+  font-size: 13px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.1s ease, background 0.1s ease;
@@ -261,7 +301,7 @@
   align-items: center;
   gap: 6px;
   margin: 1px 0 0;
-  padding: 5px 8px;
+  padding: 5px 6px;
   border: 0;
   border-radius: 5px;
   background: transparent;
@@ -271,13 +311,13 @@
   cursor: pointer;
   transition: background 0.1s ease, color 0.1s ease;
 }
-.new-session-btn svg { opacity: 0.45; }
+.new-session-btn svg { opacity: 0.45; flex-shrink: 0; }
 .new-session-btn:hover { background: rgba(255, 255, 255, 0.045); color: var(--text); }
 .new-session-btn:hover svg { opacity: 0.75; }
 
 .archived-toggle {
   display: block;
-  padding: 4px 8px;
+  padding: 4px 6px;
   margin-top: 1px;
   border: 0;
   background: none;
@@ -299,7 +339,7 @@
 .sidebar-empty { text-align: left; padding: 10px; font-size: 12.5px; color: var(--text-dim); }
 .sidebar-session-state { padding: 6px 10px; font-size: 12px; color: var(--text-dim); }
 
-/* ── Scrollbar: thin macOS overlay ──────────────────────────────────────── */
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
 .sidebar-content { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent; }
 .sidebar-content::-webkit-scrollbar { width: 6px; }
 .sidebar-content::-webkit-scrollbar-track { background: transparent; }

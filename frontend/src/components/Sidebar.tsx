@@ -249,7 +249,7 @@ export function Sidebar({
                     </span>
                     {uncommittedCount > 0 && (
                       <span className="space-git-badge" title={`${uncommittedCount} uncommitted file${uncommittedCount === 1 ? "" : "s"}`}>
-                        <span className="space-git-dot" />{uncommittedCount}
+                        <span className="space-git-dot" />
                       </span>
                     )}
                     {space.session_count ? (
