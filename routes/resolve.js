@@ -3,6 +3,7 @@ import { requireAuth } from "../lib/auth.mjs";
 import db from "../lib/db.mjs";
 import { getSpaceByShortId } from "../lib/spaces.mjs";
 import { getSessionByShortId } from "../lib/sessions.mjs";
+import { getSpaceAuthorization } from "../lib/space-access.mjs";
 
 const router = Router();
 
@@ -28,11 +29,9 @@ router.get("/api/resolve", requireAuth, (req, res) => {
   const space = getSpaceByShortId(spaceShort);
   if (!space) return res.status(404).json({ error: "space not found" });
 
-  // Access check — owner or member.
-  const member = db.prepare(
-    "SELECT role FROM space_members WHERE space_id = ? AND user_id = ?"
-  ).get(space.id, req.user.id);
-  if (space.owner_id !== req.user.id && !member) {
+  // Access check — canonical authz check.
+  const authz = getSpaceAuthorization(space.id, req.user.id);
+  if (!authz.role) {
     return res.status(403).json({ error: "access denied" });
   }
 
