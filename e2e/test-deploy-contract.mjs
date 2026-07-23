@@ -1,17 +1,30 @@
 /** Static contract for transactional, revision-verifiable production deploys. */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const workflow = read(".github/workflows/deploy.yml");
 const serverDockerfile = read("Dockerfile");
 const sandboxDockerfile = read("sandbox/Dockerfile");
-const deploy = read("scripts/deploy-production.sh");
+const deploy = read(".github/deploy/deploy-production.sh");
 const backup = read("scripts/waynode-backup.sh");
 const server = read("server.js");
 const compose = read("docker-compose.ffrapposerver.yml");
 
-assert.match(workflow, /find scripts -type f -name '\*\.sh' -exec bash -n/);
+// CI is the ONLY deploy path. The manual script was deleted for good after
+// the 2026-07-23 bypass incident; it must never come back, and the CI copy
+// must refuse to run outside the workflow.
+assert.equal(
+  existsSync(new URL("../scripts/deploy-production.sh", import.meta.url)),
+  false,
+  "the manually runnable deploy script must stay deleted — deploys go through CI only",
+);
+assert.match(deploy, /WAYNODE_CI_DEPLOY[^\n]*!= "1"/, "deploy script must gate on the CI-only flag");
+assert.match(deploy, /manual invocation is not supported/i);
+assert.match(workflow, /WAYNODE_CI_DEPLOY=1/, "workflow must set the CI-only flag");
+assert.match(workflow, /\.github\/deploy\/deploy-production\.sh/, "workflow must call the CI-owned script");
+
+assert.match(workflow, /find scripts \.github\/deploy -type f -name '\*\.sh' -exec bash -n/);
 assert.match(workflow, /docker compose -f docker-compose\.yml config --quiet/);
 assert.match(workflow, /docker compose -f docker-compose\.ffrapposerver\.yml config --quiet/);
 assert.match(workflow, /git archive --format=tar\.gz/);

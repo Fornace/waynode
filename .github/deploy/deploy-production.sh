@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# ── CI-only entry point ─────────────────────────────────────────────────────
+# Production deploys run EXCLUSIVELY from .github/workflows/deploy.yml
+# (push to main). There is no manual path: hand-run deploys are how the
+# 2026-07-23 incident happened (container updated without the sandbox-image
+# msb reload, bricking every hosted turn). The workflow sets
+# WAYNODE_CI_DEPLOY=1; nothing else may.
+if [[ "${WAYNODE_CI_DEPLOY:-}" != "1" ]]; then
+  printf 'FATAL: production deploys run only via the Deploy GitHub Actions workflow (push to main).\n' >&2
+  printf 'See .github/workflows/deploy.yml — manual invocation is not supported.\n' >&2
+  exit 64
+fi
+
 LIVE_DIR=${LIVE_DIR:-/opt/waynode}
 STAGED_SOURCE_DIR=${STAGED_SOURCE_DIR:?Set STAGED_SOURCE_DIR to the extracted release source}
 STAGED_ROOT=${STAGED_ROOT:-$(dirname "$STAGED_SOURCE_DIR")}

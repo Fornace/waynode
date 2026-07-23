@@ -30,7 +30,7 @@ jobs:
 
       - name: Validate deployment files
         run: |
-          find scripts -type f -name '*.sh' -exec bash -n {} +
+          find scripts .github/deploy -type f -name '*.sh' -exec bash -n {} +
           cp .env.example .env
           trap 'rm -f .env' EXIT
           docker compose -f docker-compose.yml config --quiet
@@ -87,5 +87,6 @@ jobs:
             DEPLOY_SHA="$DEPLOY_SHA" \
             DEPLOY_ID="$DEPLOY_ID" \
             ALLOW_LEGACY_SOURCE=1 \
-            bash "$source_dir/scripts/deploy-production.sh"
+            WAYNODE_CI_DEPLOY=1 \
+            bash "$source_dir/.github/deploy/deploy-production.sh"
           REMOTE
