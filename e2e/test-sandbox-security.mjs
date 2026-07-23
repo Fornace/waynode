@@ -66,10 +66,10 @@ try {
     id: "session", space_id: "space", owner_id: "owner",
     provider: "fornace", model: "fornace-fast",
   };
-  const llmEnv = sandboxChatLlmEnv(session, runtimeConfig);
+  const llmEnv = await sandboxChatLlmEnv(session, runtimeConfig);
   assert.deepEqual(llmEnv, { WAYNODE_LLM_KEY: "restricted-runtime-key" });
   assert.equal(Object.values(llmEnv).includes(runtimeConfig.llm.apiKey), false, "admin key never enters sandbox env");
-  assert.throws(
+  await assert.rejects(
     () => sandboxChatLlmEnv(session, { ...runtimeConfig, llm: { ...runtimeConfig.llm, sandboxRuntimeKey: "" } }),
     /restricted runtime key is not configured/,
   );

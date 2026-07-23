@@ -99,6 +99,14 @@ check("delete-while-streaming-kills-handle-and-meters", async () => {
     _intentionalKill: false,
     proc: { kill: () => { killLog.signaled = true; } },
     spaceId: "space-lifecycle",
+    // stopAgent tears handles down through shutdown(); this mirrors the
+    // real handles' contract (see AgentHandle.shutdown).
+    shutdown() {
+      this._intentionalKill = true;
+      try { this.proc?.kill(); } catch {}
+      this.dead = true;
+      this.streaming = false;
+    },
   };
   if (typeof agentManager.__injectAgentForTest === "function") {
     agentManager.__injectAgentForTest(session.id, stub);

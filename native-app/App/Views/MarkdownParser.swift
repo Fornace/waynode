@@ -3,9 +3,28 @@ import Foundation
 // MARK: - Markdown parser (line-based, GFM-ish)
 
 enum MarkdownParser {
+    /// Parse results memoized by source text. Views call parse(_:) inside
+    /// `body`, so without a cache every SwiftUI re-render (each keystroke in
+    /// the composer, each focus change, each streaming delta) re-parsed the
+    /// ENTIRE transcript's markdown on the main thread — seconds of jank on
+    /// long sessions. Only the block whose text actually changed misses.
+    // NSCache is documented thread-safe; it just isn't marked Sendable.
+    nonisolated(unsafe) private static let cache: NSCache<NSString, ParsedBlocks> = {
+        let cache = NSCache<NSString, ParsedBlocks>()
+        cache.totalCostLimit = 8 * 1024 * 1024  // ~8MB of source text
+        return cache
+    }()
+    private final class ParsedBlocks: Sendable {
+        let blocks: [MarkdownBlock]
+        init(_ blocks: [MarkdownBlock]) { self.blocks = blocks }
+    }
+
     static func parse(_ text: String) -> [MarkdownBlock] {
-        let lines = text.components(separatedBy: "\n")
-        return parseLines(lines)
+        let key = text as NSString
+        if let hit = cache.object(forKey: key) { return hit.blocks }
+        let blocks = parseLines(text.components(separatedBy: "\n"))
+        cache.setObject(ParsedBlocks(blocks), forKey: key, cost: text.utf8.count)
+        return blocks
     }
 
     private static func parseLines(_ lines: [String]) -> [MarkdownBlock] {

@@ -1,4 +1,3 @@
-import { useSyncExternalStore } from "react";
 import type { ChatItem, Block, ComposerMode, HammersmithRun, Submission, SubmissionStatus } from "../types";
 import { appendText, appendThinking, appendTool, setToolOutput } from "./sessionBlocks";
 import { abortSession, loadHammersmithRuns, loadHistoryItems, openSessionStream, SubmissionError, submitDraft } from "./sessionTransport";
@@ -8,7 +7,7 @@ import {
   type SubmissionDraft, type SubmissionView,
 } from "./sessionSubmissions";
 let _idSeq = 0;
-const uid = () => `c${Date.now()}-${_idSeq++}`;
+export const uid = () => `c${Date.now()}-${_idSeq++}`;
 const eventSentAt = (event: any) => event.createdAt ?? event.created_at ?? event.timestamp ?? new Date().toISOString();
 interface SessionState {
   items: ChatItem[]; streaming: boolean; error: string | null; status: string | null;
@@ -27,8 +26,8 @@ const EMPTY: SessionState = {
   connection: "connecting", queuedCount: 0, activeStatus: null, failedDraft: null,
 };
 const entries = new Map<string, SessionEntry>();
-const renameListeners = new Set<(sessionId: string, title: string) => void>();
-function getEntry(sessionId: string): SessionEntry {
+export const renameListeners = new Set<(sessionId: string, title: string) => void>();
+export function getEntry(sessionId: string): SessionEntry {
   let e = entries.get(sessionId);
   if (!e) {
     e = {
@@ -40,7 +39,7 @@ function getEntry(sessionId: string): SessionEntry {
   }
   return e;
 }
-function emit(e: SessionEntry) {
+export function emit(e: SessionEntry) {
   e.state = { ...e.state };
   for (const l of e.listeners) l();
 }
@@ -136,6 +135,22 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
       e.state.connection = "connected";
       e.state.streaming = !!ev.streaming;
       for (const submission of ev.submissions || []) applySubmission(e, submission);
+      // The sync snapshot is the server's full active-submission truth. Any
+      // locally-active submission missing from it was lost to a server
+      // restart — settle it as failed so the composer never stays locked
+      // behind a phantom "running" item until page reload. "sending" is
+      // excluded: that's a client-side POST still in flight, unknown to the
+      // server by definition.
+      const known = new Set((ev.submissions || []).map((s: Submission) => s.id));
+      for (const item of e.state.items) {
+        if (item.role !== "user" || !item.submissionStatus || known.has(item.id)) continue;
+        if (!["queued", "starting", "running"].includes(item.submissionStatus)) continue;
+        applySubmission(e, {
+          id: item.id, prompt: item.content, mode: item.mode ?? (item.isGoal ? "goal" : "message"),
+          isGoal: item.isGoal ?? false,
+          status: "failed", error: "The server restarted while this message was in flight. Your draft is ready to retry.",
+        });
+      }
       if (ev.streaming && ev.partialText) {
         const liveIdx = [...e.msgIndex.values()].find((i) => {
           const m = e.state.items[i];
@@ -373,27 +388,4 @@ export async function abort(sessionId: string): Promise<void> {
     emit(e);
   }
 }
-export function injectSystem(sessionId: string, content: string) {
-  const e = getEntry(sessionId);
-  e.state.items = [...e.state.items, { id: uid(), role: "system", content, sentAt: new Date().toISOString() }];
-  emit(e);
-}
-export function injectProgress(sessionId: string, key: string, content: string) {
-  const e = getEntry(sessionId);
-  const items = e.state.items.slice();
-  const last = items[items.length - 1];
-  if (last && last.role === "system" && (last as any).key === key) {
-    items[items.length - 1] = { ...last, content } as any;
-  } else {
-    items.push({ id: uid(), role: "system", content, key, sentAt: new Date().toISOString() });
-  }
-  e.state.items = items;
-  emit(e);
-}
-export function onRename(cb: (sessionId: string, title: string) => void): () => void {
-  renameListeners.add(cb);
-  return () => renameListeners.delete(cb);
-}
-export function useSessionChat(sessionId: string) {
-  return useSyncExternalStore((cb) => subscribe(sessionId, cb), () => getSnapshot(sessionId));
-}
+export { injectSystem, injectProgress, onRename, useSessionChat } from "./sessionActions";

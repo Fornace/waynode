@@ -31,6 +31,20 @@ struct ComposerBar: View {
 
     private enum ComposerMode { case message, goal, hammersmith }
     @State private var composerMode: ComposerMode = .message
+
+    /// Everything the bar animates on, as one Equatable value — drives a
+    /// single .animation node instead of five stacked whole-bar transactions.
+    private struct BarPhase: Equatable {
+        let hasError: Bool
+        let isSending: Bool
+        let isRunActive: Bool
+        let isGoalActive: Bool
+        let mode: ComposerMode
+    }
+    private var barPhase: BarPhase {
+        .init(hasError: error != nil, isSending: isSending, isRunActive: isRunActive,
+              isGoalActive: isGoalActive, mode: composerMode)
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isGoalMode: Bool { composerMode == .goal }
@@ -156,6 +170,10 @@ struct ComposerBar: View {
                     .fill(.thinMaterial)
             )
             .overlay(
+                // The focus animation lives on the stroke alone. Attached to
+                // the whole capsule it implicitly animated every animatable
+                // attribute in the subtree (material, paddings, TextField
+                // frame) and that pass raced the keyboard bring-up.
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(
                         isFocused.wrappedValue
@@ -163,18 +181,16 @@ struct ComposerBar: View {
                             : Color.secondary.opacity(0.25),
                         lineWidth: isFocused.wrappedValue ? 1.5 : 1
                     )
+                    .animation(reduceMotion ? nil : .smooth, value: isFocused.wrappedValue)
             )
             .padding(.horizontal, 10)
             .padding(.top, 4)
             .padding(.bottom, 6)
-            .animation(reduceMotion ? nil : .smooth, value: isFocused.wrappedValue)
         }
         .background(.bar)
-        .animation(reduceMotion ? nil : .smooth, value: error != nil)
-        .animation(reduceMotion ? nil : .smooth, value: isSending)
-        .animation(reduceMotion ? nil : .smooth, value: isRunActive)
-        .animation(reduceMotion ? nil : .smooth, value: isGoalActive)
-        .animation(reduceMotion ? nil : .smooth, value: composerMode)
+        // One animation node keyed on the bar's whole phase instead of five
+        // stacked whole-bar transactions — same insert/remove transitions.
+        .animation(reduceMotion ? nil : .smooth, value: barPhase)
         .onChange(of: hammersmithAvailable) { _, available in
             if !available, isHammersmithMode { composerMode = .message }
         }
@@ -273,35 +289,3 @@ struct ComposerBar: View {
     }
 }
 
-private struct GoalTensionGlyph: View {
-    let active: Bool
-    let reduceMotion: Bool
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 24, paused: reduceMotion || !active)) { timeline in
-            let seconds = timeline.date.timeIntervalSinceReferenceDate
-            let pull: CGFloat = reduceMotion || !active ? 0 : CGFloat(sin(seconds * 2.2)) * 1.15
-            Canvas { context, size in
-                let sx = size.width / 24
-                let sy = size.height / 24
-                let points = [
-                    CGPoint(x: 3 * sx, y: (5 + pull) * sy),
-                    CGPoint(x: 7 * sx, y: (18 - pull * 0.35) * sy),
-                    CGPoint(x: 12 * sx, y: (10 - pull) * sy),
-                    CGPoint(x: 17 * sx, y: (18 + pull * 0.35) * sy),
-                    CGPoint(x: 21 * sx, y: (4 - pull) * sy)
-                ]
-                var tension = Path()
-                tension.move(to: points[0])
-                points.dropFirst().forEach { tension.addLine(to: $0) }
-                let color = active ? Color.accentColor : Color.secondary
-                context.stroke(tension, with: .color(color), lineWidth: active ? 1.8 : 1.4)
-                for point in points {
-                    let node = CGRect(x: point.x - 1.8, y: point.y - 1.8, width: 3.6, height: 3.6)
-                    context.fill(Path(ellipseIn: node), with: .color(color))
-                }
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}

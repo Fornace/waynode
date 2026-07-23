@@ -76,7 +76,7 @@ enum MarkdownInline {
 
 // MARK: - Block model
 
-indirect enum MarkdownBlock: Hashable {
+indirect enum MarkdownBlock: Hashable, Sendable {
     case heading(level: Int, text: String)
     case paragraph(String)
     case codeBlock(language: String, code: String)
@@ -86,13 +86,13 @@ indirect enum MarkdownBlock: Hashable {
     case thematicBreak
 }
 
-struct MarkdownListItem: Hashable {
+struct MarkdownListItem: Hashable, Sendable {
     var depth: Int       // 0 = top level; +1 per 2 spaces of indent
     var marker: String   // "•" / number text
     var text: String
 }
 
-enum MarkdownTableAlign: Hashable { case leading, center, trailing }
+enum MarkdownTableAlign: Hashable, Sendable { case leading, center, trailing }
 
 // MARK: - Block renderer
 

@@ -60,7 +60,7 @@
 		<key>UIColorName</key>
 		<string>LaunchScreenBackground</string>
 		<key>UIImageName</key>
-		<string>LaunchLogo</string>
+		<string>LaunchMark</string>
 	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

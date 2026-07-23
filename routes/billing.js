@@ -3,6 +3,7 @@ import { requireAuth } from "../lib/auth.mjs";
 import { config, billingEnabled } from "../lib/config.mjs";
 import { isOrgMember, getOrg } from "../lib/orgs.mjs";
 import { refreshOrgStorageUsage } from "../lib/storage-quota.mjs";
+import { orgLlmKeyStatus } from "../lib/org-llm-key.mjs";
 import {
   PLANS, getSubscription, getUsage, checkQuota,
   createCheckoutSession, createPortalSession,
@@ -49,6 +50,9 @@ router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, async (req,
   const subscription = getSubscription(orgId);
   const usage = getUsage(orgId);
   const quota = checkQuota(orgId);
+  // Gateway-side truth for the org's own LLM key (spend, tokens, caps).
+  // Optional: null whenever per-org keys aren't in play.
+  const gateway = await orgLlmKeyStatus(orgId);
 
   res.json({
     enabled: billingEnabled,
@@ -62,6 +66,7 @@ router.get("/api/orgs/:orgId/billing", requireAuth, requireOrgAdmin, async (req,
       storage_bytes: storageBytes,
     },
     quota,
+    gateway,
     plans: PLANS,
   });
 });

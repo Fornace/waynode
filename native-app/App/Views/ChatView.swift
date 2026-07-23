@@ -2,34 +2,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WaynodeCore
 
-// MARK: - Edit-message environment (#9)
-//
-// Lets a user message pre-fill the composer with its text so the user can
-// tweak and resend. True conversation forking (server-side pi checkpoint /
-// resume with a parent pointer) is not yet supported by the server, so this
-// is the achievable client-side slice: edit-and-resend as a new message.
-
-private struct EditMessageKey: EnvironmentKey {
-    nonisolated(unsafe) static let defaultValue: ((String) -> Void)? = nil
-}
-
-private struct StopHammersmithKey: EnvironmentKey {
-    nonisolated(unsafe) static let defaultValue: ((String) -> Void)? = nil
-}
-
-extension EnvironmentValues {
-    /// Set by ChatView; consumed by UserMessageView's context menu.
-    var onEditMessage: ((String) -> Void)? {
-        get { self[EditMessageKey.self] }
-        set { self[EditMessageKey.self] = newValue }
-    }
-    /// Set by ChatView; consumed by HammersmithRunView's stop button.
-    var onStopHammersmith: ((String) -> Void)? {
-        get { self[StopHammersmithKey.self] }
-        set { self[StopHammersmithKey.self] = newValue }
-    }
-}
-
 // MARK: - ChatView
 //
 // The main conversation surface. Shows:
@@ -93,13 +65,13 @@ struct ChatView: View {
             }
             // Provide an edit handler so user messages can pre-fill the
             // composer via their context menu (#9).
-            .environment(\.onEditMessage) { text in
+            .environment(\.onEditMessage, ChatHandler(id: ObjectIdentifier(store)) { text in
                 composerText = text
                 composerFocused = true
-            }
-            .environment(\.onStopHammersmith) { jobId in
+            })
+            .environment(\.onStopHammersmith, ChatHandler(id: ObjectIdentifier(store)) { jobId in
                 Task { await store.stopHammersmith(jobId) }
-            }
+            })
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ComposerBar(
                     text: $composerText,
@@ -371,18 +343,37 @@ struct ChatView: View {
     /// Server history may split one agent turn into several adjacent
     /// assistant records around tool calls. Present them as one turn so
     /// consecutive reasoning fragments can collapse into a single section.
+    /// Merge cache for transcriptItems. Without it the whole-transcript merge
+    /// (fresh arrays every time) ran on every body eval — every keystroke and
+    /// focus change — and the fresh arrays defeated copy-on-write pointer
+    /// equality in row diffing. Keyed on the reducer's revision counter,
+    /// which bumps on every content mutation.
+    private final class MergeCache {
+        var key: Int = -1
+        var items: [ChatItem] = []
+    }
+    @State private var mergeCache = MergeCache()
+
     private var transcriptItems: [ChatItem] {
-        store.reducer.items.reduce(into: []) { result, item in
-            guard case .assistant(let next) = item,
-                  let last = result.last,
-                  case .assistant(var previous) = last else {
-                result.append(item)
-                return
+        var hasher = Hasher()
+        hasher.combine(store.reducer.revision)
+        hasher.combine(store.reducer.items.count)
+        let key = hasher.finalize()
+        if mergeCache.key != key {
+            mergeCache.items = store.reducer.items.reduce(into: []) { result, item in
+                guard case .assistant(let next) = item,
+                      let last = result.last,
+                      case .assistant(var previous) = last else {
+                    result.append(item)
+                    return
+                }
+                previous.blocks.append(contentsOf: next.blocks)
+                previous.done = next.done
+                result[result.count - 1] = .assistant(previous)
             }
-            previous.blocks.append(contentsOf: next.blocks)
-            previous.done = next.done
-            result[result.count - 1] = .assistant(previous)
+            mergeCache.key = key
         }
+        return mergeCache.items
     }
 }
 
