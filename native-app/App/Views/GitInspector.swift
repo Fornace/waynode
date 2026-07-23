@@ -11,6 +11,7 @@ struct GitInspector: View {
     let fixtureSnapshot: GitSnapshot?
     @Environment(AppModel.self) var appModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State var snapshot: GitSnapshot?
     @State var error: String?
     @State var isLoading: Bool = true
@@ -157,6 +158,7 @@ struct GitInspector: View {
             }
             .task {
                 await loadSnapshot()
+                await streamSnapshots()
             }
         }
         .interactiveDismissDisabled(isDiscarding)
@@ -236,8 +238,14 @@ struct GitInspector: View {
                     Button {
                         Task { await pullChanges() }
                     } label: {
-                        Label(snap.behind > 0 ? "Pull \(snap.behind)" : "Pull", systemImage: isPulling ? "arrow.triangle.2.circlepath" : "arrow.down")
-                            .frame(maxWidth: .infinity)
+                        GitSyncActionLabel(
+                            title: snap.behind > 0 ? "Pull \(snap.behind)" : "Pull",
+                            idleSystemImage: "arrow.down",
+                            busyTitle: "Pulling",
+                            isBusy: isPulling,
+                            reduceMotion: reduceMotion
+                        )
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .disabled(syncActionsBusy || pullBlockReason(snap) != nil)
@@ -247,8 +255,14 @@ struct GitInspector: View {
                     Button {
                         Task { await pushChanges() }
                     } label: {
-                        Label(snap.ahead > 0 ? "Push \(snap.ahead)" : "Push", systemImage: isPushing ? "arrow.triangle.2.circlepath" : "arrow.up")
-                            .frame(maxWidth: .infinity)
+                        GitSyncActionLabel(
+                            title: snap.ahead > 0 ? "Push \(snap.ahead)" : "Push",
+                            idleSystemImage: "arrow.up",
+                            busyTitle: "Pushing",
+                            isBusy: isPushing,
+                            reduceMotion: reduceMotion
+                        )
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .tint(snap.ahead > 0 ? .accentColor : .secondary)
@@ -362,6 +376,7 @@ struct GitInspector: View {
                         Text("\(selectedFiles.count) selected")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .contentTransition(.numericText(value: Double(selectedFiles.count)))
                     }
                 }
             }

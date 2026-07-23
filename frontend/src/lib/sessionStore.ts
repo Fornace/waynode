@@ -85,7 +85,6 @@ function submissionView(e: SessionEntry): SubmissionView {
 }
 function applySubmission(e: SessionEntry, submission: Submission, accepted = true, kind: "message" | "queue" = "message") {
   Object.assign(e.state, reconcileSubmission(submissionView(e), submission, { accepted, kind }));
-  if (["starting", "running"].includes(submission.status)) e.state.streaming = true;
   if (submission.status === "failed") e.state.error = submission.error || "Your message wasn’t delivered. Your draft is ready to retry.";
   else if (["queued", "starting", "running", "completed"].includes(submission.status)) e.state.error = null;
 }
@@ -327,7 +326,7 @@ async function postDraft(sessionId: string, draft: SubmissionDraft): Promise<boo
       id: draft.id, prompt: draft.prompt, mode: draft.mode ?? (draft.isGoal ? "goal" : "message"), isGoal: draft.isGoal, status: "failed",
       error: error instanceof Error ? error.message : "Submission failed",
     }, false, draft.kind);
-    e.state.streaming = e.state.activeStatus === "running";
+    e.state.streaming = false;
     e.state.status = null;
     emit(e);
     return false;

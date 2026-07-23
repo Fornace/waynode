@@ -30,7 +30,7 @@ A **cloud coding agent** is a managed service: the vendor clones your repository
 
 A **self-hosted coding agent** runs the same loop on machines you control: a workstation, an on-prem server, or your own cloud account. The repository is cloned to your disk, the agent process runs under your OS, and model calls go directly from your network to the LLM provider (or to a local model). Nothing about your code or credentials passes through the agent vendor.
 
-Terminal-based agents like Claude Code blur the line: the agent process runs locally on your machine, but code context is sent to Anthropic's API for inference, and its subscription plans (Pro $20/mo, Max $100–$200/mo, per [claude.com/pricing](https://claude.com/pricing)) bill through Anthropic. "Self-hosted" in the strict sense means the whole workspace (repo storage, session state, execution sandbox) lives on your infrastructure, with only inference (optionally) leaving it.
+Terminal-based agents like Claude Code blur the line: the agent process runs locally on your machine, but code context is sent to Anthropic's API for inference, and its subscription plans (Pro $20/mo, Max $100-$200/mo, per [claude.com/pricing](https://claude.com/pricing)) bill through Anthropic. "Self-hosted" in the strict sense means the whole workspace (repo storage, session state, execution sandbox) lives on your infrastructure, with only inference (optionally) leaving it.
 
 ## Comparison: self-hosted vs cloud coding agents
 
@@ -68,9 +68,9 @@ Cloud agents are subscription-first with metered usage on top. Current published
 | Devin (Cognition) | Free tier; Pro $20/mo; Max $200/mo; Teams $80/mo + $40/seat | Consumption-based on model and task; Enterprise adds VPC deployment ([source](https://devin.ai/pricing/)) |
 | Cursor | Individual from $20/mo; Teams $40/user/mo | Cloud agents bill usage-based on top of plans ([source](https://cursor.com/pricing)) |
 | GitHub Copilot coding agent | Pro $10/mo ($15 credits); Pro+ $39/mo ($70); Max $100/mo ($200) | AI Credits, 1 credit = $0.01; agent on paid plans ([source](https://github.com/features/copilot/plans)) |
-| Claude Code | Pro $20/mo; Max $100–$200/mo | Plan rate limits; API pay-as-you-go alternative ([source](https://claude.com/pricing)) |
+| Claude Code | Pro $20/mo; Max $100-$200/mo | Plan rate limits; API pay-as-you-go alternative ([source](https://claude.com/pricing)) |
 
-Self-hosting inverts the structure: the software is often free (open source), and you pay two real costs: infrastructure (a VPS or spare machine running Docker is typically $5–$40/mo, or effectively zero on hardware you own) and model API usage at list price with no intermediary margin. For heavy agent use, BYO keys is usually cheaper per token than vendor credits; for light use, a flat subscription can be cheaper than the discipline of managing keys. There is also an unpriced cost: your time operating the deployment.
+Self-hosting inverts the structure: the software is often free (open source), and you pay two real costs: infrastructure (a VPS or spare machine running Docker is typically $5-$40/mo, or effectively zero on hardware you own) and model API usage at list price with no intermediary margin. For heavy agent use, BYO keys is usually cheaper per token than vendor credits; for light use, a flat subscription can be cheaper than the discipline of managing keys. There is also an unpriced cost: your time operating the deployment.
 
 ## What maintenance does self-hosting actually require?
 
@@ -113,7 +113,7 @@ Structurally yes: self-hosting removes the agent vendor from the data path, leav
 
 ### Is self-hosting a coding agent cheaper?
 
-For heavy usage, usually: you pay raw API token prices plus modest infrastructure costs instead of subscription credits with margin. For light or occasional use, a $10–$20/mo cloud subscription is often cheaper than the time spent operating your own deployment.
+For heavy usage, usually: you pay raw API token prices plus modest infrastructure costs instead of subscription credits with margin. For light or occasional use, a $10-$20/mo cloud subscription is often cheaper than the time spent operating your own deployment.
 
 ### Can I use frontier models like GPT or Claude with a self-hosted agent?
 

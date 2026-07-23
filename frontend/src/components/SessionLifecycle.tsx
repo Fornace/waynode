@@ -113,7 +113,7 @@ function dialogTitle(request: PendingLifecycle) {
 }
 
 function confirmLabel(request: PendingLifecycle) {
-  if (request.commitFirst) return request.action === "archive" ? "Commit & archive" : "Commit & delete";
+  if (request.commitFirst) return request.action === "archive" ? "Commit and archive" : "Commit and delete";
   return "Delete session";
 }
 

@@ -3,6 +3,7 @@ import WaynodeCore
 
 struct ChatTranscriptRow: View {
     let item: ChatItem
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
@@ -31,27 +32,34 @@ struct ChatTranscriptRow: View {
         .padding(.horizontal, 8)
     }
 
+    @ViewBuilder
     private var timestamp: some View {
-        Group {
-            if let sentAt = item.sentAt {
+        if let sentAt = item.sentAt {
+            HStack(spacing: 3) {
+                Image(systemName: "clock")
+                    .accessibilityHidden(true)
                 Text(sentAt.formatted(date: .omitted, time: .shortened))
                     .monospacedDigit()
-                    .accessibilityLabel(sentAt.formatted(date: .abbreviated, time: .shortened))
-            } else {
-                Text("Time unavailable")
-                    .accessibilityLabel("Sent time unavailable")
             }
+            .accessibilityLabel(sentAt.formatted(date: .abbreviated, time: .shortened))
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .accessibilityIdentifier("chat.message.\(item.id).time")
         }
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
-        .accessibilityIdentifier("chat.message.\(item.id).time")
     }
 
     private func submissionStatus(_ status: SubmissionStatus, error: Bool) -> some View {
-        Label(label(for: status), systemImage: icon(for: status))
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(error ? Color.red : Color.secondary)
-            .accessibilityIdentifier("chat.submission.\(status.rawValue)")
+        HStack(spacing: 4) {
+            Image(systemName: icon(for: status))
+                .symbolRenderingMode(.hierarchical)
+                .symbolEffect(.rotate, isActive: status.isActive && !reduceMotion)
+                .symbolEffect(.wiggle, value: status == .failed)
+                .contentTransition(.symbolEffect(.replace))
+            Text(label(for: status))
+        }
+        .font(.caption2.weight(.medium))
+        .foregroundStyle(error ? Color.red : Color.secondary)
+        .accessibilityIdentifier("chat.submission.\(status.rawValue)")
     }
 
     private func label(for status: SubmissionStatus) -> String {
@@ -61,7 +69,7 @@ struct ChatTranscriptRow: View {
         case .starting: "Starting"
         case .running: "Running"
         case .completed: "Sent"
-        case .failed: "Failed — draft restored"
+        case .failed: "Failed: draft restored"
         case .cancelled: "Cancelled"
         }
     }
@@ -73,6 +81,17 @@ struct ChatTranscriptRow: View {
         case .completed: "checkmark"
         case .failed: "exclamationmark.circle"
         case .cancelled: "stop.circle"
+        }
+    }
+}
+
+private extension SubmissionStatus {
+    var isActive: Bool {
+        switch self {
+        case .sending, .starting, .running:
+            true
+        case .queued, .completed, .failed, .cancelled:
+            false
         }
     }
 }

@@ -53,6 +53,8 @@
 		89ED4A1123BF82E715F6576F /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */; };
 		8A88588B54A51A69FB853FD0 /* ChatUITestFixtureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C6CD2135BFD61792040C7C /* ChatUITestFixtureView.swift */; };
 		8B20CEA23B95339948E763BA /* WorkbenchDeletionAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C94E539B91186E5F8B46D06 /* WorkbenchDeletionAlerts.swift */; };
+		8C78646530118F56009B0AC1 /* GitActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C78646430118F56009B0AC1 /* GitActivityViews.swift */; };
+		8C78646630118F56009B0AC1 /* GitActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C78646430118F56009B0AC1 /* GitActivityViews.swift */; };
 		8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF14352DE276CEE0FD2DEEC /* RootView.swift */; };
 		8F8E2166148B1A17C4D4E71E /* GitTerminalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B295EE18F924453E6C38B40 /* GitTerminalUITests.swift */; };
 		93C0B6F45DBA42D8A62BCA91 /* IPadResponsiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12408235CB744178BE2C4B79 /* IPadResponsiveUITests.swift */; };
@@ -114,9 +116,9 @@
 		02D7AE1B68CED2FAB3490786 /* SignedKeychainUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignedKeychainUITests.swift; sourceTree = "<group>"; };
 		05DEA2882D8C1DF151489327 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0ADED7FBF7E899002F98DF79 /* AuthPresentationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthPresentationProvider.swift; sourceTree = "<group>"; };
-		12408235CB744178BE2C4B79 /* IPadResponsiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadResponsiveUITests.swift; sourceTree = "<group>"; };
 		0B954C00B60D3DB33B2A804F /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
-		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WaynodeCore; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
+		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
+		12408235CB744178BE2C4B79 /* IPadResponsiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadResponsiveUITests.swift; sourceTree = "<group>"; };
 		156A741D0EA8E9804E056580 /* SessionDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetail.swift; sourceTree = "<group>"; };
 		15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTerminalSurface.swift; sourceTree = "<group>"; };
 		3597634E9CD330E43026BD8B /* CloneSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloneSheet.swift; sourceTree = "<group>"; };
@@ -145,6 +147,7 @@
 		7EDBB5991A1EE64E7425BCC1 /* AccountScene+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountScene+Actions.swift"; sourceTree = "<group>"; };
 		88CF5AEFDBBFC6C0D9E40A8F /* SessionSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSettingsSheet.swift; sourceTree = "<group>"; };
 		8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
+		8C78646430118F56009B0AC1 /* GitActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitActivityViews.swift; sourceTree = "<group>"; };
 		92F9A894B5CC7EC58EDBCBA3 /* WaynodeMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WaynodeMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		973570FC4313CD06E6FCF0E4 /* ChatStatusViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStatusViews.swift; sourceTree = "<group>"; };
 		9A6A987D9CE9EBA58B250DB9 /* ChatTranscriptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTranscriptRow.swift; sourceTree = "<group>"; };
@@ -243,6 +246,7 @@
 				54B382C33134DF897FD4C618 /* SpacesSidebar.swift */,
 				8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */,
 				4C94E539B91186E5F8B46D06 /* WorkbenchDeletionAlerts.swift */,
+				8C78646430118F56009B0AC1 /* GitActivityViews.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -469,6 +473,7 @@
 				246CD828E4EE647AF2C8BD42 /* ComposerBar.swift in Sources */,
 				809AA3152028564A2034A860 /* GitInspector.swift in Sources */,
 				98E820915573A77B9B630B2A /* GitInspectorActions.swift in Sources */,
+				8C78646630118F56009B0AC1 /* GitActivityViews.swift in Sources */,
 				1D67D0FEC464C5F8FBBFE282 /* GitInspectorSupportingViews.swift in Sources */,
 				7B702D4C0A963B0A66B1B61B /* GitUITestFixtures.swift in Sources */,
 				DEE31357FAE78BA8E2ACF89F /* MacCommands.swift in Sources */,
@@ -519,6 +524,7 @@
 				7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */,
 				6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */,
 				855A8EA61057C7E04B8D24C3 /* GitInspectorActions.swift in Sources */,
+				8C78646530118F56009B0AC1 /* GitActivityViews.swift in Sources */,
 				AAB014B3667DE5BAB8D7B39F /* GitInspectorSupportingViews.swift in Sources */,
 				2AD75EE640D4C061F3B57605 /* GitUITestFixtures.swift in Sources */,
 				7F5A8E64C4AB396AB6C86BE5 /* MacCommands.swift in Sources */,

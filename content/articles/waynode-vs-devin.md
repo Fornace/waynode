@@ -55,7 +55,7 @@ Two ways to run it:
 | Interaction | Chat, autonomous goals, full terminal, Git panel; mobile web | Web app, Slack/Teams, CLI; shell/IDE/browser inside the session ([docs](https://docs.devin.ai/get-started/devin-intro)) |
 | Models | Bring your own keys (self-host); Fornace/GLM/Qwen tiers (cloud) | Cognition-managed models |
 | Repo providers | GitHub, GitLab (OAuth) | GitHub, GitLab (incl. Devin Review) ([release notes](https://docs.devin.ai/release-notes/overview)) |
-| Pricing | Free self-host; Cloud $39–$249/mo flat tiers | Free; Pro $20/mo; Max $200/mo; Teams $80/mo + $40/seat; Enterprise custom ([pricing](https://devin.ai/pricing/), [announcement](https://cognition.com/blog/new-self-serve-plans-for-devin)) |
+| Pricing | Free self-host; Cloud $39-$249/mo flat tiers | Free; Pro $20/mo; Max $200/mo; Teams $80/mo + $40/seat; Enterprise custom ([pricing](https://devin.ai/pricing/), [announcement](https://cognition.com/blog/new-self-serve-plans-for-devin)) |
 | Usage metering | Token allowances on Cloud; unmetered on self-host (your API costs) | Auto-refreshing quotas, dollar-billed overages; ACUs on Enterprise |
 | Multi-agent orchestration | No | Yes ("Devin manages Devins") |
 | Automated PR review product | No | Yes (Devin Review) |

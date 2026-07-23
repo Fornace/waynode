@@ -75,7 +75,7 @@ struct UserMessageView: View {
                     onEdit?(message.content)
                     Haptics.light()
                 } label: {
-                    Label("Edit & Resend", systemImage: "pencil")
+                    Label("Edit and Resend", systemImage: "pencil")
                 }
             }
         }
@@ -93,9 +93,11 @@ struct AssistantMessageView: View {
     let message: ChatItem.AssistantItem
 
     var body: some View {
+        let blocks = displayBlocks
+
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(displayBlocks.enumerated()), id: \.offset) { _, block in
-                BlockView(block: block)
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                BlockView(block: block, isReasoningStreaming: isLiveReasoningBlock(block, at: index, in: blocks))
             }
             if !message.done {
                 HStack(spacing: 4) {
@@ -125,6 +127,15 @@ struct AssistantMessageView: View {
             }
             result[result.count - 1] = .thinking(.init(text: previous.text + "\n\n" + next.text))
         }
+    }
+
+    private func isLiveReasoningBlock(_ block: Block, at index: Int, in blocks: [Block]) -> Bool {
+        guard !message.done,
+              index == blocks.indices.last,
+              case .thinking = block else {
+            return false
+        }
+        return true
     }
 }
 
@@ -181,13 +192,14 @@ struct SystemMessageView: View {
 
 struct BlockView: View {
     let block: Block
+    var isReasoningStreaming: Bool = false
 
     var body: some View {
         switch block {
         case .text(let data):
             TextBlock(text: data.text)
         case .thinking(let data):
-            ThinkingBlock(text: data.text)
+            ThinkingBlock(text: data.text, isStreaming: isReasoningStreaming)
         case .tool(let data):
             ToolBlockView(data: data)
         }
@@ -217,8 +229,11 @@ struct TextBlock: View {
 
 struct ThinkingBlock: View {
     let text: String
+    let isStreaming: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded: Bool = false
+
+    private var showsBody: Bool { isStreaming || isExpanded }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -226,32 +241,154 @@ struct ThinkingBlock: View {
                 Haptics.light()
                 withAnimation(reduceMotion ? nil : .smooth) { isExpanded.toggle() }
             } label: {
-                HStack {
-                    Image(systemName: "brain.head.profile")
-                        .font(.caption)
-                    Text("Reasoning")
-                        .font(.caption.bold())
+                HStack(spacing: 9) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.indigo.opacity(0.16))
+                        Image(systemName: isStreaming ? "sparkles" : "brain.head.profile")
+                            .font(.caption)
+                            .foregroundStyle(Color.indigo)
+                            .symbolRenderingMode(.hierarchical)
+                            .symbolEffect(.breathe, isActive: isStreaming && !reduceMotion)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .frame(width: 24, height: 24)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Reasoning")
+                            .font(.caption.bold())
+                            .foregroundStyle(.primary)
+                        Text(isStreaming ? "Streaming thoughts" : (isExpanded ? "Expanded" : "Collapsed"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption2)
+                    Image(systemName: showsBody ? "chevron.down" : "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.symbolEffect(.replace))
                 }
-                .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.vertical, 9)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityHint(isStreaming ? "Reasoning is shown while it streams" : "Expands or collapses reasoning")
 
-            if isExpanded {
-                MarkdownView(text: text)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
-                    .transition(.opacity)
+            if showsBody {
+                ScrollView(.vertical) {
+                    ReasoningContentView(text: text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                }
+                .frame(maxHeight: isStreaming ? 220 : 360)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color.secondary.opacity(0.07))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.indigo.opacity(0.08))
+        )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color.indigo.opacity(isStreaming ? 0.85 : 0.55))
+                .frame(width: 3)
+                .padding(.vertical, 8)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.indigo.opacity(isStreaming ? 0.28 : 0.16))
+        )
+    }
+}
+
+private struct ReasoningContentView: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(MarkdownParser.parse(text).enumerated()), id: \.offset) { _, block in
+                ReasoningMarkdownBlock(block: block)
+            }
+        }
+        .textSelection(.enabled)
+    }
+}
+
+private struct ReasoningMarkdownBlock: View {
+    let block: MarkdownBlock
+
+    var body: some View {
+        switch block {
+        case .heading(let level, let text):
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Image(systemName: icon(for: level))
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.indigo)
+                    .frame(width: 14)
+                Text(MarkdownInline.attributed(text))
+                    .font(level <= 2 ? .subheadline.weight(.semibold) : .caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.top, level <= 2 ? 2 : 0)
+
+        case .paragraph(let text):
+            Text(MarkdownInline.attributed(text, baseColor: .secondary))
+                .font(.callout)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+        case .codeBlock(let language, let code):
+            CodeBlockView(language: language, code: code)
+
+        case .listBlock(let ordered, let items):
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(items.enumerated()), id: \.offset) { idx, item in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(ordered ? item.marker : "•")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.indigo)
+                            .frame(width: ordered ? 24 : 12, alignment: .trailing)
+                        Text(MarkdownInline.attributed(item.text, baseColor: .secondary))
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.leading, CGFloat(item.depth) * 14)
+                    .id(idx)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.indigo.opacity(0.055), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+        case .blockquote(let blocks):
+            HStack(alignment: .top, spacing: 8) {
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(Color.indigo.opacity(0.55))
+                    .frame(width: 3)
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                        ReasoningMarkdownBlock(block: block)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+        case .table(let header, let alignments, let rows):
+            TableView(header: header, alignments: alignments, rows: rows)
+
+        case .thematicBreak:
+            Divider()
+                .padding(.vertical, 2)
+        }
+    }
+
+    private func icon(for level: Int) -> String {
+        level <= 2 ? "list.bullet.rectangle" : "smallcircle.filled.circle"
     }
 }
 
@@ -277,6 +414,7 @@ struct ToolBlockView: View {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .contentShape(Rectangle())
                 .padding(.horizontal, 12)
@@ -337,16 +475,25 @@ struct ToolBlockView: View {
     private var statusIcon: some View {
         switch data.status {
         case .running:
-            ProgressView()
-                .controlSize(.mini)
+            ActivitySymbol(
+                systemImage: "gearshape.arrow.triangle.2.circlepath",
+                reduceMotion: reduceMotion,
+                size: 12
+            )
+            .foregroundStyle(.orange)
+            .contentTransition(.symbolEffect(.replace))
         case .done:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
                 .font(.caption)
+                .symbolEffect(.bounce, value: data.status)
+                .contentTransition(.symbolEffect(.replace))
         case .error:
             Image(systemName: "xmark.circle.fill")
                 .foregroundStyle(.red)
                 .font(.caption)
+                .symbolEffect(.wiggle, value: data.status)
+                .contentTransition(.symbolEffect(.replace))
         }
     }
 

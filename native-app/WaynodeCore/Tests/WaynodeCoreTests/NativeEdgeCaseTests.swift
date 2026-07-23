@@ -7,8 +7,8 @@ import Testing
 // Each test pins one confirmed edge-case bug from the QA scout. Bugs 1, 2, 4,
 // 7 exercise existing code paths and fail behaviourally against the current
 // implementation. Bugs 3, 5, 6 require a small testability seam that the fix
-// introduces (consume/heartbeatResets on SSEClient; cloneProgressRequest on
-// APIClient; terminalRequest on WSClient), so they fail until those seams —
+// introduces (consume/heartbeatResets on SSEClient; SSEWire.request for SSE
+// endpoints; terminalRequest on WSClient), so they fail until those seams —
 // which are part of the fix — exist.
 
 @Suite("Native edge-case fixes", .serialized)
@@ -109,6 +109,41 @@ struct NativeEdgeCaseTests {
         #expect(after > before)
     }
 
+    // MARK: SSE parsing under real AsyncLineSequence behaviour.
+    // URLSession's bytes.lines NEVER yields the blank lines that separate SSE
+    // events, so a parser that waits for `line.isEmpty` as an event boundary
+    // buffers forever and decodes nothing — no streamed deltas ever reached
+    // the reducer. consume() must decode each `data:` line as one event.
+
+    @Test("consume decodes events without blank boundary lines")
+    func consumeDecodesWithoutBlankLines() async throws {
+        let client = SSEClient(url: URL(string: "https://example.test/stream")!, token: nil)
+
+        let collector = Task { () -> [SSEEvent.Kind] in
+            var got: [SSEEvent.Kind] = []
+            for await event in client.events() { got.append(event) }
+            return got
+        }
+
+        // Exactly what AsyncLineSequence delivers for a live turn: data lines
+        // and comment keep-alives, never an empty boundary line.
+        try await client.consume(LineStream(lines: [
+            #"data: {"type":"start"}"#,
+            #"data: {"type":"message_start","messageId":"m1"}"#,
+            #"data: {"type":"thinking_delta","messageId":"m1","delta":"pondering"}"#,
+            ": ka",
+            #"data: {"type":"text_delta","messageId":"m1","delta":"answer"}"#,
+            #"data: {"type":"message_end","messageId":"m1"}"#,
+            #"data: {"type":"end"}"#,
+        ]))
+        await client.stop()  // finish the continuation so the collector ends
+
+        let events = await collector.value
+        #expect(events.count == 6)
+        #expect(events[2] == .thinkingDelta(messageId: "m1", delta: "pondering"))
+        #expect(events[3] == .textDelta(messageId: "m1", delta: "answer"))
+    }
+
     // MARK: Bug 6
 
     // MARK: Bug 4 — Concurrent submit silently drops the draft. The old
@@ -140,19 +175,21 @@ struct NativeEdgeCaseTests {
 
     // MARK: Bug 6 — Clone-progress SSE put the bearer token in the URL query
     // (?t=...), contradicting SSEClient's header policy. The fix sends it via
-    // the Authorization header. (URL-level; also removes the line-189
-    // URLComponents force-unwrap from bug 5.)
+    // the Authorization header. Every SSE endpoint (chat, clone-progress, git
+    // inspector) now builds its request through SSEWire.request, so one test
+    // pins the policy for all of them.
 
-    @Test("Clone-progress SSE authenticates via Authorization header, not query token")
-    func cloneProgressUsesHeaderAuth() {
+    @Test("SSE requests authenticate via Authorization header, not query token")
+    func sseRequestsUseHeaderAuth() {
         let client = APIClient(baseURL: URL(string: "https://example.test")!, token: nil)
         let url = client.makeURL("/api/spaces/s1/clone-events")
-        let req = client.cloneProgressRequest(url: url, token: "wn_secret")
+        let req = SSEWire.request(url: url, token: "wn_secret")
 
         #expect(req.value(forHTTPHeaderField: "Authorization") == "Bearer wn_secret")
         // Token must NOT leak into the URL query (proxy-log policy).
         #expect(req.url?.query == nil)
         #expect(req.url?.absoluteString.contains("t=wn_secret") == false)
+        #expect(req.value(forHTTPHeaderField: "Accept") == "text/event-stream")
     }
 
     // MARK: Bug 5 — Force-unwrapped URLComponents can crash. WSClient.connect() — Force-unwrapped URLComponents can crash. WSClient.connect()
@@ -160,7 +197,7 @@ struct NativeEdgeCaseTests {
     // fix guard-lets with a typed failure. (URL-level guard test for WSClient;
     // the rawData guard is defense-in-depth since URLComponents never returns
     // nil for a URL(string:)-accepted URL, and the clone-progress force-unwrap
-    // is removed entirely by cloneProgressRequest above.)
+    // is removed entirely by SSEWire.request above.)
 
     @Test("WSClient terminal request rewrites scheme, carries bearer header, and never force-unwraps")
     func wsClientTerminalRequestIsGuarded() throws {
@@ -244,7 +281,7 @@ private actor NativeEdgeTransport: SessionTransport {
 
 /// A trivial synchronous AsyncSequence over a [String], used to feed SSE wire
 /// lines into SSEClient.consume() without a live URL session.
-private struct LineStream: AsyncSequence {
+struct LineStream: AsyncSequence {
     let lines: [String]
     struct Iterator: AsyncIteratorProtocol {
         var lines: [String]

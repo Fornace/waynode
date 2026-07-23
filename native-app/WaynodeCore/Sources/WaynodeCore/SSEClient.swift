@@ -182,10 +182,7 @@ public actor SSEClient {
     }
 
     private func connectOnce() async throws {
-        var req = URLRequest(url: url)
-        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        let req = SSEWire.request(url: url, token: token)
 
         // Create a fresh session per connection so forceReconnect() can
         // invalidate it without affecting the task.
@@ -217,14 +214,16 @@ public actor SSEClient {
     /// the handling of comment keep-alive lines (`: ka`) that carry no `data:`
     /// payload — is unit-testable without a live URL session.
     ///
-    /// Any received line (event data, a comment keep-alive, or a blank event
-    /// boundary) proves the connection is alive, so the watchdog is reset here
-    /// rather than only inside `if let event = parseEvent(...)`. The old code
-    /// reset solely on a successfully parsed event, which meant an idle-but-
-    /// healthy stream force-reconnected every 90s forever (and each reconnect
-    /// compounded the sync-duplicate bug).
+    /// Every `data:` line is parsed as one complete event. The server writes
+    /// each event as a single `data: ${JSON.stringify(ev)}\n\n` frame, so a
+    /// payload can never span lines — and `AsyncLineSequence` (bytes.lines)
+    /// NEVER yields the blank separator lines, so any parser that waits for
+    /// `line.isEmpty` as an event boundary waits forever and decodes nothing.
+    ///
+    /// Any received line (event data or a comment keep-alive) proves the
+    /// connection is alive, so the watchdog is reset here rather than only
+    /// on a successfully parsed event.
     func consume<S: AsyncSequence>(_ lines: S) async throws where S.Element == String {
-        var buffer = ""
         var heartbeatTask = Task { [weak self] in
             // If no events for 90s, force-reconnect by invalidating the session.
             try? await sleep(seconds: 90)
@@ -246,35 +245,10 @@ public actor SSEClient {
             }
             heartbeatResets += 1
 
-            if line.isEmpty {
-                // Event boundary — flush buffer if we have data.
-                if !buffer.isEmpty {
-                    if let event = parseEvent(buffer) {
-                        continuation.yield(event)
-                    }
-                    buffer = ""
-                }
-                continue
-            }
-            buffer += line + "\n"
-        }
-    }
-
-    /// Parse the buffered lines of one SSE event into an SSEEvent.Kind.
-    /// Only `data:` lines matter to us; the server doesn't send `event:`
-    /// or `id:` fields.
-    private func parseEvent(_ buffer: String) -> SSEEvent.Kind? {
-        var dataLines: [String] = []
-        for line in buffer.split(separator: "\n", omittingEmptySubsequences: false) {
-            if line.hasPrefix("data:") {
-                let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
-                dataLines.append(String(payload))
+            if let event = SSEWire.decode(line, as: SSEEvent.self)?.kind {
+                continuation.yield(event)
             }
         }
-        guard !dataLines.isEmpty else { return nil }
-        let json = dataLines.joined(separator: "\n")
-        guard let data = json.data(using: .utf8) else { return nil }
-        return (try? JSONDecoder.api.decode(SSEEvent.self, from: data))?.kind
     }
 
     /// Force a reconnect by invalidating the current URLSession.
@@ -309,6 +283,37 @@ private struct StreamHTTPError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         permanentFailure?.message ?? "Live connection failed (HTTP \(statusCode))."
+    }
+}
+
+// MARK: - SSE wire decoding
+
+/// Decodes one SSE wire line into a payload. The Waynode server writes every
+/// event as a single `data: <one-line JSON>` frame (JSON.stringify never emits
+/// raw newlines), so each `data:` line is one complete event. Non-data lines —
+/// comment keep-alives (`: ka`) and blank boundaries — decode to nil.
+///
+/// This exists because `URLSession.AsyncBytes.lines` silently drops empty
+/// lines, so the classic "accumulate until blank line" SSE parser never fires.
+/// Parse per line; never wait for a boundary.
+enum SSEWire {
+    static func decode<T: Decodable>(_ line: some StringProtocol, as type: T.Type) -> T? {
+        guard line.hasPrefix("data:") else { return nil }
+        let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+        guard let data = payload.data(using: .utf8) else { return nil }
+        return try? JSONDecoder.api.decode(T.self, from: data)
+    }
+
+    /// Build the URLRequest for any Waynode SSE endpoint. The token travels in
+    /// the Authorization header (NOT the query string) to keep it out of proxy
+    /// access logs; the server's `sseAuth` middleware accepts the header on
+    /// every SSE route. Pure so it is unit-testable without a live URL session.
+    static func request(url: URL, token: String?) -> URLRequest {
+        var req = URLRequest(url: url)
+        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        return req
     }
 }
 

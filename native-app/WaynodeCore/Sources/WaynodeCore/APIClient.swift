@@ -182,37 +182,22 @@ public actor APIClient {
         case error(String)
     }
 
-    /// Build the URLRequest for the clone-progress SSE. The token travels in
-    /// the Authorization header (NOT the query string) to keep it out of proxy
-    /// access logs — matching SSEClient's documented policy. The server's
-    /// `sseAuth` middleware (routes/spaces.js) accepts the header via
-    /// `requireAuth` → `resolveBearerUser` → `resolveApiToken` (verified in
-    /// lib/auth.mjs), so the header works on the clone-events route and the
-    /// query fallback is no longer needed. Pure (nonisolated) so it is
-    /// unit-testable without a live URL session.
-    public nonisolated func cloneProgressRequest(url: URL, token: String?) -> URLRequest {
-        var req = URLRequest(url: url)
-        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        return req
-    }
-
-    /// Stream live clone progress for a space. The server's clone-events SSE
-    /// replays buffered lines + terminal state (done/error), then streams live
-    /// until the clone settles. If the clone already finished and the in-memory
-    /// registry entry was cleaned up, the stream simply finishes with no events.
-    public func streamCloneProgress(spaceId: String) -> AsyncThrowingStream<CloneEvent, Error> {
-        let tok = self.token
-        let url = baseURL.appendingPathComponent("/api/spaces/\(spaceId)/clone-events")
+    /// Open a Waynode SSE endpoint and yield one decoded event per `data:`
+    /// line. Shared scaffolding for every APIClient SSE stream: header policy
+    /// (SSEWire.request), ephemeral session, HTTP status check, per-line
+    /// decode, and cancellation via onTermination.
+    func streamSSE<Event: Sendable>(
+        path: String,
+        timeout: TimeInterval,
+        parse: @escaping @Sendable (String) -> Event?
+    ) -> AsyncThrowingStream<Event, Error> {
+        let req = SSEWire.request(url: baseURL.appendingPathComponent(path), token: token)
 
         return AsyncThrowingStream { continuation in
             let task = Task {
-                let req = cloneProgressRequest(url: url, token: tok)
-
                 do {
                     let cfg = URLSessionConfiguration.ephemeral
-                    cfg.timeoutIntervalForRequest = 120
+                    cfg.timeoutIntervalForRequest = timeout
                     cfg.waitsForConnectivity = true
                     let session = URLSession(configuration: cfg)
 
@@ -221,22 +206,14 @@ public actor APIClient {
                         throw URLError(.badServerResponse)
                     }
                     guard (200...299).contains(http.statusCode) else {
-                        throw URLError(.badServerResponse)
+                        throw APIError(statusCode: http.statusCode, message: "Live stream failed (HTTP \(http.statusCode))")
                     }
 
-                    var buffer = ""
                     for try await line in bytes.lines {
                         if Task.isCancelled { break }
-                        if line.isEmpty {
-                            if !buffer.isEmpty {
-                                if let event = Self.parseCloneEvent(buffer) {
-                                    continuation.yield(event)
-                                }
-                                buffer = ""
-                            }
-                            continue
+                        if let event = parse(line) {
+                            continuation.yield(event)
                         }
-                        buffer += line + "\n"
                     }
                     continuation.finish()
                 } catch {
@@ -247,25 +224,22 @@ public actor APIClient {
         }
     }
 
-    /// Parse one SSE event buffer into a CloneEvent (or nil for pings/unknown).
-    private static func parseCloneEvent(_ buffer: String) -> CloneEvent? {
-        var dataLines: [String] = []
-        for line in buffer.split(separator: "\n", omittingEmptySubsequences: false) {
-            if line.hasPrefix("data:") {
-                let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
-                dataLines.append(String(payload))
-            }
-        }
-        guard !dataLines.isEmpty else { return nil }
-        let json = dataLines.joined(separator: "\n")
-        guard let data = json.data(using: .utf8) else { return nil }
+    /// Stream live clone progress for a space. The server's clone-events SSE
+    /// replays buffered lines + terminal state (done/error), then streams live
+    /// until the clone settles. If the clone already finished and the in-memory
+    /// registry entry was cleaned up, the stream simply finishes with no events.
+    public func streamCloneProgress(spaceId: String) -> AsyncThrowingStream<CloneEvent, Error> {
+        streamSSE(path: "/api/spaces/\(spaceId)/clone-events", timeout: 120, parse: Self.parseCloneEvent)
+    }
 
+    /// Parse one SSE `data:` line into a CloneEvent (or nil for pings/unknown).
+    private static func parseCloneEvent(_ line: String) -> CloneEvent? {
         struct Payload: Decodable {
             let type: String
             let line: String?
             let error: String?
         }
-        guard let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return nil }
+        guard let payload = SSEWire.decode(line, as: Payload.self) else { return nil }
         switch payload.type {
         case "progress": return .progress(payload.line ?? "")
         case "done": return .done

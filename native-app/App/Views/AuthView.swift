@@ -2,6 +2,12 @@ import SwiftUI
 import WaynodeCore
 import AuthenticationServices
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 // MARK: - AuthView
 //
 // The login screen. Presents two buttons: "Continue with GitHub" and
@@ -343,6 +349,50 @@ struct AuthView: View {
 // MARK: - BrandLogo
 
 struct BrandLogo: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drawProgress = 0.0
+
+    var body: some View {
+        Group {
+            if BrandSymbolAsset.isAvailable {
+                Image("waynode.mark", variableValue: drawProgress)
+                    .resizable()
+                    .scaledToFit()
+                    .symbolRenderingMode(.palette)
+                    .symbolVariableValueMode(.draw)
+                    .symbolEffect(.drawOn, isActive: !reduceMotion && drawProgress > 0)
+                    .foregroundStyle(Color.accentColor, Color.blue.opacity(0.55), Color.white.opacity(0.9))
+            } else {
+                BrandLogoFallback()
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .onAppear {
+            if reduceMotion {
+                drawProgress = 1
+            } else {
+                drawProgress = 0
+                withAnimation(.easeOut(duration: 1.1)) {
+                    drawProgress = 1
+                }
+            }
+        }
+    }
+}
+
+private enum BrandSymbolAsset {
+    static var isAvailable: Bool {
+        #if canImport(UIKit)
+        UIImage(named: "waynode.mark") != nil
+        #elseif canImport(AppKit)
+        NSImage(named: "waynode.mark") != nil
+        #else
+        false
+        #endif
+    }
+}
+
+private struct BrandLogoFallback: View {
     var body: some View {
         GeometryReader { proxy in
             let scale = min(proxy.size.width, proxy.size.height) / 64
@@ -381,6 +431,5 @@ struct BrandLogo: View {
                 }
             }
         }
-        .aspectRatio(1, contentMode: .fit)
     }
 }

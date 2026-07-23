@@ -252,6 +252,8 @@ struct CodeBlockView: View {
                     Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
                         .font(.caption2)
                         .foregroundStyle(showCopied ? .green : .secondary)
+                        .symbolEffect(.bounce, value: showCopied)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(showCopied ? "Copied" : "Copy code")

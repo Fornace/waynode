@@ -21,6 +21,31 @@ extension GitInspector {
         isLoading = false
     }
 
+    func streamSnapshots() async {
+        guard fixtureSnapshot == nil else { return }
+        guard let api = appModel.currentAPI() else { return }
+
+        do {
+            let stream = await api.streamGitSnapshotEvents(spaceId: spaceId)
+            for try await event in stream {
+                guard !Task.isCancelled else { return }
+                switch event {
+                case .snapshot(let fresh):
+                    applySnapshot(fresh)
+                    error = nil
+                    isLoading = false
+                case .error(let message):
+                    error = message
+                    isLoading = false
+                }
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            self.error = error.localizedDescription
+            isLoading = false
+        }
+    }
+
     func discardChanges(in file: GitFile) async {
         pendingDiscard = nil
         guard discardEligible(file), !isDiscarding else { return }
@@ -208,21 +233,29 @@ extension GitInspector {
             Label("Diverged", systemImage: "arrow.triangle.branch")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.orange)
+                .symbolEffect(.wiggle, value: snap.ahead + snap.behind)
+                .contentTransition(.symbolEffect(.replace))
                 .padding(.horizontal, 9).padding(.vertical, 6)
                 .background(.orange.opacity(0.12), in: Capsule())
         } else if snap.ahead == 0 && snap.behind == 0 {
             Label("Synced", systemImage: "checkmark.circle.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.green)
+                .symbolEffect(.bounce, value: snap.ahead + snap.behind)
+                .contentTransition(.symbolEffect(.replace))
                 .padding(.horizontal, 9).padding(.vertical, 6)
                 .background(.green.opacity(0.12), in: Capsule())
         } else {
             VStack(alignment: .trailing, spacing: 3) {
                 if snap.ahead > 0 {
-                    Label("\(snap.ahead) ahead", systemImage: "arrow.up").foregroundStyle(.green)
+                    Label("\(snap.ahead) ahead", systemImage: "arrow.up")
+                        .foregroundStyle(.green)
+                        .contentTransition(.numericText(value: Double(snap.ahead)))
                 }
                 if snap.behind > 0 {
-                    Label("\(snap.behind) behind", systemImage: "arrow.down").foregroundStyle(.orange)
+                    Label("\(snap.behind) behind", systemImage: "arrow.down")
+                        .foregroundStyle(.orange)
+                        .contentTransition(.numericText(value: Double(snap.behind)))
                 }
             }
             .font(.caption2.weight(.semibold))
@@ -234,6 +267,8 @@ extension GitInspector {
             HStack {
                 Image(systemName: snap.hasUncommittedChanges ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .foregroundStyle(snap.hasUncommittedChanges ? .orange : .green)
+                    .symbolEffect(.wiggle, value: snap.hasUncommittedChanges)
+                    .contentTransition(.symbolEffect(.replace))
                 Text(snap.hasUncommittedChanges ? "\(snap.files.count) uncommitted change\(snap.files.count == 1 ? "" : "s")" : "Working tree clean")
                     .font(.subheadline)
             }

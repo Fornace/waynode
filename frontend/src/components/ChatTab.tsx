@@ -130,10 +130,11 @@ export function ChatTab({ session }: ChatTabProps) {
     setComposerMode(next);
   }, [session.composer_mode]);
 
-  const streaming = state.streaming || ["sending", "starting", "running"].includes(state.activeStatus || "");
+  const contentStreaming = state.streaming;
+  const runActive = contentStreaming || ["sending", "starting", "running"].includes(state.activeStatus || "");
 
   const sendMessage = async (mode: ComposerMode) => {
-    if (submitInFlight.current || !input.trim() || streaming) return;
+    if (submitInFlight.current || !input.trim() || runActive) return;
     const prompt = input.trim();
     submitInFlight.current = true;
     setInput("");
@@ -158,7 +159,7 @@ export function ChatTab({ session }: ChatTabProps) {
   };
 
   const handleQueue = async () => {
-    if (submitInFlight.current || !input.trim() || !streaming) return;
+    if (submitInFlight.current || !input.trim() || !runActive) return;
     const prompt = input.trim();
     submitInFlight.current = true;
     setInput("");
@@ -189,7 +190,7 @@ export function ChatTab({ session }: ChatTabProps) {
     // docs/KEYBOARD-CONTRACT.md §1.2.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (streaming) handleQueue();
+      if (runActive) handleQueue();
       else sendMessage(composerMode);
     }
   };
@@ -309,10 +310,10 @@ export function ChatTab({ session }: ChatTabProps) {
         </div>
       )}
 
-      <div className="chat-messages" ref={messagesRef} role="log" aria-label="Session conversation" aria-live="polite" aria-busy={streaming}>
+      <div className="chat-messages" ref={messagesRef} role="log" aria-label="Session conversation" aria-live="polite" aria-busy={contentStreaming}>
         <div className="chat-lane">
         {!state.loaded && !state.error && <div className="agent-preflight"><StartingAgent phase="Loading conversation…" /></div>}
-        {state.loaded && state.items.length === 0 && !streaming && (
+        {state.loaded && state.items.length === 0 && !runActive && (
           <div className="chat-empty">
             <div className="chat-empty-title">Start from the worktree, not a blank chat.</div>
             <div className="chat-empty-desc">Ask for an outcome you can verify in this repository and branch.</div>
@@ -339,14 +340,14 @@ export function ChatTab({ session }: ChatTabProps) {
             // generated. Without this guard, every historical assistant
             // message would re-show the active generation state
             // whenever ANY turn (even a later, unrelated one) is streaming.
-            streaming={streaming && idx === state.items.length - 1}
-            phase={streaming && idx === state.items.length - 1 ? state.status : null}
+            streaming={contentStreaming && idx === state.items.length - 1}
+            phase={contentStreaming && idx === state.items.length - 1 ? state.status : null}
             onQuote={quoteInReply}
           />
         ))}
         {/* Between send and the server's `message_start`, there is no
             assistant item yet. Keep that first-token wait legible. */}
-        {streaming && state.items[state.items.length - 1]?.role === "user" && (
+        {runActive && state.items[state.items.length - 1]?.role === "user" && (
           <div className="agent-preflight"><StartingAgent phase={state.status} /></div>
         )}
         <div ref={bottomRef} />
@@ -365,7 +366,7 @@ export function ChatTab({ session }: ChatTabProps) {
       <ChatComposer
         input={input}
         mode={composerMode}
-        streaming={streaming}
+        streaming={runActive}
         uploading={uploading}
         hammersmithState={hammersmithState}
         inputRef={inputRef}

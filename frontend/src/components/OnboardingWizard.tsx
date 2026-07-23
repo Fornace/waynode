@@ -63,7 +63,7 @@ export function OnboardingWizard({ githubConnected, gitlabConnected, cloning, er
           <h1 id="onboarding-title">Get the workspace ready</h1>
           <p className="onboarding-intro">Prepare verified delegation and GitHub access, then clone the repository for this durable worktree.</p>
           {environmentReady ? (
-            <div className="onboarding-env-ready">Environment ready — Hammersmith and GitHub are connected.</div>
+            <div className="onboarding-env-ready">Environment ready: Hammersmith and GitHub are connected.</div>
           ) : (
           <div className="onboarding-guides">
             <article className="onboarding-guide" aria-labelledby="hammersmith-guide-title">

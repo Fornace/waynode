@@ -54,7 +54,7 @@ struct SessionSettingsSheet: View {
     }
 
     @ViewBuilder private var modelSection: some View {
-        Section("Model") {
+        Section {
             switch modelLoadState {
             case .loading:
                 ProgressView("Loading models…").controlSize(.small)
@@ -86,34 +86,57 @@ struct SessionSettingsSheet: View {
                 if let modelError {
                     Label(modelError, systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.red)
+                        .symbolEffect(.wiggle, value: modelError)
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                         .accessibilityLabel("Could not change model: \(modelError)")
                         .accessibilityIdentifier("session.settings.model.error")
                 }
             }
+        } header: {
+            Label("Model", systemImage: "cpu")
         }
     }
 
     private var goalSection: some View {
-        Section("Goal Status") {
+        Section {
             if store.goalStatus.status != nil {
                 GoalStatusSummary(status: store.goalStatus)
             } else {
-                Text("No active goal").foregroundStyle(.secondary)
+                Label("No active goal", systemImage: "target")
+                    .foregroundStyle(.secondary)
             }
+        } header: {
+            Label("Goal Status", systemImage: "target")
         }
     }
 
     private var connectionSection: some View {
-        Section("Connection") {
-            LabeledContent("Status") { ConnectionStateBadge(state: store.connectionState) }
-            LabeledContent("Session ID") {
+        Section {
+            LabeledContent {
+                ConnectionStateBadge(state: store.connectionState)
+            } label: {
+                Label("Status", systemImage: "dot.radiowaves.left.and.right")
+            }
+            LabeledContent {
                 Text(store.sessionId)
                     .font(.caption.monospaced()).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
                     .textSelection(.enabled)
+            } label: {
+                Label("Session ID", systemImage: "number")
             }
+        } header: {
+            Label("Connection", systemImage: "network")
+        }
+    }
+
+    private var modelLoadStateKey: String {
+        switch modelLoadState {
+        case .loading: "loading"
+        case .loaded: "loaded"
+        case .empty: "empty"
+        case .failed: "failed"
         }
     }
 
@@ -123,9 +146,14 @@ struct SessionSettingsSheet: View {
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
             .accessibilityIdentifier("session.settings.models.message")
-        Button("Try Again") { Task { await loadModels() } }
-            .accessibilityIdentifier("session.settings.models.retry")
-            .accessibilityHint("Requests the model list from the server again")
+        Button {
+            Task { await loadModels() }
+        } label: {
+            Label("Try Again", systemImage: "arrow.clockwise")
+                .symbolEffect(.rotate, value: modelLoadStateKey)
+        }
+        .accessibilityIdentifier("session.settings.models.retry")
+        .accessibilityHint("Requests the model list from the server again")
     }
 
     private func loadModels() async {

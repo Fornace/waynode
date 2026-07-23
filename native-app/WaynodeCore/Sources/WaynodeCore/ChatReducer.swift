@@ -36,11 +36,11 @@ public struct ChatReducer: Sendable, Equatable {
         public var blockIdx: Int
     }
     // Transient turn state
-    public private(set) var isStreaming: Bool = false
-    public private(set) var statusText: String?
-    public private(set) var lastError: String?
-    public private(set) var turnEnded: Bool = false
-    public private(set) var submissionState = ChatSubmissionState()
+    public internal(set) var isStreaming: Bool = false
+    public internal(set) var statusText: String?
+    public internal(set) var lastError: String?
+    public internal(set) var turnEnded: Bool = false
+    public internal(set) var submissionState = ChatSubmissionState()
     // The id of the assistant message currently receiving deltas. Cleared on
     // message_end. Used to resolve text_delta events that omit messageId
     // (defensive: the server always sends it, but the web client falls back
@@ -73,6 +73,7 @@ public struct ChatReducer: Sendable, Equatable {
         submissionState.reconcile(items: &items, submission: submission, accepted: accepted, kind: kind)
         revision += 1
     }
+
 
     public mutating func discardFailedDraft() { submissionState.discardFailedDraft(); revision += 1 }
 
@@ -160,7 +161,7 @@ public struct ChatReducer: Sendable, Equatable {
         case .submission(let submission):
             reconcileSubmission(submission)
             if submission.status == .starting { statusText = "Starting agent…" }
-            if submission.status == .running { statusText = "Agent working"; isStreaming = true }
+            if submission.status == .running { statusText = "Agent working" }
             if [.completed, .failed, .cancelled].contains(submission.status) { statusText = nil }
             return true
 
@@ -262,7 +263,7 @@ public struct ChatReducer: Sendable, Equatable {
 
     /// On turn_end / end / error: if the current assistant message was never
     /// marked done, mark it done now so the UI shows a complete turn.
-    private mutating func finalisePendingAssistant() {
+    mutating func finalisePendingAssistant() {
         for i in items.indices {
             if case .assistant(let a) = items[i], !a.done {
                 markAssistantDone(at: i)

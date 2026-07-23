@@ -37,6 +37,44 @@ extension ChatReducer {
         }
     }
 
+    public mutating func mergeHistory(_ history: [HistoryItem]) {
+        var staged = ChatReducer()
+        staged.loadHistory(history)
+
+        for item in staged.items {
+            if containsEquivalentHistoryItem(item) { continue }
+            items.append(item)
+            if case .assistant(let assistant) = item {
+                msgIndex[assistant.id] = items.count - 1
+            }
+        }
+        revision += 1
+    }
+
+    private func containsEquivalentHistoryItem(_ item: ChatItem) -> Bool {
+        if items.contains(where: { $0.id == item.id }) { return true }
+
+        switch item {
+        case .user(let incoming):
+            return items.contains { existing in
+                guard case .user(let user) = existing else { return false }
+                return user.content == incoming.content && user.isGoal == incoming.isGoal
+            }
+        case .assistant(let incoming):
+            return items.contains { existing in
+                guard case .assistant(let assistant) = existing else { return false }
+                return assistant.blocks == incoming.blocks
+            }
+        case .system(let incoming):
+            return items.contains { existing in
+                guard case .system(let system) = existing else { return false }
+                return system.content == incoming.content && system.key == incoming.key
+            }
+        case .hammersmithRun:
+            return false
+        }
+    }
+
     public struct HistoryItem: Sendable {
         public var role: String
         public var id: String

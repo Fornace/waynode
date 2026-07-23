@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import type { Space, GitSnapshot } from "../types";
-import { BranchIcon, CloseIcon, MergeModal, Pill, buildAskPrompt, type GitIssue } from "./GitSidebarShared";
+import { BranchIcon, CloseIcon, GitActivityIcon, MergeModal, Pill, buildAskPrompt, type GitIssue } from "./GitSidebarShared";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 // ───────────────────────────── Branches ─────────────────────────────
@@ -85,9 +85,9 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
   const askPi = (prompt: string) => { store.send(sessionId, prompt, false); onClose(); onIssue(null); };
 
   const raiseMergeConflict = (target: string, files: string[]) => {
-    note(`🔀 Merge conflict — merging \`${target}\` into \`${cur}\` conflicted in ${files.length} file(s): ${files.join(", ")}. The merge was aborted; the repo is clean.`);
+    note(`🔀 Merge conflict: merging \`${target}\` into \`${cur}\` conflicted in ${files.length} file(s): ${files.join(", ")}. The merge was aborted; the repo is clean.`);
     onIssue({
-      title: "Merge — conflicts",
+      title: "Merge: conflicts",
       detail: `Merging ${target} into ${cur} conflicted. The merge was aborted so the repo is clean. Let the agent merge and resolve?`,
       files,
       actions: [
@@ -100,7 +100,7 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
   const raiseRebaseConflict = (files: string[]) => {
     note(`🔀 Pull rebased with conflicts in ${files.length} file(s): ${files.join(", ")}. The rebase was aborted; the repo is clean.`);
     onIssue({
-      title: "Pull — rebase conflicts",
+      title: "Pull: rebase conflicts",
       detail: `Rebasing ${cur} conflicted. The rebase was aborted so the repo is clean. Let the agent resolve and finish the pull?`,
       files,
       actions: [
@@ -110,9 +110,9 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
     });
   };
   const raiseDiverged = () => {
-    note(`🔀 Pull diverged — ${cur} and its remote have diverged (fast-forward not possible).`);
+    note(`🔀 Pull diverged: ${cur} and its remote have diverged (fast-forward not possible).`);
     onIssue({
-      title: "Pull — branches diverged",
+      title: "Pull: branches diverged",
       detail: `${cur} and its remote have diverged. Merge, rebase, or let the agent handle it?`,
       actions: [
         { id: "merge", label: "Merge", run: async () => doPullMode("merge") },
@@ -143,8 +143,9 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
           <div className="git-branches-label">Current branch</div>
           <div className="git-branches-cur">{cur}</div>
         </div>
-        <button className="git-mini-btn" onClick={handlePull} disabled={pulling}>
-          ↓ {pulling ? "…" : "Pull origin"}
+        <button className={`git-mini-btn ${pulling ? "is-busy" : ""}`} onClick={handlePull} disabled={pulling} aria-busy={pulling}>
+          <GitActivityIcon busy={pulling} idle="down" />
+          <span>{pulling ? "Pulling" : "Pull origin"}</span>
         </button>
       </div>
 

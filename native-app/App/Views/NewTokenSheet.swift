@@ -14,6 +14,7 @@ struct NewTokenSheet: View {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 48))
                     .foregroundStyle(.green)
+                    .symbolEffect(.bounce, value: token)
                     .accessibilityHidden(true)
                 Text("Token Created").font(.title2.bold())
                 Text("Copy this token now. For security, it will not be shown again.")
@@ -39,6 +40,8 @@ struct NewTokenSheet: View {
                     hasCopied = true
                 } label: {
                     Label(hasCopied ? "Copied!" : "Copy Token", systemImage: hasCopied ? "checkmark" : "doc.on.doc")
+                        .symbolEffect(.bounce, value: hasCopied)
+                        .contentTransition(.symbolEffect(.replace))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)

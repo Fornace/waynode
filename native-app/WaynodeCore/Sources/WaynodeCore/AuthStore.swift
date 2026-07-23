@@ -342,8 +342,8 @@ public final class AuthStore {
         return APIClient(
             baseURL: serverConfig.baseURL,
             token: token,
-            requestTimeout: forLogout ? 5 : 30,
-            waitsForConnectivity: !forLogout
+            requestTimeout: forLogout ? 5 : 8,
+            waitsForConnectivity: false
         )
     }
 

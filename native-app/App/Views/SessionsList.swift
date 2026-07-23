@@ -355,7 +355,7 @@ struct SessionRow: View {
                 }
                 let rel = Format.compactRelative(fromISO: session.createdAt)
                 if !rel.isEmpty {
-                    Text(rel)
+                    Label(rel, systemImage: "clock")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -364,12 +364,12 @@ struct SessionRow: View {
             Spacer(minLength: 8)
 
             if let model = session.model, !model.isEmpty {
-                Text(model)
+                Label(model, systemImage: "cpu")
                     .font(.caption2.monospaced())
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .frame(maxWidth: 96, alignment: .trailing)
+                    .frame(maxWidth: 112, alignment: .trailing)
             }
         }
         .padding(.horizontal, 6)

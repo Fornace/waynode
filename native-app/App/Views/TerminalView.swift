@@ -17,11 +17,13 @@ struct TerminalView: View {
     let spaceId: String
 
     @Environment(AppModel.self) private var appModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var terminal = TerminalSessionState()
     @State private var streamID = UUID()
     @State private var wsClient: WSClient?
     @State private var listenTask: Task<Void, Never>?
     @State private var hasAttemptedConnection = false
+    @State private var showCopied = false
 
     private let bottomID = "term-bottom"
 
@@ -29,9 +31,12 @@ struct TerminalView: View {
         VStack(spacing: 0) {
             // Status bar
             HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
+                Image(systemName: statusSystemImage)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(statusColor)
+                    .symbolEffect(.rotate, isActive: isConnecting && !reduceMotion)
+                    .symbolEffect(.wiggle, value: retryMessage != nil)
+                    .contentTransition(.symbolEffect(.replace))
                 Text(statusText)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
@@ -57,9 +62,17 @@ struct TerminalView: View {
                 Button {
                     copyToClipboard(terminal.output)
                     Haptics.success()
+                    withAnimation(reduceMotion ? nil : .default) { showCopied = true }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        await MainActor.run { showCopied = false }
+                    }
                 } label: {
-                    Image(systemName: "doc.on.doc")
+                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
                         .font(.caption2)
+                        .foregroundStyle(showCopied ? .green : .secondary)
+                        .symbolEffect(.bounce, value: showCopied)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
                 .disabled(terminal.output.isEmpty)
@@ -86,6 +99,7 @@ struct TerminalView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.caption2)
+                            .symbolEffect(.rotate, value: isConnecting)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Reconnect terminal transport")
@@ -119,6 +133,7 @@ struct TerminalView: View {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
+                        .symbolEffect(.wiggle, value: msg)
                     Text(msg)
                         .font(.caption)
                         .lineLimit(2)
@@ -185,6 +200,16 @@ struct TerminalView: View {
         case .disconnected: return .secondary
         case .failed: return .red
         case .exited: return .secondary
+        }
+    }
+
+    private var statusSystemImage: String {
+        switch terminal.connection {
+        case .connected: "checkmark.circle.fill"
+        case .connecting, .reconnecting: "arrow.triangle.2.circlepath"
+        case .disconnected: "wifi.slash"
+        case .failed: "exclamationmark.triangle.fill"
+        case .exited: "checkmark.circle"
         }
     }
 

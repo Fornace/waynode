@@ -19,7 +19,7 @@ struct EmptyChatState: View {
             }
             VStack(spacing: 8) {
                 SuggestionChip(icon: "doc.text.magnifyingglass", text: "Explain this codebase") { onTap("Explain this codebase") }
-                SuggestionChip(icon: "ant.fill", text: "Find and fix bugs") { onTap("Find and fix bugs") }
+                SuggestionChip(icon: "stethoscope", text: "Find and fix bugs") { onTap("Find and fix bugs") }
                 SuggestionChip(icon: "wand.and.stars", text: "Add a feature") { onTap("Add a feature") }
             }
             .padding(.top, 4)
@@ -45,6 +45,33 @@ struct HistoryFailureState: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.history.failure")
+    }
+}
+
+struct AgentWaitingRow: View {
+    let text: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ActivitySymbol(
+                systemImage: "arrow.trianglehead.2.clockwise.rotate.90",
+                reduceMotion: reduceMotion,
+                size: 12,
+                weight: .medium
+            )
+            .foregroundStyle(.tint)
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
+        .accessibilityAddTraits(.updatesFrequently)
+        .accessibilityIdentifier("chat.agent.waiting")
     }
 }
 
@@ -119,11 +146,29 @@ struct ConnectionBanner: View {
     }
 
     private var icon: some View {
+        Image(systemName: bannerSystemImage)
+            .symbolRenderingMode(.hierarchical)
+            .symbolEffect(.rotate, isActive: isReconnecting)
+            .symbolEffect(.wiggle, value: isFailed)
+            .contentTransition(.symbolEffect(.replace))
+    }
+
+    private var bannerSystemImage: String {
         switch state {
-        case .reconnecting: Image(systemName: "arrow.triangle.2.circlepath")
-        case .failed: Image(systemName: "wifi.slash")
-        default: Image(systemName: "circle.fill")
+        case .reconnecting: "arrow.triangle.2.circlepath"
+        case .failed: "wifi.slash"
+        default: "circle.fill"
         }
+    }
+
+    private var isReconnecting: Bool {
+        if case .reconnecting = state { return true }
+        return false
+    }
+
+    private var isFailed: Bool {
+        if case .failed = state { return true }
+        return false
     }
 
     private var title: String {
@@ -161,10 +206,12 @@ struct ConnectionBanner: View {
 struct GoalBanner: View {
     let status: GoalStatus
     var onAbort: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: status.status == .active ? "target" : "pause.circle").foregroundStyle(.tint)
+            goalSymbol
+                .foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.objective ?? "Goal running").font(.caption.bold()).lineLimit(1)
                 if let budget = status.tokenBudget, let usage = status.tokenUsage {
@@ -187,6 +234,20 @@ struct GoalBanner: View {
         .padding(.horizontal, 16).padding(.vertical, 8).background(.tint.opacity(0.08))
         .accessibilityIdentifier("chat.goal")
     }
+
+    private var goalProgress: Double? {
+        guard let usage = status.tokenUsage, let budget = status.tokenBudget, budget > 0 else { return nil }
+        return min(1, max(0, Double(usage) / Double(budget)))
+    }
+
+    private var goalSymbol: some View {
+        let systemImage = status.status == .active ? "target" : "pause.circle"
+        return Image(systemName: systemImage, variableValue: goalProgress ?? 0)
+            .symbolRenderingMode(.hierarchical)
+            .symbolVariableValueMode(.draw)
+            .symbolEffect(.breathe, isActive: status.status == .active && !reduceMotion)
+            .contentTransition(.symbolEffect(.replace))
+    }
 }
 
 struct GoalStatusSummary: View {
@@ -197,8 +258,15 @@ struct GoalStatusSummary: View {
             if let objective = status.objective { Text(objective).font(.subheadline) }
             HStack {
                 if let value = status.status {
-                    Label(value.rawValue.capitalized, systemImage: value == .active ? "target" : "pause.circle")
-                        .font(.caption).foregroundStyle(.tint)
+                    Label {
+                        Text(value.rawValue.capitalized)
+                    } icon: {
+                        Image(systemName: value == .active ? "target" : "pause.circle", variableValue: goalProgress ?? 0)
+                            .symbolRenderingMode(.hierarchical)
+                            .symbolVariableValueMode(.draw)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .font(.caption).foregroundStyle(.tint)
                 }
                 if let usage = status.tokenUsage, let budget = status.tokenBudget {
                     Text("· \(Format.tokenCount(usage))/\(Format.tokenCount(budget)) tokens")
@@ -207,6 +275,11 @@ struct GoalStatusSummary: View {
             }
         }
     }
+
+    private var goalProgress: Double? {
+        guard let usage = status.tokenUsage, let budget = status.tokenBudget, budget > 0 else { return nil }
+        return min(1, max(0, Double(usage) / Double(budget)))
+    }
 }
 
 struct ConnectionStateBadge: View {
@@ -214,7 +287,9 @@ struct ConnectionStateBadge: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 8, height: 8)
+            Image(systemName: systemImage)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(color)
             Text(label).font(.caption)
         }
     }
@@ -225,6 +300,15 @@ struct ConnectionStateBadge: View {
         case .connecting, .reconnecting: .orange
         case .disconnected: .secondary
         case .failed: .red
+        }
+    }
+
+    private var systemImage: String {
+        switch state {
+        case .connected: "checkmark.circle.fill"
+        case .connecting, .reconnecting: "arrow.triangle.2.circlepath"
+        case .disconnected: "wifi.slash"
+        case .failed: "exclamationmark.octagon.fill"
         }
     }
 

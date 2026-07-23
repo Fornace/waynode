@@ -79,9 +79,10 @@ export function reconcileSubmission(
     sentAt: existingSentAt ?? serverSentAt ?? new Date().toISOString(),
   };
   const index = items.findIndex((item) => item.role === "user" && item.id === submission.id);
+  const pendingIndex = index >= 0 ? index : findPendingSubmissionIndex(items, submission.prompt, normalizedMode === "goal");
 
   if (!accepted && submission.status === "failed") {
-    if (index >= 0) items.splice(index, 1);
+    if (pendingIndex >= 0) items.splice(pendingIndex, 1);
   } else {
     const item: ChatItem = {
       id: submission.id,
@@ -92,7 +93,7 @@ export function reconcileSubmission(
       isGoal: draft.isGoal,
       submissionStatus: submission.status,
     };
-    if (index >= 0) items[index] = { ...items[index], ...item } as ChatItem;
+    if (pendingIndex >= 0) items[pendingIndex] = { ...items[pendingIndex], ...item } as ChatItem;
     else items.push(item);
     if (submission.job) {
       const runId = `hammersmith-${submission.job.id}`;
@@ -110,7 +111,7 @@ export function reconcileSubmission(
         sentAt: submission.job.createdAt,
       };
       if (runIndex >= 0) items[runIndex] = runItem;
-      else items.splice((index >= 0 ? index : items.length - 1) + 1, 0, runItem);
+      else items.splice((pendingIndex >= 0 ? pendingIndex : items.length - 1) + 1, 0, runItem);
     }
   }
 
@@ -125,6 +126,25 @@ export function reconcileSubmission(
     queuedCount: statuses.filter((status) => status === "queued").length,
     activeStatus,
   };
+}
+
+function isPendingStatus(status?: SubmissionStatus): boolean {
+  return status === "sending" || status === "queued" || status === "starting" || status === "running";
+}
+
+function findPendingSubmissionIndex(items: ChatItem[], prompt: string, isGoal: boolean): number {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (
+      item.role === "user"
+      && item.content === prompt
+      && Boolean(item.isGoal) === isGoal
+      && isPendingStatus(item.submissionStatus)
+    ) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 export function optimisticSubmission(view: SubmissionView, draft: SubmissionDraft): SubmissionView {

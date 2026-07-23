@@ -55,7 +55,7 @@ export function SupportContent() {
       <li>the account handle and organization or worktree name involved;</li>
       <li>the device, OS, app or browser version, and approximate time with timezone;</li>
       <li>the action taken, visible error, and whether retry changed the result; and</li>
-      <li>for billing, the Stripe invoice or checkout reference—not card details.</li>
+      <li>for billing, the Stripe invoice or checkout reference, not card details.</li>
     </ul><p>
       Never email OAuth tokens, API keys, recovery codes, full payment-card data, private
       source files, or another person’s personal data. Redact screenshots and logs first.

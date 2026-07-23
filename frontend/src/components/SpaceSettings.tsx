@@ -122,7 +122,7 @@ export function SpaceSettings({ space, onClose }: SpaceSettingsProps) {
                 aria-label="AGENTS.md editor"
                 value={agentsContent}
                 onChange={(e) => { setAgentsContent(e.target.value); setAgentsDirty(true); }}
-                placeholder="# AGENTS.md — pi reads this on every session"
+                placeholder="# AGENTS.md: pi reads this on every session"
                 spellCheck={false}
               />
             </>

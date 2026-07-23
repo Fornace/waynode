@@ -17,9 +17,17 @@ export interface GitIssue {
   actions: GitIssueAction[];
 }
 
+export function GitActivityIcon({ busy, idle }: { busy: boolean; idle: "down" | "up" }) {
+  return (
+    <span className={`git-activity-icon ${busy ? "is-active" : ""}`} aria-hidden="true">
+      {busy ? "↻" : idle === "down" ? "↓" : "↑"}
+    </span>
+  );
+}
+
 /** Compose the user-visible prompt we send to pi when delegating resolution. */
 export function buildAskPrompt(kind: "merge" | "rebase" | "push", ctx: { cur: string; target?: string; files?: string[] }): string {
-  const fl = ctx.files && ctx.files.length ? ` — ${ctx.files.join(", ")}` : "";
+  const fl = ctx.files && ctx.files.length ? `: ${ctx.files.join(", ")}` : "";
   if (kind === "merge") {
     return `Resolve the merge of \`${ctx.target}\` into \`${ctx.cur}\`. Run \`git merge ${ctx.target}\`; for any files with \`<<<<<<<\` conflict markers${fl}, resolve them based on both sides' intent, \`git add\` the resolved files, and finish with \`git commit\`. Summarize what you changed; if it isn't safely resolvable, stop and explain.`;
   }

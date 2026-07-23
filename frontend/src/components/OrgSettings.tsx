@@ -296,7 +296,7 @@ export function OrgSettings({ org, onClose, onRenamed, onDeleted }: OrgSettingsP
               </div>
             </div>
             <div className="settings-section">
-              <div className="settings-section-title">Knowledge & Memory</div>
+              <div className="settings-section-title">Knowledge and Memory</div>
               <div className="field-card">
                 <div className="field-row">
                   <div className="field-row-head">

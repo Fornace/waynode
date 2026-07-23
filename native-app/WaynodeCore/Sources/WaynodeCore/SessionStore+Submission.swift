@@ -51,6 +51,17 @@ extension SessionStore {
         await loadHistory()
     }
 
+    public func refreshCompletedHistory() async {
+        do {
+            let history = try await api.getMessages(sessionId)
+            reducer.mergeHistory(history.map(ChatReducer.HistoryItem.init))
+            historyError = nil
+            didLoadHistory = true
+        } catch {
+            historyError = "Latest assistant response couldn’t be loaded. Pull to refresh or reopen this session."
+        }
+    }
+
     public func sendMessage(_ prompt: String, isGoal: Bool = false) async {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -133,7 +144,10 @@ extension SessionStore {
                 status: fallbackStatus
             )
             reducer.reconcileSubmission(acknowledged, kind: draft.kind)
-            if draft.isGoal { startGoalPolling() }
+            if ![.completed, .failed, .cancelled].contains(acknowledged.status) {
+                startRunStatePolling()
+                if draft.isGoal { startGoalPolling() }
+            }
         } catch {
             reject(draft, message: error.localizedDescription)
         }

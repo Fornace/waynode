@@ -143,6 +143,24 @@ struct SessionStoreSubmissionTests {
         #expect(store.reducer.items.isEmpty)
     }
 
+    @Test("Inactive server state completes stale running submission")
+    @MainActor
+    func inactiveStateCompletesStaleRun() async {
+        let transport = MockSessionTransport()
+        await transport.setState(.init(active: false, done: true, submissions: []))
+        let store = SessionStore(sessionId: "session", spaceId: "space", api: transport)
+        _ = store.reducer.reduce(.submission(.init(
+            id: "running", prompt: "Work", isGoal: false, status: .running
+        )))
+        #expect(store.isRunActive)
+
+        await store.refreshSessionState()
+
+        #expect(!store.isRunActive)
+        guard case .user(let user) = store.reducer.items[0] else { return }
+        #expect(user.submissionStatus == .completed)
+    }
+
     @Test("Hosted cancelled false keeps active Stop truth and explains why")
     @MainActor
     func hostedAbortTruth() async {
@@ -173,6 +191,7 @@ private actor MockSessionTransport: SessionTransport {
     private var queueMode: Mode = .success
     private var historyFails = false
     private var abortCancelled = false
+    private var stateResponse = APIClient.StateResponse(active: false, done: true, submissions: [])
 
     nonisolated func makeURL(_ path: String) -> URL { URL(string: "https://example.test\(path)")! }
     func currentToken() -> String? { "token" }
@@ -180,6 +199,7 @@ private actor MockSessionTransport: SessionTransport {
     func setQueueMode(_ mode: Mode) { queueMode = mode }
     func setHistoryFailure(_ value: Bool) { historyFails = value }
     func setAbortCancelled(_ value: Bool) { abortCancelled = value }
+    func setState(_ response: APIClient.StateResponse) { stateResponse = response }
 
     func getMessages(_ sessionId: String) async throws -> [APIClient.HistoryMessage] {
         if historyFails { throw APIClient.APIError(statusCode: 503, message: "offline") }
@@ -191,7 +211,7 @@ private actor MockSessionTransport: SessionTransport {
     }
 
     func getSessionState(_ sessionId: String) async throws -> APIClient.StateResponse {
-        .init(active: false, done: true, submissions: [])
+        stateResponse
     }
 
     func sendMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse {

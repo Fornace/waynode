@@ -73,7 +73,7 @@ extension AccountScene {
     var organizationSection: some View {
         Section("Organization") {
             if appModel.orgs.isEmpty {
-                Text("No organization membership is available.")
+                Label("No organization membership is available.", systemImage: "person.2.slash")
                     .foregroundStyle(.secondary)
             } else {
                 Picker("Active organization", selection: Binding(
@@ -86,8 +86,12 @@ extension AccountScene {
                 }
                 .accessibilityIdentifier("account.organization")
                 if let org = appModel.activeOrg {
-                    LabeledContent("Your role", value: roleLabel(org.myRole))
-                        .accessibilityIdentifier("account.organization.role")
+                    LabeledContent {
+                        Text(roleLabel(org.myRole))
+                    } label: {
+                        Label("Your role", systemImage: "person.badge.key")
+                    }
+                    .accessibilityIdentifier("account.organization.role")
                 }
             }
         }
@@ -98,6 +102,7 @@ extension AccountScene {
             switch billingCapability {
             case .checking:
                 Label("Checking billing availability…", systemImage: "arrow.triangle.2.circlepath")
+                    .symbolEffect(.rotate, isActive: !reduceMotion)
                     .accessibilityIdentifier("account.billing.checking")
             case .selfHosted:
                 Label("This server is self-hosted", systemImage: "server.rack")
@@ -109,8 +114,13 @@ extension AccountScene {
                     .foregroundStyle(.secondary)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("account.billing.unavailable")
-                Button("Try Again") { Task { await loadBilling() } }
-                    .accessibilityIdentifier("account.billing.retry")
+                Button {
+                    Task { await loadBilling() }
+                } label: {
+                    Label("Try Again", systemImage: "arrow.clockwise")
+                        .symbolEffect(.rotate, value: isLoadingBilling)
+                }
+                .accessibilityIdentifier("account.billing.retry")
             case .hosted:
                 hostedBillingContent
             }
@@ -132,13 +142,23 @@ extension AccountScene {
     @ViewBuilder
     private var hostedBillingContent: some View {
         if let org = appModel.activeOrg {
-            LabeledContent("Organization", value: org.name)
-                .accessibilityIdentifier("account.billing.organization")
-            LabeledContent("Your role", value: roleLabel(org.myRole))
+            LabeledContent {
+                Text(org.name)
+            } label: {
+                Label("Organization", systemImage: "building.2")
+            }
+            .accessibilityIdentifier("account.billing.organization")
+            LabeledContent {
+                Text(roleLabel(org.myRole))
+            } label: {
+                Label("Your role", systemImage: "person.badge.key")
+            }
             if !appModel.activeOrgCanManageBilling {
-                Button("Manage billing") {}
-                    .disabled(true)
-                    .accessibilityIdentifier("account.billing.manage.disabled")
+                Button {} label: {
+                    Label("Manage billing", systemImage: "creditcard")
+                }
+                .disabled(true)
+                .accessibilityIdentifier("account.billing.manage.disabled")
                 Text("Only organization admins can view plans or manage billing for \(org.name).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -149,15 +169,23 @@ extension AccountScene {
                 billingDetails(billing, org: org)
             }
         } else {
-            Text("No organization is available for billing.")
+            Label("No organization is available for billing.", systemImage: "building.2.crop.circle")
                 .foregroundStyle(.secondary)
         }
     }
 
     @ViewBuilder
     private func billingDetails(_ billing: APIClient.BillingInfo, org: Org) -> some View {
-        LabeledContent("Plan", value: billingLabel(billing.plan))
-        LabeledContent("Status", value: billingLabel(billing.status))
+        LabeledContent {
+            Text(billingLabel(billing.plan))
+        } label: {
+            Label("Plan", systemImage: "tag")
+        }
+        LabeledContent {
+            Text(billingLabel(billing.status))
+        } label: {
+            Label("Status", systemImage: "checkmark.seal")
+        }
         #if os(macOS)
         if billing.plan == "free" || billing.status == "expired" {
             Menu {
@@ -257,7 +285,7 @@ extension AccountScene {
         error = nil
         isCreatingToken = true
         do {
-            let label = "iOS App — \(formattedDate)"
+            let label = "iOS App (\(formattedDate))"
             let created = try await api.createToken(label: label)
             newToken = NewTokenPresentation(value: created.token)
             await loadTokens()
@@ -304,20 +332,28 @@ extension AccountScene {
         if stacked {
             VStack(alignment: .leading, spacing: 2) {
                 tokenMask
-                Text(lastUsed).font(.caption2).foregroundStyle(.secondary)
+                Label(lastUsed, systemImage: "clock")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         } else {
             HStack {
                 tokenMask
                 Spacer()
-                Text(lastUsed).font(.caption2).foregroundStyle(.secondary)
+                Label(lastUsed, systemImage: "clock")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
     var tokenMask: some View {
-        Text("wn_\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}")
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
+        Label {
+            Text("wn_\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}")
+        } icon: {
+            Image(systemName: "key.horizontal")
+        }
+        .font(.caption.monospaced())
+        .foregroundStyle(.secondary)
     }
 }

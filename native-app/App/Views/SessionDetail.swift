@@ -230,9 +230,14 @@ private struct SessionContextBar: View {
                 Spacer(minLength: 8)
                 switch state {
                 case .loaded(let snapshot):
-                    Text(snapshot.files.isEmpty ? "Clean" : "\(snapshot.files.count) changed")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(snapshot.files.isEmpty ? Color.secondary : Color.orange)
+                    Label(
+                        snapshot.files.isEmpty ? "Clean" : "\(snapshot.files.count) changed",
+                        systemImage: snapshot.files.isEmpty ? "checkmark.circle" : "exclamationmark.circle"
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(snapshot.files.isEmpty ? Color.secondary : Color.orange)
+                    .symbolEffect(.wiggle, value: snapshot.files.count)
+                    .contentTransition(.numericText(value: Double(snapshot.files.count)))
                 case .loading:
                     ProgressView()
                         .controlSize(.mini)

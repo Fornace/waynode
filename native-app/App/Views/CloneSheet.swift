@@ -73,12 +73,12 @@ struct CloneSheet: View {
                     .accessibilityIdentifier("clone.branch")
                     .accessibilityHint("Optional; leave empty for the default branch")
             } header: {
-                Text("Repository")
+                Label("Repository", systemImage: "shippingbox")
             } footer: {
                 Text("Leave Branch empty to use the repository's default branch.")
             }
             if !appModel.orgs.isEmpty {
-                Section("Organization") {
+                Section {
                     Picker("Org", selection: Binding(
                         get: { appModel.activeOrgId ?? "" },
                         set: { appModel.selectOrganization($0) }
@@ -89,24 +89,31 @@ struct CloneSheet: View {
                     }
                     .accessibilityIdentifier("clone.organization")
                     if let org = appModel.activeOrg {
-                        Text("New worktree: \(org.name) · \(roleLabel(org.myRole))")
+                        Label("New worktree: \(org.name) · \(roleLabel(org.myRole))", systemImage: "folder.badge.plus")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("clone.organization.summary")
                     }
+                } header: {
+                    Label("Organization", systemImage: "building.2")
                 }
             } else {
-                Section("Organization") {
+                Section {
                     Label("No organization membership is available", systemImage: "person.2.slash")
                         .foregroundStyle(.secondary)
+                } header: {
+                    Label("Organization", systemImage: "building.2")
                 }
             }
         }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Clone") {
+                Button {
                     Haptics.light()
                     startClone()
+                } label: {
+                    Label("Clone", systemImage: phase == .creating ? "square.and.arrow.down.fill" : "square.and.arrow.down")
+                        .symbolEffect(.bounce, value: phase)
                 }
                 .disabled(repoURL.trimmingCharacters(in: .whitespaces).isEmpty || phase == .creating || appModel.activeOrg == nil)
                 .buttonStyle(.glassProminent)
@@ -124,9 +131,10 @@ struct CloneSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if progressLines.isEmpty {
-                        Text("Connecting…")
+                        Label("Connecting…", systemImage: "cable.connector")
                             .font(.system(.caption, design: .monospaced))
                             .foregroundStyle(.secondary)
+                            .symbolEffect(.breathe, isActive: !reduceMotion)
                     } else {
                         ForEach(Array(progressLines.enumerated()), id: \.offset) { _, line in
                             Text(line)
@@ -153,7 +161,10 @@ struct CloneSheet: View {
             .overlay(alignment: .bottom) {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
-                    Text("Cloning repository…").font(.subheadline).foregroundStyle(.secondary)
+                    Label("Cloning repository…", systemImage: "arrow.down.doc")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .symbolEffect(.breathe, isActive: !reduceMotion)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -170,6 +181,7 @@ struct CloneSheet: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 38))
                     .foregroundStyle(.orange)
+                    .symbolEffect(.wiggle, value: message)
                 Text("Clone Failed")
                     .font(.title2.bold())
                 Text(message)
@@ -181,12 +193,18 @@ struct CloneSheet: View {
                     .accessibilityLabel("Clone error: \(message)")
                     .accessibilitySortPriority(2)
                 HStack {
-                    Button("Close") { dismiss() }
-                        .keyboardShortcut(.cancelAction)
-                        .accessibilityIdentifier("clone.error.close")
-                    Button("Try Again") {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Label("Close", systemImage: "xmark")
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("clone.error.close")
+                    Button {
                         phase = .input
                         progressLines = []
+                    } label: {
+                        Label("Try Again", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)

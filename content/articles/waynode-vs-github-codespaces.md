@@ -48,7 +48,7 @@ The Git surface is agent-native: changed files, hunks, diffs, commits, branches,
 | Hosting | GitHub's cloud only | Self-host (Docker Compose) or Waynode Cloud |
 | Source availability | Proprietary service | MIT, open source |
 | Repo providers | GitHub | GitHub and GitLab (OAuth) |
-| Pricing model | Usage: $0.18/hr (2-core) to $2.88/hr (32-core) + $0.07/GB-month; free personal quota 120–180 core hrs/mo; no free org quota ([docs](https://docs.github.com/en/billing/concepts/product-billing/github-codespaces)) | Self-host free (BYO model keys); Cloud: Starter $39/mo (3 seats, 3M tokens, 10 GB) · Pro $99/mo · Team $249/mo |
+| Pricing model | Usage: $0.18/hr (2-core) to $2.88/hr (32-core) + $0.07/GB-month; free personal quota 120-180 core hrs/mo; no free org quota ([docs](https://docs.github.com/en/billing/concepts/product-billing/github-codespaces)) | Self-host free (BYO model keys); Cloud: Starter $39/mo (3 seats, 3M tokens, 10 GB) · Pro $99/mo · Team $249/mo |
 | AI assistance | GitHub Copilot via editor extension, a separate product ([docs](https://docs.github.com/en/codespaces/reference/using-github-copilot-in-github-codespaces)) | Built in: the workspace is operated by an agent |
 | Mobile review | Editing UX is desktop-oriented | Same workspace, session, and diff on a phone |
 

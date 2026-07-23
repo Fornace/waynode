@@ -3,14 +3,41 @@ import Foundation
 extension APIClient {
     // MARK: - Git
 
+    public enum GitSnapshotEvent: Sendable, Equatable {
+        case snapshot(GitSnapshot)
+        case error(String)
+    }
+
     public func getGitSnapshot(_ spaceId: String) async throws -> GitSnapshot {
         try await request("/api/spaces/\(spaceId)/git")
+    }
+
+    public func streamGitSnapshotEvents(spaceId: String) -> AsyncThrowingStream<GitSnapshotEvent, Error> {
+        streamSSE(path: "/api/spaces/\(spaceId)/git/sse", timeout: 60, parse: Self.parseGitSnapshotEvent)
     }
 
     public func getGitDiff(_ spaceId: String, file: String? = nil) async throws -> GitDiffResponse {
         var query: [URLQueryItem] = []
         if let file { query.append(.init(name: "path", value: file)) }
         return try await request("/api/spaces/\(spaceId)/git/diff", query: query)
+    }
+
+    private static func parseGitSnapshotEvent(_ line: String) -> GitSnapshotEvent? {
+        struct Payload: Decodable {
+            let type: String
+            let data: GitSnapshot?
+            let message: String?
+        }
+
+        guard let payload = SSEWire.decode(line, as: Payload.self) else { return nil }
+        switch payload.type {
+        case "snapshot":
+            return payload.data.map(GitSnapshotEvent.snapshot)
+        case "error":
+            return .error(payload.message ?? "Git stream failed")
+        default:
+            return nil
+        }
     }
 
     public struct CommitBody: Encodable, Sendable {

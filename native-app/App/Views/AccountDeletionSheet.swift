@@ -35,6 +35,7 @@ struct AccountDeletionSheet: View {
                     Label("Permanently delete \(accountName)", systemImage: "exclamationmark.triangle.fill")
                         .font(.headline)
                         .foregroundStyle(.red)
+                        .symbolEffect(.bounce, value: confirmation == "DELETE")
                         .fixedSize(horizontal: false, vertical: true)
                     Text("Personal spaces, sessions, API tokens, and saved credentials are permanently removed. Shared organization work stays with its other administrators.")
                         .fixedSize(horizontal: false, vertical: true)
@@ -74,6 +75,7 @@ struct AccountDeletionSheet: View {
                     Section {
                         Label(error, systemImage: "exclamationmark.circle")
                             .foregroundStyle(.red)
+                            .symbolEffect(.wiggle, value: error)
                             .fixedSize(horizontal: false, vertical: true)
                             .textSelection(.enabled)
                             .accessibilityElement(children: .combine)

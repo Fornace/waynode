@@ -198,6 +198,10 @@
 .git-changes { display: flex; flex-direction: column; height: 100%; }
 .git-changes-count { font-size: 13px; font-weight: 600; color: var(--text-dim); letter-spacing: 0; }
 .git-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-size: 12px;
   padding: 5px 10px;
   border-radius: 6px;
@@ -207,6 +211,14 @@
 }
 .git-mini-btn:hover:not(:disabled) { background: var(--bg-hover); }
 .git-mini-btn:disabled { opacity: 0.5; }
+.git-mini-btn.is-busy { color: #c7d2fe; border-color: rgba(129,140,248,.34); background: rgba(99,102,241,.11); opacity: 1; }
+.git-activity-icon { display: inline-grid; place-items: center; width: 15px; height: 15px; flex: none; font-size: 13px; line-height: 1; }
+.git-activity-icon.is-active { animation: git-activity-spin 1s linear infinite; }
+@keyframes git-activity-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .git-activity-icon.is-active { animation: none; }
+}
 
 .git-clean {
   padding: 48px 16px;

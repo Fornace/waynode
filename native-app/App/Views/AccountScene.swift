@@ -12,6 +12,7 @@ struct AccountScene: View {
     @Environment(\.openURL) var openURL
     @Environment(\.dismiss) var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State var tokens: [APIClient.TokenInfo] = []
     @State var newToken: NewTokenPresentation?
     @State var isLoadingTokens = false
@@ -180,12 +181,12 @@ struct AccountScene: View {
             if let providers = appModel.auth.providers {
                 providerRow(
                     name: "GitHub",
-                    icon: "network",
+                    icon: "chevron.left.forwardslash.chevron.right",
                     connected: providers.github ?? false
                 )
                 providerRow(
                     name: "GitLab",
-                    icon: "fox",
+                    icon: "square.stack.3d.up",
                     connected: providers.gitlab ?? false
                 )
                 if providers.dev == true {
@@ -196,8 +197,9 @@ struct AccountScene: View {
                     )
                 }
             } else {
-                Text("Loading…")
+                Label("Loading…", systemImage: "arrow.triangle.2.circlepath")
                     .foregroundStyle(.secondary)
+                    .symbolEffect(.rotate, isActive: !reduceMotion)
             }
         }
     }
@@ -211,6 +213,7 @@ struct AccountScene: View {
             if connected {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                    .symbolEffect(.bounce, value: connected)
             } else {
                 Text("Not connected")
                     .font(.caption)
@@ -233,7 +236,9 @@ struct AccountScene: View {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Label("Create Token", systemImage: "plus.circle")
+                    Label("Create Token", systemImage: isCreatingToken ? "key.fill" : "plus.circle")
+                        .symbolEffect(.bounce, value: isCreatingToken)
+                        .contentTransition(.symbolEffect(.replace))
                 }
             }
             .disabled(tokens.count >= 10 || isCreatingToken)
@@ -243,13 +248,14 @@ struct AccountScene: View {
             if isLoadingTokens {
                 HStack { Spacer(); ProgressView(); Spacer() }
             } else if tokens.isEmpty {
-                Text("No API tokens")
+                Label("No API tokens", systemImage: "key.slash")
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("account.tokens.empty")
             } else {
-                Text("\(tokens.count) active token\(tokens.count == 1 ? "" : "s")")
+                Label("\(tokens.count) active token\(tokens.count == 1 ? "" : "s")", systemImage: "key.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .contentTransition(.numericText(value: Double(tokens.count)))
                     .accessibilityIdentifier("account.tokens.summary")
                 ForEach(tokens) { token in
                     HStack(alignment: .top, spacing: 10) {
@@ -310,9 +316,11 @@ struct AccountScene: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Server, \(appModel.auth.serverConfig.baseURL.absoluteString)")
-            Button("Change Server URL") {
+            Button {
                 serverURL = appModel.auth.serverConfig.baseURL.absoluteString
                 showingServerSheet = true
+            } label: {
+                Label("Change Server URL", systemImage: "link")
             }
             .accessibilityIdentifier("account.server.change")
             .accessibilityHint("Opens server address settings")
@@ -323,8 +331,16 @@ struct AccountScene: View {
 
     private var aboutSection: some View {
         Section("About") {
-            LabeledContent("Version", value: appVersion)
-            LabeledContent("Build", value: buildNumber)
+            LabeledContent {
+                Text(appVersion)
+            } label: {
+                Label("Version", systemImage: "app.badge")
+            }
+            LabeledContent {
+                Text(buildNumber)
+            } label: {
+                Label("Build", systemImage: "hammer")
+            }
             Link(destination: URL(string: "https://github.com/Fornace/waynode")!) {
                 Label("View on GitHub", systemImage: "chevron.left.slash.chevron.right")
             }

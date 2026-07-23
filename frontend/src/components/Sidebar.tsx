@@ -305,8 +305,8 @@ export function Sidebar({
                             onClose={() => setOpenMenuFor(null)}
                             items={[
                               { label: "Archive session", onClick: () => lifecycle.archiveSession(session, true) },
-                              { label: "Commit changes & archive", onClick: () => lifecycle.requestLifecycle(session, "archive", true) },
-                              { label: "Commit changes & delete", danger: true, onClick: () => lifecycle.requestLifecycle(session, "delete", true) },
+                              { label: "Commit changes and archive", onClick: () => lifecycle.requestLifecycle(session, "archive", true) },
+                              { label: "Commit changes and delete", danger: true, onClick: () => lifecycle.requestLifecycle(session, "delete", true) },
                               { label: "Delete session", danger: true, onClick: () => lifecycle.requestLifecycle(session, "delete", false) },
                             ]}
                           />

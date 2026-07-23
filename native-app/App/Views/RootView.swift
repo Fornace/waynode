@@ -208,7 +208,10 @@ struct LaunchView: View {
                 .controlSize(.small)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background {
+            Color("LaunchScreenBackground")
+                .ignoresSafeArea()
+        }
     }
 }
 

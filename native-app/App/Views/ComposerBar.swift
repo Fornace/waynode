@@ -40,10 +40,13 @@ struct ComposerBar: View {
         VStack(spacing: 0) {
             // Mode Picker
             Picker("Send Mode", selection: $composerMode) {
-                Text("Chat").tag(ComposerMode.message)
-                Text("Goal").tag(ComposerMode.goal)
+                Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                    .tag(ComposerMode.message)
+                Label("Goal", systemImage: "target")
+                    .tag(ComposerMode.goal)
                 if hammersmithAvailable {
-                    Text("Swarm").tag(ComposerMode.hammersmith)
+                    Label("Swarm", systemImage: "person.3.sequence")
+                        .tag(ComposerMode.hammersmith)
                 }
             }
             .pickerStyle(.segmented)
@@ -56,6 +59,7 @@ struct ComposerBar: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption2)
+                        .symbolEffect(.bounce, value: error)
                     Text(error)
                         .font(.caption2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -73,8 +77,9 @@ struct ComposerBar: View {
             // Goal-mode hint strip
             if isGoalMode {
                 HStack(spacing: 6) {
-                    GoalTensionGlyph(active: true, reduceMotion: reduceMotion)
-                        .frame(width: 16, height: 16)
+                    Image(systemName: "target")
+                        .font(.caption2)
+                        .symbolEffect(.pulse, isActive: !reduceMotion)
                     Text("Goal mode · Waynode keeps working until done")
                         .font(.caption2)
                     Spacer()
@@ -88,8 +93,9 @@ struct ComposerBar: View {
             // Hammersmith-mode hint strip
             if isHammersmithMode {
                 HStack(spacing: 6) {
-                    Image(systemName: "checkmark.seal")
+                    Image(systemName: "person.3.sequence.fill")
                         .font(.caption2)
+                        .symbolEffect(.pulse, isActive: !reduceMotion)
                     Text("Hammersmith · delegates this job to a verified swarm")
                         .font(.caption2)
                     Spacer()
@@ -134,6 +140,8 @@ struct ComposerBar: View {
                     .padding(.horizontal, 2)
                     .padding(.vertical, 7)
                     .frame(minHeight: 32)
+                    .submitLabel(.send)
+                    .onSubmit { send() }
                     .accessibilityLabel("Message")
                     .accessibilityHint("Type a message for the coding agent")
                     .accessibilityIdentifier("composer.input")
@@ -180,9 +188,10 @@ struct ComposerBar: View {
             HStack(spacing: 0) {
                 if canSend {
                     Button { send() } label: {
-                        Image(systemName: "text.badge.plus")
+                        Image(systemName: isGoalMode ? "target" : "text.badge.plus")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.accentColor)
+                            .symbolEffect(.bounce, value: canSend)
                             .frame(width: 32, height: 32)
                     }
                     .buttonStyle(.plain)

@@ -97,15 +97,42 @@ function BlockView({ block, streaming, isLastBlock, onQuote }: { block: Block; s
   }
 
   if (block.type === "thinking") {
-    return (
-      <details className="trace-disclosure reasoning-disclosure">
-        <summary><DisclosureChevron /><span>Reasoning</span><small>Collapsed</small></summary>
-        <div className="msg-thinking-body">{block.text}</div>
-      </details>
-    );
+    return <ReasoningDisclosure text={block.text} streaming={streaming && isLastBlock} />;
   }
 
   return <ToolDisclosure block={block} onRecover={onQuote} />;
+}
+
+function ReasoningDisclosure({ text, streaming }: { text: string; streaming: boolean }) {
+  const [open, setOpen] = useState(streaming);
+
+  useEffect(() => {
+    setOpen(streaming);
+  }, [streaming]);
+
+  return (
+    <details
+      className={`trace-disclosure reasoning-disclosure ${streaming ? "is-streaming" : ""}`}
+      open={open}
+      onToggle={(event) => {
+        if (!streaming) setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary onClick={(event) => {
+        if (streaming) event.preventDefault();
+      }}>
+        <span className="reasoning-glyph" aria-hidden="true" />
+        <span>Reasoning</span>
+        <small>{streaming ? "Streaming thoughts" : open ? "Expanded" : "Collapsed"}</small>
+        <DisclosureChevron />
+      </summary>
+      <div className="msg-thinking-body" tabIndex={0}>
+        <div className="msg-thinking-content">
+          <MarkdownDocument>{text}</MarkdownDocument>
+        </div>
+      </div>
+    </details>
+  );
 }
 
 function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "tool" }>; onRecover?: (markdown: string) => void }) {

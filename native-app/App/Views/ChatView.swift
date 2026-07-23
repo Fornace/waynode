@@ -106,7 +106,7 @@ struct ChatView: View {
                     isSending: store.isSending,
                     isRunActive: store.isRunActive,
                     isAttaching: isUploadingAttachments,
-                    error: attachmentError ?? store.sendError,
+                    error: attachmentError ?? store.sendError ?? store.reducer.lastError,
                     isGoalActive: store.goalStatus.status == .active,
                     hammersmithAvailable: store.hammersmithCapability?.available == true,
                     isFocused: $composerFocused,
@@ -250,6 +250,10 @@ struct ChatView: View {
                             .id(item.id)
                     }
 
+                    if showsWaitingForAssistant {
+                        AgentWaitingRow(text: store.reducer.statusText ?? "Waiting for output…")
+                    }
+
                     // Bottom anchor for auto-scroll — generous bottom padding
                     // so the last message doesn't hide behind the composer
                     // when the keyboard is visible.
@@ -327,6 +331,16 @@ struct ChatView: View {
         }
     }
 
+    private var showsWaitingForAssistant: Bool {
+        guard store.isRunActive,
+              !store.reducer.isStreaming,
+              let last = transcriptItems.last,
+              case .user(let user) = last else {
+            return false
+        }
+        return user.submissionStatus?.isPendingForAssistant ?? true
+    }
+
     private var showConnectionBanner: Bool {
         switch store.connectionState {
         case .reconnecting, .failed:
@@ -368,6 +382,17 @@ struct ChatView: View {
             previous.blocks.append(contentsOf: next.blocks)
             previous.done = next.done
             result[result.count - 1] = .assistant(previous)
+        }
+    }
+}
+
+private extension SubmissionStatus {
+    var isPendingForAssistant: Bool {
+        switch self {
+        case .sending, .queued, .starting, .running:
+            true
+        case .completed, .failed, .cancelled:
+            false
         }
     }
 }

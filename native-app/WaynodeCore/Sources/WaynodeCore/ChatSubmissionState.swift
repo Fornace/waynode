@@ -20,6 +20,11 @@ public struct ChatSubmissionState: Sendable, Equatable {
         let index = items.firstIndex { item in
             if case .user(let user) = item { return user.id == submission.id }
             return false
+        } ?? items.lastIndex { item in
+            guard case .user(let user) = item else { return false }
+            return user.content == submission.prompt
+                && user.isGoal == submission.isGoal
+                && user.submissionStatus?.isPending == true
         }
         if !accepted && submission.status == .failed {
             if let index { items.remove(at: index) }
@@ -53,6 +58,23 @@ public struct ChatSubmissionState: Sendable, Equatable {
         failedDraft = nil; queuedCount = 0; activeStatus = nil
     }
 
+    mutating func completePending(items: inout [ChatItem]) {
+        for index in items.indices {
+            guard case .user(let user) = items[index],
+                  user.submissionStatus?.isPending == true else {
+                continue
+            }
+            items[index] = .user(.init(
+                id: user.id,
+                content: user.content,
+                isGoal: user.isGoal,
+                submissionStatus: .completed,
+                sentAt: user.sentAt
+            ))
+        }
+        derive(from: items)
+    }
+
     public mutating func discardFailedDraft() {
         failedDraft = nil
     }
@@ -64,5 +86,16 @@ public struct ChatSubmissionState: Sendable, Equatable {
         }
         queuedCount = statuses.filter { $0 == .queued }.count
         activeStatus = [.running, .starting, .queued, .sending].first { statuses.contains($0) }
+    }
+}
+
+private extension SubmissionStatus {
+    var isPending: Bool {
+        switch self {
+        case .sending, .queued, .starting, .running:
+            true
+        case .completed, .failed, .cancelled:
+            false
+        }
     }
 }

@@ -16,7 +16,10 @@ struct GitFileRow: View {
     var body: some View {
         HStack {
             if isSelected {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.tint)
+                    .symbolEffect(.bounce, value: isSelected)
+                    .transition(.symbolEffect(.appear))
             }
             Image(systemName: statusIcon).foregroundStyle(statusColor).font(.caption)
             Text(file.path)
@@ -65,6 +68,7 @@ struct GitInlineDiffPane: View {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             HStack(spacing: 8) {
                                 Image(systemName: "doc.text.magnifyingglass")
+                                    .symbolEffect(.bounce, value: file.id)
                                 Text(file.path)
                                     .font(.headline.monospaced())
                                     .textSelection(.enabled)

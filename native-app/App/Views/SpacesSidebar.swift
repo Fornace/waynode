@@ -214,7 +214,7 @@ struct SpaceRow: View {
 
             VStack(alignment: .trailing, spacing: 4) {
                 if !space.branch.isEmpty {
-                    Text(space.branch)
+                    Label(space.branch, systemImage: "arrow.triangle.branch")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

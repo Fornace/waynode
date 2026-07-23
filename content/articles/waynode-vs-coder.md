@@ -66,7 +66,7 @@ Self-hosting starts with `git clone` and `./scripts/self-host.sh setup`. The gui
 | Mobile | Mobile-first web; native macOS/iOS clients planned | Web dashboard; IDE-centric workflow |
 | Governance (SSO, audit, RBAC, quotas) | Not offered | OIDC SSO free; audit/RBAC/quotas in Premium ([pricing](https://coder.com/pricing)) |
 | Free-tier limits | Fully free self-host, MIT | Unlimited workspaces; 1,000 agent builds, then AI Governance add-on |
-| Managed option | Waynode Cloud: $39–$249/mo flat tiers | Premium: annual per-user, quote-based |
+| Managed option | Waynode Cloud: $39-$249/mo flat tiers | Premium: annual per-user, quote-based |
 
 ## When is Coder the better choice?
 

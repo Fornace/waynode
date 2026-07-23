@@ -31,6 +31,7 @@ public final class SessionStore {
     private var sse: SSEClient?
     private var listenerTask: Task<Void, Never>?
     private var stateTask: Task<Void, Never>?
+    private var runStateTask: Task<Void, Never>?
     private var closeTimer: Task<Void, Never>?
     private var viewerCount: Int = 0
     private var isRestartingStream: Bool = false
@@ -102,9 +103,8 @@ public final class SessionStore {
         await loadHistory()
 
         // Check live state — if the agent is mid-turn, we'll get a sync event.
-        if let state = try? await api.getSessionState(sessionId) {
-            for submission in state.submissions { reducer.reconcileSubmission(submission) }
-            if state.active { startGoalPolling() }
+        if let state = await refreshSessionState(), state.active || isRunActive {
+            startRunStatePolling()
         }
 
         await refreshHammersmithJobs()
@@ -167,6 +167,8 @@ public final class SessionStore {
         listenerTask = nil
         stateTask?.cancel()
         stateTask = nil
+        runStateTask?.cancel()
+        runStateTask = nil
         Task { [sse] in await sse?.stop() }
         sse = nil
         connectionState = .disconnected
@@ -198,14 +200,21 @@ public final class SessionStore {
             return
         case .submission(let submission):
             _ = reducer.reduce(event)
-            if submission.isGoal,
-               ![.completed, .failed, .cancelled].contains(submission.status) {
-                startGoalPolling()
+            if ![.completed, .failed, .cancelled].contains(submission.status) {
+                startRunStatePolling()
+                if submission.isGoal { startGoalPolling() }
+            } else if !isRunActive {
+                stopRunStatePolling()
+                Task { await self.refreshCompletedHistory() }
             }
             return
         case .end, .turnEnd:
             _ = reducer.reduce(event)
-            if !isRunActive { stopGoalPolling() }
+            if !isRunActive {
+                stopRunStatePolling()
+                stopGoalPolling()
+                Task { await self.refreshCompletedHistory() }
+            }
             // Final fetch of goal status.
             Task { await self.refreshGoalStatus() }
             return
@@ -216,6 +225,50 @@ public final class SessionStore {
 
     private func handle(_ state: SSEClient.ConnectionState) {
         connectionState = state
+    }
+
+    // MARK: - Run state polling
+
+    public func startRunStatePolling() {
+        guard !isPollingRunState else { return }
+        runStateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                let state = await self.refreshSessionState()
+                let runActive = self.isRunActive
+                if state?.active == false, !runActive {
+                    self.stopRunStatePolling()
+                    return
+                }
+            }
+        }
+    }
+
+    public func stopRunStatePolling() {
+        runStateTask?.cancel()
+        runStateTask = nil
+    }
+
+    public var isPollingRunState: Bool {
+        runStateTask != nil
+    }
+
+    @discardableResult
+    public func refreshSessionState() async -> APIClient.StateResponse? {
+        guard let state = try? await api.getSessionState(sessionId) else { return nil }
+        reducer.reconcileSessionState(
+            active: state.active,
+            done: state.done,
+            submissions: state.submissions
+        )
+        if !state.active, state.done {
+            stopRunStatePolling()
+            if !isRunActive {
+                Task { await self.refreshCompletedHistory() }
+            }
+        }
+        return state
     }
 
     // MARK: - Goal polling

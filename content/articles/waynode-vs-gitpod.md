@@ -51,7 +51,7 @@ Waynode connects to GitHub and GitLab via OAuth. Its default Compose deployment 
 | Workspace model | Persistent Git worktree on disk; sessions survive between visits | Ephemeral, sandboxed environments; 7-day auto-delete on Core ([source](https://ona.com/pricing)) |
 | License | MIT, fully open source | Core source under AGPL (proprietary license removed after the 2022 self-hosted shutdown); the platform is a commercial service ([source](https://devclass.com/2022/12/09/gitpod-abandons-self-hosted-product-in-favor-of-dedicated-cloud/)) |
 | Self-hosting | Free: guided Docker Compose setup; OAuth and model key required | Enterprise plan only: customer-managed VPC on AWS/GCP, custom pricing ([source](https://ona.com/pricing)) |
-| Entry price (hosted) | Starter $39/mo (3 seats, 3M agent tokens, 10 GB) | Core from $20/mo, usage in OCUs (80–2,200 OCUs/mo included; add-ons from $10/40 OCUs) ([source](https://ona.com/pricing)) |
+| Entry price (hosted) | Starter $39/mo (3 seats, 3M agent tokens, 10 GB) | Core from $20/mo, usage in OCUs (80-2,200 OCUs/mo included; add-ons from $10/40 OCUs) ([source](https://ona.com/pricing)) |
 | Models | Hosted: fast/reasoning/max tiers (Fornace, GLM, Qwen). Self-host: bring your own keys | Private LLM access with MCP support; model flexibility via AWS Bedrock, Google Vertex, or private APIs ([source](https://ona.com/stories/gitpod-is-now-ona)) |
 | Workspace setup | OAuth to GitHub or GitLab; workspace is a clone of your repo | Declarative, via `devcontainer.json` and `automations.yml` ([source](https://ona.com/stories/gitpod-is-now-ona)) |
 | Mobile | Mobile-first web; same workspace/session/diff on a phone; native macOS/iOS clients planned | Browser VS Code and desktop IDE handoff ([source](https://ona.com/stories/gitpod-is-now-ona)) |
@@ -60,7 +60,7 @@ Waynode connects to GitHub and GitLab via OAuth. Its default Compose deployment 
 
 ## How does pricing actually compare?
 
-They meter different things. Ona bills in **Ona Compute Units (OCUs)**, a normalized measure covering both agent token usage and infrastructure: roughly 1 OCU for a small codebase explanation, 1 OCU for one hour of a standard VM, 7 OCUs/hour for a GPU VM. There is a Free tier (3 parallel environments, up to 4 vCPU); Core starts at $20/month with 80–2,200 OCUs included depending on configuration; add-ons cost from $10 per 40 OCUs; Enterprise is custom ([ona.com/pricing](https://ona.com/pricing)).
+They meter different things. Ona bills in **Ona Compute Units (OCUs)**, a normalized measure covering both agent token usage and infrastructure: roughly 1 OCU for a small codebase explanation, 1 OCU for one hour of a standard VM, 7 OCUs/hour for a GPU VM. There is a Free tier (3 parallel environments, up to 4 vCPU); Core starts at $20/month with 80-2,200 OCUs included depending on configuration; add-ons cost from $10 per 40 OCUs; Enterprise is custom ([ona.com/pricing](https://ona.com/pricing)).
 
 Waynode hosted plans bundle seats, agent tokens, and storage at a flat rate: Starter $39/mo (3 seats, 3M agent tokens/mo, 10 GB), Pro $99/mo (10 seats, 8M tokens, 50 GB), Team $249/mo (25 seats, 20M tokens, 200 GB), with a 15-day free trial for new organizations (5M trial tokens, 2 GB storage, 1 seat). Self-hosting is free under MIT; you pay only your own infrastructure and model API keys.
 
@@ -109,4 +109,4 @@ Not exactly. Gitpod/Ona is built around ephemeral, fleet-scale dev environments 
 
 ### How do Waynode and Ona pricing models differ?
 
-Ona meters usage in Ona Compute Units covering agent tokens plus infrastructure (Core from $20/month with 80–2,200 OCUs included; add-ons from $10/40 OCUs). Waynode hosted plans are flat: $39, $99, or $249 per month for bundled seats, agent tokens, and storage, and self-hosting costs nothing beyond your own infrastructure and model keys.
+Ona meters usage in Ona Compute Units covering agent tokens plus infrastructure (Core from $20/month with 80-2,200 OCUs included; add-ons from $10/40 OCUs). Waynode hosted plans are flat: $39, $99, or $249 per month for bundled seats, agent tokens, and storage, and self-hosting costs nothing beyond your own infrastructure and model keys.

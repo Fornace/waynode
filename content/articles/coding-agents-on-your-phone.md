@@ -99,4 +99,4 @@ Persistence and ownership. Hosted agents run in ephemeral vendor environments an
 
 ### Do I need the Waynode Cloud plan to use it from a phone?
 
-No. The self-hosted version is free and MIT-licensed, and the mobile web experience is part of the open-source stack. Waynode Cloud ($39–$249/month, 15-day trial) adds managed server operation, updates, encrypted secrets, and Stripe billing on top of the same code. Interactive terminal access is currently self-hosted only.
+No. The self-hosted version is free and MIT-licensed, and the mobile web experience is part of the open-source stack. Waynode Cloud ($39-$249/month, 15-day trial) adds managed server operation, updates, encrypted secrets, and Stripe billing on top of the same code. Interactive terminal access is currently self-hosted only.

@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import type { Space, GitSnapshot } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { buildAskPrompt, basename, dirname, CheckIcon, CloseIcon, FileEditor, Pill, WarnIcon, type GitIssue } from "./GitSidebarShared";
+import { buildAskPrompt, basename, dirname, CheckIcon, CloseIcon, FileEditor, GitActivityIcon, Pill, WarnIcon, type GitIssue } from "./GitSidebarShared";
 import { DiffView, GitStatusBadge } from "./GitReviewEvidence";
 
 // ───────────────────────────── Changes ─────────────────────────────
@@ -66,7 +66,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     setDiff("");
     try {
       const { diff } = await api.git.diff(space.id, path);
-      setDiff(diff || "(no textual diff — binary or untracked)");
+      setDiff(diff || "(no textual diff: binary or untracked)");
     } catch {
       setDiff("Couldn’t load this diff. Your worktree is unchanged.");
     } finally {
@@ -178,7 +178,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     const cur = snap.currentBranch || "current";
     note(`🔀 Pull rebased with conflicts in ${files.length} file(s): ${files.join(", ")}. The rebase was aborted; the repo is clean.`);
     onIssue({
-      title: "Pull — rebase conflicts",
+      title: "Pull: rebase conflicts",
       detail: `Rebasing ${cur} conflicted. The rebase was aborted so the repo is clean. Let the agent resolve and finish the pull?`,
       files,
       actions: [
@@ -189,9 +189,9 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
   };
   const raiseDiverged = () => {
     const cur = snap.currentBranch || "current";
-    note(`🔀 Pull diverged — ${cur} and its remote have diverged (fast-forward not possible).`);
+    note(`🔀 Pull diverged: ${cur} and its remote have diverged (fast-forward not possible).`);
     onIssue({
-      title: "Pull — branches diverged",
+      title: "Pull: branches diverged",
       detail: `${cur} and its remote have diverged. Merge, rebase, or let the agent handle it?`,
       actions: [
         { id: "merge", label: "Merge", run: async () => doPullMode("merge") },
@@ -203,9 +203,9 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
   };
   const raisePushRejected = () => {
     const cur = snap.currentBranch || "current";
-    note(`🔀 Push rejected — the remote has commits you don't have yet. Pull first.`);
+    note(`🔀 Push rejected: the remote has commits you don't have yet. Pull first.`);
     onIssue({
-      title: "Push — rejected",
+      title: "Push: rejected",
       detail: `The remote has new commits on ${cur}. Pull first, or let the agent pull and push?`,
       actions: [
         { id: "pull", label: "Pull first", run: async () => { onIssue(null); await handlePull(); } },
@@ -218,10 +218,10 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
     const cur = snap.currentBranch || "current";
     note(`🔀 ${cur} has no upstream branch set.`);
     onIssue({
-      title: "Push — no upstream",
+      title: "Push: no upstream",
       detail: `${cur} has no upstream. Set it and push to origin?`,
       actions: [
-        { id: "up", label: "Push & set upstream", primary: true, run: async () => { const r = await api.git.push(space.id, true); onChange(r.data); onIssue(null); showMsg("Pushed & upstream set", "success"); } },
+        { id: "up", label: "Push and set upstream", primary: true, run: async () => { const r = await api.git.push(space.id, true); onChange(r.data); onIssue(null); showMsg("Pushed and upstream set", "success"); } },
         { id: "ignore", label: "Cancel", run: async () => onIssue(null) },
       ],
     });
@@ -233,7 +233,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
       const r = await api.git.pull(space.id, mode);
       onChange(r.data);
       if (r.conflicts && r.conflicts.length) raiseRebaseConflict(r.conflicts, r.output);
-      else { onIssue(null); showMsg(mode === "merge" ? "Merged & pulled" : "Rebased & pulled", "success"); }
+      else { onIssue(null); showMsg(mode === "merge" ? "Merged and pulled" : "Rebased and pulled", "success"); }
     } catch {
       showMsg("Couldn’t update from the remote. Your local work is preserved; try again.", "error");
     } finally {
@@ -251,11 +251,13 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
               Discard tracked edits
             </button>
           )}
-          <button className="git-mini-btn" onClick={handlePull} disabled={pulling}>
-            ↓ {pulling ? "…" : "Pull"}
+          <button className={`git-mini-btn ${pulling ? "is-busy" : ""}`} onClick={handlePull} disabled={pulling} aria-busy={pulling}>
+            <GitActivityIcon busy={pulling} idle="down" />
+            <span>{pulling ? "Pulling" : "Pull"}</span>
           </button>
-          <button className="git-mini-btn" onClick={handlePush} disabled={pushing} title="Push current branch to its upstream">
-            ↑ {pushing ? "…" : "Push"}
+          <button className={`git-mini-btn ${pushing ? "is-busy" : ""}`} onClick={handlePush} disabled={pushing} aria-busy={pushing} title="Push current branch to its upstream">
+            <GitActivityIcon busy={pushing} idle="up" />
+            <span>{pushing ? "Pushing" : "Push"}</span>
           </button>
         </div>
       </div>
@@ -329,7 +331,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
               space={space}
               path={editorPath}
               onClose={() => setEditorPath(null)}
-              onSaved={() => { api.git.status(space.id).then(onChange).catch(() => {}); showMsg("Saved — ready to review and commit", "success"); }}
+              onSaved={() => { api.git.status(space.id).then(onChange).catch(() => {}); showMsg("Saved: ready to review and commit", "success"); }}
             />
           )}
           {discardTarget && (
