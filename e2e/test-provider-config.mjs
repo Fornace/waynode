@@ -63,7 +63,7 @@ try {
   rpcHandle._send = async (command) => { firstTurnCommand = command; };
   const firstTurn = rpcHandle.sendPrompt("ordinary message", "message", "rpc-submission");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(firstTurnCommand, { type: "prompt", message: "ordinary message" }, "ordinary first turns use the RPC prompt command without rewriting content");
+  assert.deepEqual(firstTurnCommand, { type: "prompt", message: "ordinary message", streamingBehavior: "followUp" }, "ordinary first turns use the RPC prompt command without rewriting content");
   rpcHandle.submissions.settle(rpcHandle.currentSubmission, "completed");
   await firstTurn;
   let turnProbeCount = 0;
