@@ -183,8 +183,8 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
       return;
     case "submission":
       applySubmission(e, ev.submission);
-      if (ev.submission.status === "starting") e.state.status = "Starting agent…";
-      if (ev.submission.status === "running") e.state.status = "Agent working";
+      if (["starting", "running"].includes(ev.submission.status)) e.state.streaming = true;
+      if (ev.submission.status === "starting") e.state.status = "Starting agent…"; if (ev.submission.status === "running") e.state.status = "Agent working";
       if (["completed", "failed", "cancelled"].includes(ev.submission.status)) e.state.status = null;
       emit(e);
       return;
