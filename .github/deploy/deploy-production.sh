@@ -255,7 +255,11 @@ if [[ -f "$LIVE_DIR/.waynode-revision" && -f "$LIVE_DIR/.waynode-source.sha256" 
   recorded_revision=$(<"$LIVE_DIR/.waynode-revision")
   recorded_digest=$(<"$LIVE_DIR/.waynode-source.sha256")
   [[ "$recorded_revision" == "$previous_revision" ]] || die "Live source/image revision mismatch."
-  [[ "$recorded_digest" == "$previous_source_digest" ]] || die "Unreconciled production source changes found."
+  if [[ "$recorded_digest" != "$previous_source_digest" ]]; then
+    [[ "$ALLOW_LEGACY_SOURCE" == 1 ]] \
+      || die "Unreconciled production source changes found."
+    say "Legacy source digest manifest is stale; accepting it for this CI bootstrap."
+  fi
 else
   [[ "$ALLOW_LEGACY_SOURCE" == 1 ]] \
     || die "Production source has no trusted revision manifest."
