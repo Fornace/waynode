@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import type { ChatItem, Block, ComposerMode, HammersmithRun, Submission, SubmissionStatus } from "../types";
 import { appendText, appendThinking, appendTool, setToolOutput } from "./sessionBlocks";
 import { abortSession, loadHammersmithRuns, loadHistoryItems, openSessionStream, SubmissionError, submitDraft } from "./sessionTransport";
@@ -7,7 +8,7 @@ import {
   type SubmissionDraft, type SubmissionView,
 } from "./sessionSubmissions";
 let _idSeq = 0;
-export const uid = () => `c${Date.now()}-${_idSeq++}`;
+const uid = () => `c${Date.now()}-${_idSeq++}`;
 const eventSentAt = (event: any) => event.createdAt ?? event.created_at ?? event.timestamp ?? new Date().toISOString();
 interface SessionState {
   items: ChatItem[]; streaming: boolean; error: string | null; status: string | null;
@@ -26,8 +27,8 @@ const EMPTY: SessionState = {
   connection: "connecting", queuedCount: 0, activeStatus: null, failedDraft: null,
 };
 const entries = new Map<string, SessionEntry>();
-export const renameListeners = new Set<(sessionId: string, title: string) => void>();
-export function getEntry(sessionId: string): SessionEntry {
+const renameListeners = new Set<(sessionId: string, title: string) => void>();
+function getEntry(sessionId: string): SessionEntry {
   let e = entries.get(sessionId);
   if (!e) {
     e = {
@@ -39,7 +40,7 @@ export function getEntry(sessionId: string): SessionEntry {
   }
   return e;
 }
-export function emit(e: SessionEntry) {
+function emit(e: SessionEntry) {
   e.state = { ...e.state };
   for (const l of e.listeners) l();
 }
@@ -388,4 +389,12 @@ export async function abort(sessionId: string): Promise<void> {
     emit(e);
   }
 }
-export { injectSystem, injectProgress, onRename, useSessionChat } from "./sessionActions";
+export function injectSystem(sessionId: string, content: string) { const e = getEntry(sessionId); e.state.items = [...e.state.items, { id: uid(), role: "system", content, sentAt: new Date().toISOString() }]; emit(e); }
+export function injectProgress(sessionId: string, key: string, content: string) {
+  const e = getEntry(sessionId), items = e.state.items.slice(), last = items[items.length - 1];
+  if (last && last.role === "system" && (last as any).key === key) items[items.length - 1] = { ...last, content } as any;
+  else items.push({ id: uid(), role: "system", content, key, sentAt: new Date().toISOString() });
+  e.state.items = items; emit(e);
+}
+export function onRename(cb: (sessionId: string, title: string) => void): () => void { renameListeners.add(cb); return () => renameListeners.delete(cb); }
+export function useSessionChat(sessionId: string) { return useSyncExternalStore((cb) => subscribe(sessionId, cb), () => getSnapshot(sessionId)); }
