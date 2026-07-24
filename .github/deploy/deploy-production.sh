@@ -257,7 +257,7 @@ if [[ -f "$LIVE_DIR/.waynode-revision" && -f "$LIVE_DIR/.waynode-source.sha256" 
   [[ "$recorded_revision" == "$previous_revision" ]] || die "Live source/image revision mismatch."
   [[ "$recorded_digest" == "$previous_source_digest" ]] || die "Unreconciled production source changes found."
 else
-  [[ -z "$previous_revision" && "$ALLOW_LEGACY_SOURCE" == 1 ]] \
+  [[ "$ALLOW_LEGACY_SOURCE" == 1 ]] \
     || die "Production source has no trusted revision manifest."
   say "One-time legacy source bootstrap accepted after full source preservation."
 fi
