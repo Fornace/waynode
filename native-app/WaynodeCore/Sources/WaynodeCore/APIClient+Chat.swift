@@ -39,10 +39,34 @@ extension APIClient: SessionTransport {
         public var prompt: String
         public var isGoal: Bool
         public var submissionId: String
+
+        public init(prompt: String, isGoal: Bool, submissionId: String) {
+            self.prompt = prompt
+            self.isGoal = isGoal
+            self.submissionId = submissionId
+        }
+
+        /// Canonical submission mode the server prefers. The chat endpoints only ever
+        /// carry `message`/`goal` (hammersmith has its own delegation endpoint).
+        public var mode: String { isGoal ? "goal" : "message" }
+
         enum CodingKeys: String, CodingKey {
             case prompt
-            case isGoal = "isGoal"
-            case submissionId = "submissionId"
+            case mode
+            case isGoal
+            case submissionId
+        }
+
+        // Send the canonical `mode` string (matching the web client and server
+        // contract) and retain the legacy `isGoal` boolean so an older server that
+        // predates the `mode` field still resolves goal turns instead of silently
+        // downgrading them to a plain message.
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(prompt, forKey: .prompt)
+            try container.encode(mode, forKey: .mode)
+            try container.encode(isGoal, forKey: .isGoal)
+            try container.encode(submissionId, forKey: .submissionId)
         }
     }
 
