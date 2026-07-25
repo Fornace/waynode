@@ -196,7 +196,7 @@ try {
     value: "org-scoped-runtime-key",
   });
   assert.deepEqual(
-    hammersmithWorkerLlmEnv({ space_id: "no-space", org_id: starterOrg.id }),
+    await hammersmithWorkerLlmEnv({ space_id: "no-space", org_id: starterOrg.id }),
     { WAYNODE_LLM_KEY: "org-scoped-runtime-key" },
   );
   db.prepare("INSERT INTO spaces (id, org_id, owner_id, repo_url, repo_name, local_path) VALUES (?, ?, ?, ?, ?, ?)")
@@ -206,16 +206,16 @@ try {
     value: "space-scoped-runtime-key",
   });
   assert.deepEqual(
-    hammersmithWorkerLlmEnv({ space_id: "cred-space", org_id: starterOrg.id }),
+    await hammersmithWorkerLlmEnv({ space_id: "cred-space", org_id: starterOrg.id }),
     { WAYNODE_LLM_KEY: "space-scoped-runtime-key" },
     "space-scope overrides org-scope",
   );
-  assert.throws(
+  await assert.rejects(
     () => hammersmithWorkerLlmEnv({ space_id: "space-y", org_id: trialOrg.id }),
     (error) => error.status === 503,
   );
   assert.notEqual(
-    hammersmithWorkerLlmEnv({ space_id: "cred-space", org_id: starterOrg.id }).WAYNODE_LLM_KEY,
+    (await hammersmithWorkerLlmEnv({ space_id: "cred-space", org_id: starterOrg.id })).WAYNODE_LLM_KEY,
     process.env.WAYNODE_SANDBOX_LLM_KEY,
     "the deployment-wide runtime key is never a worker credential",
   );

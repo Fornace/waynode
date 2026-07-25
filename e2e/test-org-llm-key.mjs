@@ -23,8 +23,12 @@ Object.assign(process.env, {
 
 const db = (await import("../lib/db.mjs")).default;
 const { upsertSubscription, PLANS } = await import("../lib/billing-state.mjs");
-const { getSecretValue } = await import("../lib/secrets.mjs");
-const { ensureOrgLlmKey, revokeOrgLlmKey, ORG_LLM_KEY } = await import("../lib/org-llm-key.mjs");
+const { getSecretValue, setSecret } = await import("../lib/secrets.mjs");
+const {
+  ensureOrgLlmKey, ensureOrgHammersmithKey, revokeOrgLlmKey,
+  ORG_LLM_KEY, HAMMERSMITH_LLM_KEY,
+} = await import("../lib/org-llm-key.mjs");
+const { hammersmithWorkerLlmEnv } = await import("../lib/sandbox-llm-key.mjs");
 
 // ── Fake mantice ────────────────────────────────────────────────────────────
 const calls = [];
@@ -34,7 +38,7 @@ const fakeFetch = async (url, init = {}) => {
   if (gatewayDown) throw new Error("connect ECONNREFUSED");
   const { pathname } = new URL(url);
   const method = init.method || "GET";
-  calls.push({ method, pathname });
+  calls.push({ method, pathname, body: init.body });
   assert.equal(init.headers.Authorization, "Bearer admin-secret", "admin token must be sent");
   assert.ok(!url.includes("/v1/admin"), "admin API must be addressed at the gateway root, not /v1");
   const json = (status, body) => ({ status, ok: status < 300, json: async () => body });
@@ -102,6 +106,77 @@ await check("no admin token configured -> per-org keys inert", async () => {
   const { config } = await import("../lib/config.mjs");
   const runtimeConfig = { ...config, llm: { ...config.llm, adminToken: "" } };
   assert.equal(await ensureOrgLlmKey(orgId, { ...opts, runtimeConfig }), null);
+});
+
+// ── Hosted Hammersmith worker key ───────────────────────────────────────────
+// An org that pays for the Hammersmith add-on must be able to start its first
+// run without an operator hand-planting a secret, while the credential stays
+// tenant-scoped — the deployment-wide chat runtime key is never a fallback.
+const hammerOrg = "org-hammersmith";
+db.prepare("INSERT INTO orgs (id, name, slug) VALUES (?, ?, ?)").run(hammerOrg, "Hammer Org", "hammer-org");
+const workerSession = { space_id: "hammer-no-space", org_id: hammerOrg };
+
+await check("chat entitlement alone does not mint a Hammersmith key", async () => {
+  upsertSubscription(hammerOrg, { plan: "pro", status: "active" });
+  assert.ok(await ensureOrgLlmKey(hammerOrg, opts), "pro org still gets its chat key");
+  assert.equal(await ensureOrgHammersmithKey(hammerOrg, opts), null, "add-on is a separate entitlement");
+  await assert.rejects(
+    () => hammersmithWorkerLlmEnv(workerSession, opts),
+    (error) => error.status === 503,
+    "a non-entitled org fails closed instead of borrowing any key",
+  );
+});
+
+let workerKey;
+await check("entitled org self-provisions a tenant-scoped worker key", async () => {
+  upsertSubscription(hammerOrg, { plan: "hammersmith", status: "active" });
+  const env = await hammersmithWorkerLlmEnv(workerSession, opts);
+  workerKey = env.WAYNODE_LLM_KEY;
+  assert.ok(workerKey, "first run provisions its own credential");
+  assert.ok(workerKey.endsWith(`_${PLANS.hammersmith.tokensPerMonth}`), "capped at the add-on allowance");
+  assert.equal(
+    getSecretValue({ scope: "org", orgId: hammerOrg, keyName: HAMMERSMITH_LLM_KEY }), workerKey,
+    "stored encrypted under its own secret name",
+  );
+  assert.notEqual(
+    workerKey, getSecretValue({ scope: "org", orgId: hammerOrg, keyName: ORG_LLM_KEY }),
+    "worker credential is distinct from the chat credential",
+  );
+  assert.notEqual(workerKey, process.env.WAYNODE_SANDBOX_LLM_KEY, "never the deployment-wide key");
+  const minted = calls.filter((c) => c.method === "POST" && c.pathname === "/admin/tokens");
+  assert.ok(
+    JSON.parse(minted.at(-1).body).label === `waynode-hammersmith:${hammerOrg}`,
+    "labelled at the gateway so spend and revocation are attributable",
+  );
+});
+
+await check("route pre-flight and runner reuse one key, not two", async () => {
+  const before = calls.filter((c) => c.method === "POST" && c.pathname === "/admin/tokens").length;
+  assert.equal((await hammersmithWorkerLlmEnv(workerSession, opts)).WAYNODE_LLM_KEY, workerKey);
+  assert.equal(calls.filter((c) => c.method === "POST" && c.pathname === "/admin/tokens").length, before);
+});
+
+await check("Space-scoped secret still overrides the org key", async () => {
+  db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("hammer-owner", "Hammer Owner");
+  db.prepare("INSERT INTO spaces (id, org_id, owner_id, repo_url, repo_name, local_path) VALUES (?, ?, ?, ?, ?, ?)")
+    .run("hammer-space", hammerOrg, "hammer-owner", "https://example.test/h.git", "h", root);
+  setSecret({ scope: "space", spaceId: "hammer-space", keyName: HAMMERSMITH_LLM_KEY, value: "space-worker-key" });
+  const env = await hammersmithWorkerLlmEnv({ space_id: "hammer-space", org_id: hammerOrg }, opts);
+  assert.deepEqual(env, { WAYNODE_LLM_KEY: "space-worker-key" });
+});
+
+await check("gateway outage falls back to the stored tenant key, never the shared one", async () => {
+  gatewayDown = true;
+  const env = await hammersmithWorkerLlmEnv(workerSession, opts);
+  assert.equal(env.WAYNODE_LLM_KEY, workerKey, "last good tenant key keeps the run alive");
+  assert.notEqual(env.WAYNODE_LLM_KEY, process.env.WAYNODE_SANDBOX_LLM_KEY);
+  gatewayDown = false;
+});
+
+await check("revoking the subscription disables the worker key too", async () => {
+  await revokeOrgLlmKey(hammerOrg, opts);
+  assert.equal(getSecretValue({ scope: "org", orgId: hammerOrg, keyName: HAMMERSMITH_LLM_KEY }), null);
+  assert.equal(getSecretValue({ scope: "org", orgId: hammerOrg, keyName: ORG_LLM_KEY }), null);
 });
 
 console.log("org LLM key lifecycle checks passed");

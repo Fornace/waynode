@@ -256,7 +256,9 @@ router.post("/api/sessions/:sessionId/hammersmith", requireAuth, async (req, res
   const admissionGate = hostedHammersmithAdmission(session, userSettings.hostingMode);
   if (admissionGate) return res.status(admissionGate.status).json({ error: admissionGate.error });
   if (userSettings.hostingMode === "hosted") {
-    try { hammersmithWorkerLlmEnv(session); }
+    // Provisions the org's gateway key on first run, so this pre-flight both
+    // verifies the credential and makes it exist for the worker below.
+    try { await hammersmithWorkerLlmEnv(session); }
     catch (error) { return res.status(error.status || 503).json({ error: error.message }); }
   }
   const admission = reserveHammersmithBudget(session, userSettings.hostingMode, res);

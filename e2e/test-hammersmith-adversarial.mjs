@@ -163,7 +163,7 @@ setSettingsForUser(invalidUser, {
 const normalized = settingsFor(invalidUser);
 assert.equal(normalized.hostingMode, "hosted");
 assert.equal(normalized.defaultEngine, "pi");
-assert.throws(
+await assert.rejects(
   () => hammersmithWorkerLlmEnv({ space_id: "missing-space", org_id: null }),
   /encrypted Space or organization/,
   "hosted launch fails before execution when a scoped credential is unavailable",
