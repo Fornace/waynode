@@ -21,6 +21,7 @@ process.env.WAYNODE_SANDBOX_LLM_KEY = "test-runtime-value";
 const { ManifestFactory, deriveSelfHostedTaskLayout } = await import("../lib/hammersmith-manifest.mjs");
 const {
   HostedMicrosandboxHammersmithRunner, LocalProcessHammersmithRunner, hostedOuterTimeoutMs,
+  writeRuntimeConfig,
 } = await import("../lib/hammersmith-runner.mjs");
 const {
   descendantProcesses, expectedStructuredState, fingerprintGitMetadata, terminateProcessTree,
@@ -229,6 +230,17 @@ await hostedRecovery.recover({
   session: { local_path: repo },
 });
 assert.equal(hostedRecoveryFields.lifecycle, "stopped", "an already-absent sandbox is safely recoverable");
+
+// The pi engine must be declared, because hammersmith's built-in passes the
+// prompt as "@{spec}" and pi reads a leading @word as a file mention: that made
+// every hosted run exit non-zero in seconds before the model ran at all.
+const runtimeConfigPath = join(root, "runtime-config.toml");
+writeRuntimeConfig(runtimeConfigPath, join(root, "runtime-state"));
+const runtimeConfigText = readFileSync(runtimeConfigPath, "utf8");
+assert.match(runtimeConfigText, /^\[engines\.pi\]$/m, "the pi engine is pinned, not left to the built-in");
+assert.match(runtimeConfigText, /args_template = \["-p", "\{spec\}", "--no-session"\]/, "spec passed verbatim");
+assert.doesNotMatch(runtimeConfigText, /@\{spec\}/, "the mention-triggering @ prefix never returns");
+assert.doesNotMatch(runtimeConfigText, /bash/, "no shell wrapper: hammersmith does not quote a multi-line spec");
 
 const ts = await import(pathToFileURL(join(process.cwd(), "frontend/node_modules/typescript/lib/typescript.js")));
 async function importTs(path) {
