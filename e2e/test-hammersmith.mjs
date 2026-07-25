@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
@@ -70,11 +70,14 @@ assert.equal(manifest.tasks[0].full_access, false);
 assert.equal(manifest.tasks[0].engine, "pi");
 assert.match(manifest.tasks[0].check, /git diff --check/);
 assert.match(manifest.tasks[0].check, /\[ -f package\.json \]/);
+assert.match(manifest.tasks[0].check, /\[ -d node_modules \]/); // npm gates wait for installed deps
 assert.deepEqual(manifest.tasks[0].expect_files, []);
 assert.ok(manifest.tasks[0].verified.length > 40);
 assert.throws(() => normalizeSubmissionMode("surprise"), /Unknown submission mode/);
 assert.equal(normalizeSubmissionMode(true), "goal", "legacy isGoal remains compatible");
+writeFileSync(join(repo, "package.json"), '{"scripts":{"test":"exit 7"}}'); // would fail if gates ran
 execFileSync("/bin/sh", ["-c", manifest.tasks[0].check], { cwd: repo, stdio: "pipe" });
+rmSync(join(repo, "package.json"));
 const pinnedRoot = join(root, "pinned-source");
 mkdirSync(pinnedRoot);
 const archive = join(process.cwd(), "vendor/hammersmith/hammersmith-0.1.0+86a8308d.tar.gz");
