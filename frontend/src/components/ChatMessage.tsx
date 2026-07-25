@@ -20,7 +20,7 @@ export function MessageRowImpl({ item, streaming, phase, onQuote }: MessageRowPr
       <article className="msg msg-user">
         <div className="msg-user-stack">
           <div className="msg-bubble msg-bubble-user">
-            {(item.mode === "goal" || item.isGoal) && <span className="msg-tag">Goal</span>}
+            {item.mode === "goal" && <span className="msg-tag">Goal</span>}
             {item.mode === "hammersmith" && <span className="msg-tag">Hammersmith</span>}
             {item.submissionStatus && !["completed", "running"].includes(item.submissionStatus) && (
               <span className={`msg-tag submission-${item.submissionStatus}`}>{submissionLabel(item.submissionStatus)}</span>

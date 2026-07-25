@@ -202,7 +202,7 @@ public final class SessionStore {
             _ = reducer.reduce(event)
             if ![.completed, .failed, .cancelled].contains(submission.status) {
                 startRunStatePolling()
-                if submission.isGoal { startGoalPolling() }
+                if submission.mode == .goal { startGoalPolling() }
             } else if !isRunActive {
                 stopRunStatePolling()
                 Task { await self.refreshCompletedHistory() }
@@ -325,7 +325,6 @@ extension ChatReducer.HistoryItem {
             role: msg.role,
             id: msg.id ?? UUID().uuidString,
             content: msg.content,
-            isGoal: msg.isGoal ?? false,
             text: msg.text,
             thinking: msg.thinking,
             key: msg.key,

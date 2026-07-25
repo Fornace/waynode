@@ -13,7 +13,10 @@ extension ChatReducer {
         for h in history {
             switch h.role {
             case "user":
-                items.append(.user(.init(id: h.id, content: h.content ?? "", isGoal: h.isGoal ?? false, sentAt: h.sentAt)))
+                // The persisted transcript carries no submission mode — the
+                // server stores the prompt the agent saw, not how it was
+                // submitted — so replayed rows are plain messages.
+                items.append(.user(.init(id: h.id, content: h.content ?? "", sentAt: h.sentAt)))
             case "assistant":
                 // Server sends assistant text as `content` (NOT `text`), and
                 // optional reasoning as `thinking`. This mirrors the web
@@ -56,9 +59,11 @@ extension ChatReducer {
 
         switch item {
         case .user(let incoming):
+            // Content only: history rows never carry a mode, so comparing modes
+            // would make every goal/swarm row look new and duplicate it.
             return items.contains { existing in
                 guard case .user(let user) = existing else { return false }
-                return user.content == incoming.content && user.isGoal == incoming.isGoal
+                return user.content == incoming.content
             }
         case .assistant(let incoming):
             return items.contains { existing in
@@ -79,13 +84,12 @@ extension ChatReducer {
         public var role: String
         public var id: String
         public var content: String?
-        public var isGoal: Bool?
         public var text: String?
         public var thinking: String?
         public var key: String?
         public var sentAt: Date?
-        public init(role: String, id: String, content: String? = nil, isGoal: Bool? = nil, text: String? = nil, thinking: String? = nil, key: String? = nil, sentAt: Date? = nil) {
-            self.role = role; self.id = id; self.content = content; self.isGoal = isGoal
+        public init(role: String, id: String, content: String? = nil, text: String? = nil, thinking: String? = nil, key: String? = nil, sentAt: Date? = nil) {
+            self.role = role; self.id = id; self.content = content
             self.text = text; self.thinking = thinking; self.key = key; self.sentAt = sentAt
         }
     }

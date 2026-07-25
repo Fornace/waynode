@@ -62,17 +62,21 @@ extension SessionStore {
         }
     }
 
-    public func sendMessage(_ prompt: String, isGoal: Bool = false) async {
+    /// The one entry point for composer submissions. `mode` alone decides the
+    /// endpoint (via SubmissionDraft.kind), so the UI cannot route a goal to the
+    /// swarm — or a swarm job to the chat stream — by getting a second flag wrong.
+    public func send(_ prompt: String, mode: SubmissionMode = .message) async {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let kind: SubmissionDraft.Kind = shouldQueueSubmission ? .queue : .message
         let draft: SubmissionDraft
         if let failed = reducer.submissionState.failedDraft,
-           failed.prompt == trimmed, failed.isGoal == isGoal {
-            draft = SubmissionDraft(id: failed.id, prompt: trimmed, isGoal: isGoal, kind: kind)
+           failed.prompt == trimmed, failed.mode == mode {
+            draft = SubmissionDraft(id: failed.id, prompt: trimmed, mode: mode, queued: shouldQueueSubmission)
         } else {
             reducer.discardFailedDraft()
-            draft = SubmissionDraft(id: UUID().uuidString, prompt: trimmed, isGoal: isGoal, kind: kind)
+            draft = SubmissionDraft(
+                id: UUID().uuidString, prompt: trimmed, mode: mode, queued: shouldQueueSubmission
+            )
         }
         // Archived sessions are read-only. Reject before any network attempt
         // and route through the existing failedDraft path so the text is
@@ -87,8 +91,9 @@ extension SessionStore {
 
     public func retryFailedSubmission() async {
         guard var draft = reducer.submissionState.failedDraft else { return }
-        if draft.kind == .hammersmith { await submitHammersmith(draft); return }
-        if shouldQueueSubmission { draft.kind = .queue }
+        // Re-derive the routing bit: the run state may have changed while the
+        // draft sat in the composer. A hammersmith draft ignores it.
+        draft.queued = shouldQueueSubmission
         await submit(draft)
     }
 
@@ -108,7 +113,16 @@ extension SessionStore {
         isRunActive || reducer.submissionState.queuedCount > 0
     }
 
-    private func submit(_ draft: SubmissionDraft) async {
+    /// Endpoint dispatch — the single place a draft's kind becomes a request.
+    /// Being total over Kind is what keeps mode and endpoint in lockstep.
+    func submit(_ draft: SubmissionDraft) async {
+        switch draft.kind {
+        case .hammersmith: await submitHammersmith(draft)
+        case .message, .queue: await submitChat(draft)
+        }
+    }
+
+    private func submitChat(_ draft: SubmissionDraft) async {
         guard !isSending else {
             // A previous submission is still in flight. Surface a busy
             // rejection through the existing failedDraft path so the composer
@@ -129,7 +143,7 @@ extension SessionStore {
             if draft.kind == .queue {
                 response = try await api.queueMessage(
                     sessionId, prompt: draft.prompt,
-                    isGoal: draft.isGoal, submissionId: draft.id
+                    mode: draft.mode, submissionId: draft.id
                 )
             } else {
                 response = try await sendOrQueueWhenBusy(draft)
@@ -139,14 +153,18 @@ extension SessionStore {
                 return
             }
             let fallbackStatus: SubmissionStatus = response.queued == true ? .queued : .starting
-            let acknowledged = response.submission ?? Submission(
-                id: draft.id, prompt: draft.prompt, isGoal: draft.isGoal,
+            var acknowledged = response.submission ?? Submission(
+                id: draft.id, prompt: draft.prompt, mode: draft.mode,
                 status: fallbackStatus
             )
-            reducer.reconcileSubmission(acknowledged, kind: draft.kind)
+            // The client chose the endpoint, so its mode is authoritative for the
+            // row already on screen: a mode-less acknowledgement must never
+            // downgrade a goal turn to a plain message.
+            acknowledged.mode = draft.mode
+            reducer.reconcileSubmission(acknowledged, queued: draft.queued)
             if ![.completed, .failed, .cancelled].contains(acknowledged.status) {
                 startRunStatePolling()
-                if draft.isGoal { startGoalPolling() }
+                if draft.mode == .goal { startGoalPolling() }
             }
         } catch {
             reject(draft, message: error.localizedDescription)
@@ -157,21 +175,21 @@ extension SessionStore {
         do {
             return try await api.sendMessage(
                 sessionId, prompt: draft.prompt,
-                isGoal: draft.isGoal, submissionId: draft.id
+                mode: draft.mode, submissionId: draft.id
             )
         } catch let error as APIClient.APIError where error.statusCode == 409 {
             return try await api.queueMessage(
                 sessionId, prompt: draft.prompt,
-                isGoal: draft.isGoal, submissionId: draft.id
+                mode: draft.mode, submissionId: draft.id
             )
         }
     }
 
-    private func reject(_ draft: SubmissionDraft, message: String) {
+    func reject(_ draft: SubmissionDraft, message: String) {
         reducer.reconcileSubmission(Submission(
-            id: draft.id, prompt: draft.prompt, isGoal: draft.isGoal,
+            id: draft.id, prompt: draft.prompt, mode: draft.mode,
             status: .failed, error: message
-        ), accepted: false, kind: draft.kind)
+        ), accepted: false, queued: draft.queued)
         sendError = "Message not sent. \(message) Your draft is ready to retry."
     }
 }

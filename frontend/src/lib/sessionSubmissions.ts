@@ -3,8 +3,7 @@ import type { ChatItem, ComposerMode, HammersmithRun, Submission, SubmissionStat
 export interface SubmissionDraft {
   id: string;
   prompt: string;
-  mode?: ComposerMode;
-  isGoal: boolean;
+  mode: ComposerMode;
   kind: "message" | "queue";
   sentAt: string;
 }
@@ -36,15 +35,12 @@ export function hammersmithRunTitle(run: HammersmithRun) {
   return "Hammersmith running";
 }
 
-function submissionMode(value: ComposerMode | boolean | undefined, isGoal = false): ComposerMode {
-  if (value === true || isGoal) return "goal";
-  if (value === false || value === undefined) return "message";
-  return value;
+function submissionMode(value: ComposerMode | undefined): ComposerMode {
+  return value ?? "message";
 }
 
-export function newDraft(prompt: string, mode: ComposerMode | boolean, kind: "message" | "queue"): SubmissionDraft {
-  const normalized = submissionMode(mode);
-  return { id: crypto.randomUUID(), prompt, mode: normalized, isGoal: normalized === "goal", kind, sentAt: new Date().toISOString() };
+export function newDraft(prompt: string, mode: ComposerMode, kind: "message" | "queue"): SubmissionDraft {
+  return { id: crypto.randomUUID(), prompt, mode, kind, sentAt: new Date().toISOString() };
 }
 
 export function submissionFromHammersmithRun(run: HammersmithRun): Submission {
@@ -52,7 +48,6 @@ export function submissionFromHammersmithRun(run: HammersmithRun): Submission {
     id: run.submissionId || `hammersmith-user-${run.id}`,
     prompt: run.description,
     mode: "hammersmith",
-    isGoal: false,
     status: "completed",
     createdAt: run.createdAt,
     jobId: run.id,
@@ -69,17 +64,16 @@ export function reconcileSubmission(
   let items = current.items.slice();
   const serverSentAt = submission.createdAt ?? submission.created_at ?? submission.timestamp;
   const existingSentAt = items.find((item) => item.role === "user" && item.id === submission.id)?.sentAt;
-  const normalizedMode = submissionMode(submission.mode, submission.isGoal);
+  const normalizedMode = submissionMode(submission.mode);
   const draft: SubmissionDraft = {
     id: submission.id,
     prompt: submission.prompt,
-    ...(submission.mode !== undefined ? { mode: normalizedMode } : {}),
-    isGoal: normalizedMode === "goal",
+    mode: normalizedMode,
     kind,
     sentAt: existingSentAt ?? serverSentAt ?? new Date().toISOString(),
   };
   const index = items.findIndex((item) => item.role === "user" && item.id === submission.id);
-  const pendingIndex = index >= 0 ? index : findPendingSubmissionIndex(items, submission.prompt, normalizedMode === "goal");
+  const pendingIndex = index >= 0 ? index : findPendingSubmissionIndex(items, submission.prompt, normalizedMode);
 
   if (!accepted && submission.status === "failed") {
     if (pendingIndex >= 0) items.splice(pendingIndex, 1);
@@ -89,8 +83,7 @@ export function reconcileSubmission(
       role: "user",
       content: submission.prompt,
       sentAt: draft.sentAt,
-      mode: draft.mode ?? normalizedMode,
-      isGoal: draft.isGoal,
+      mode: draft.mode,
       submissionStatus: submission.status,
     };
     if (pendingIndex >= 0) items[pendingIndex] = { ...items[pendingIndex], ...item } as ChatItem;
@@ -132,13 +125,13 @@ function isPendingStatus(status?: SubmissionStatus): boolean {
   return status === "sending" || status === "queued" || status === "starting" || status === "running";
 }
 
-function findPendingSubmissionIndex(items: ChatItem[], prompt: string, isGoal: boolean): number {
+function findPendingSubmissionIndex(items: ChatItem[], prompt: string, mode: ComposerMode): number {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
     if (
       item.role === "user"
       && item.content === prompt
-      && Boolean(item.isGoal) === isGoal
+      && submissionMode(item.mode) === mode
       && isPendingStatus(item.submissionStatus)
     ) {
       return index;
@@ -151,8 +144,7 @@ export function optimisticSubmission(view: SubmissionView, draft: SubmissionDraf
   return reconcileSubmission(view, {
     id: draft.id,
     prompt: draft.prompt,
-    mode: draft.mode ?? (draft.isGoal ? "goal" : "message"),
-    isGoal: draft.isGoal,
+    mode: draft.mode,
     status: "sending",
     createdAt: draft.sentAt,
   }, { accepted: true, kind: draft.kind });

@@ -50,7 +50,6 @@ export interface Submission {
   id: string;
   prompt: string;
   mode: ComposerMode;
-  isGoal?: boolean;
   status: SubmissionStatus;
   error?: string;
   createdAt?: string;
@@ -70,7 +69,7 @@ export type Block =
   | { type: "tool"; id: string; name: string; args: any; output: string; status: ToolStatus; startedAt?: number; endedAt?: number };
 
 export type ChatItem =
-  | { id: string; role: "user"; content: string; sentAt: string | null; mode?: ComposerMode; isGoal?: boolean; submissionStatus?: SubmissionStatus }
+  | { id: string; role: "user"; content: string; sentAt: string | null; mode?: ComposerMode; submissionStatus?: SubmissionStatus }
   | { id: string; role: "assistant"; blocks: Block[]; done: boolean; sentAt: string | null }
   | { id: string; role: "system"; content: string; sentAt: string | null; key?: string }
   | { id: string; role: "hammersmith-run"; initiatingItemId: string; run: HammersmithRun; sentAt: string | null };
@@ -123,7 +122,6 @@ export interface SSEEvent {
   type: "start" | "delta" | "stderr" | "done" | "error";
   text?: string;
   msgId?: string;
-  isGoal?: boolean;
   exitCode?: number;
   message?: string;
 }

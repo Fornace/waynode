@@ -52,25 +52,25 @@ public struct ChatReducer: Sendable, Equatable {
 
     /// Append a user message optimistically. The server does NOT echo the
     /// user message back over SSE — the web client appends it locally too.
-    public mutating func appendUser(_ content: String, isGoal: Bool = false, id: String? = nil) {
+    public mutating func appendUser(_ content: String, mode: SubmissionMode = .message, id: String? = nil) {
         let mid = id ?? UUID().uuidString
-        items.append(.user(.init(id: mid, content: content, isGoal: isGoal)))
+        items.append(.user(.init(id: mid, content: content, mode: mode)))
         revision += 1
     }
 
     public mutating func appendSubmission(_ draft: SubmissionDraft) {
         reconcileSubmission(.init(
-            id: draft.id, prompt: draft.prompt, isGoal: draft.isGoal,
+            id: draft.id, prompt: draft.prompt, mode: draft.mode,
             status: .sending, error: nil
-        ), kind: draft.kind)
+        ), queued: draft.queued)
     }
 
     public mutating func reconcileSubmission(
         _ submission: Submission,
         accepted: Bool = true,
-        kind: SubmissionDraft.Kind = .message
+        queued: Bool = false
     ) {
-        submissionState.reconcile(items: &items, submission: submission, accepted: accepted, kind: kind)
+        submissionState.reconcile(items: &items, submission: submission, accepted: accepted, queued: queued)
         revision += 1
     }
 
@@ -325,7 +325,7 @@ public struct ChatReducer: Sendable, Equatable {
                 }
             case "user":
                 let mid = wire.id ?? UUID().uuidString
-                items.append(.user(.init(id: mid, content: wire.content ?? "", isGoal: wire.isGoal ?? false)))
+                items.append(.user(.init(id: mid, content: wire.content ?? "", mode: wire.mode ?? .message)))
             case "system":
                 let mid = wire.id ?? UUID().uuidString
                 items.append(.system(.init(id: mid, content: wire.content ?? "", key: nil)))

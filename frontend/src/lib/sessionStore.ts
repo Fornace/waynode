@@ -147,8 +147,7 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
         if (item.role !== "user" || !item.submissionStatus || known.has(item.id)) continue;
         if (!["queued", "starting", "running"].includes(item.submissionStatus)) continue;
         applySubmission(e, {
-          id: item.id, prompt: item.content, mode: item.mode ?? (item.isGoal ? "goal" : "message"),
-          isGoal: item.isGoal ?? false,
+          id: item.id, prompt: item.content, mode: item.mode ?? "message",
           status: "failed", error: "The server restarted while this message was in flight. Your draft is ready to retry.",
         });
       }
@@ -339,7 +338,7 @@ async function postDraft(sessionId: string, draft: SubmissionDraft): Promise<boo
       return postDraft(sessionId, { ...draft, kind: "queue" });
     }
     applySubmission(e, error instanceof SubmissionError && error.body?.submission ? error.body.submission : {
-      id: draft.id, prompt: draft.prompt, mode: draft.mode ?? (draft.isGoal ? "goal" : "message"), isGoal: draft.isGoal, status: "failed",
+      id: draft.id, prompt: draft.prompt, mode: draft.mode, status: "failed",
       error: error instanceof Error ? error.message : "Submission failed",
     }, false, draft.kind);
     e.state.streaming = false;
@@ -348,7 +347,7 @@ async function postDraft(sessionId: string, draft: SubmissionDraft): Promise<boo
     return false;
   }
 }
-export async function send(sessionId: string, prompt: string, mode: ComposerMode | boolean): Promise<boolean> {
+export async function send(sessionId: string, prompt: string, mode: ComposerMode): Promise<boolean> {
   const e = getEntry(sessionId);
   const draft = newDraft(prompt, mode, "message");
   Object.assign(e.state, optimisticSubmission(submissionView(e), draft));
@@ -357,7 +356,7 @@ export async function send(sessionId: string, prompt: string, mode: ComposerMode
   emit(e);
   return postDraft(sessionId, draft);
 }
-export async function queue(sessionId: string, prompt: string, mode: ComposerMode | boolean = "message"): Promise<boolean> {
+export async function queue(sessionId: string, prompt: string, mode: ComposerMode = "message"): Promise<boolean> {
   const e = getEntry(sessionId);
   const draft = newDraft(prompt, mode, "queue");
   Object.assign(e.state, optimisticSubmission(submissionView(e), draft));

@@ -97,7 +97,7 @@ try {
   const guestArgs = getSandboxPiArgs({
     session: { ...session, pi_session_dir: hostSessionDir },
     prompt: "persist this turn",
-    isGoal: false,
+    mode: "message",
     workspaceDir: root,
   });
   assert.equal(guestArgs[guestArgs.indexOf("--session-dir") + 1], guestSessionDir);

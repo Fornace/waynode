@@ -257,7 +257,7 @@ const terminalLoading = {
 };
 assert.equal(submissions.hammersmithRunTitle(terminalLoading), "Verified", "terminal reload state outranks loading freshness");
 let view = {
-  items: [], failedDraft: { id: "old", prompt: "rejected", mode: "message", isGoal: false, kind: "message", sentAt: new Date().toISOString() },
+  items: [], failedDraft: { id: "old", prompt: "rejected", mode: "message", kind: "message", sentAt: new Date().toISOString() },
   queuedCount: 0, activeStatus: null,
 };
 view = submissions.reconcileSubmission(view, {

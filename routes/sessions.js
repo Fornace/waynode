@@ -11,6 +11,7 @@ import {
   getMessagesFromDisk,
   touchSession,
 } from "../lib/sessions.mjs";
+import { SUBMISSION_MODES } from "../lib/agent-submissions.mjs";
 import { isPiAvailable } from "../lib/pi-runner.mjs";
 import { readGoalStatus } from "../lib/pi-runner.mjs";
 import { getAgent, getAgentIfActive, stopAgent } from "../lib/agent-manager.mjs";
@@ -130,11 +131,8 @@ function requestSubmission(req) {
   const id = typeof supplied === "string" && supplied.length > 0 && supplied.length <= 128
     ? supplied
     : randomUUID();
-  const suppliedMode = req.body?.mode;
-  const mode = suppliedMode === undefined
-    ? (req.body?.isGoal ? "goal" : "message")
-    : suppliedMode;
-  if (!["message", "goal", "hammersmith"].includes(mode)) {
+  const mode = req.body?.mode ?? "message";
+  if (!SUBMISSION_MODES.includes(mode)) {
     const error = new Error("Unknown or unavailable submission mode");
     error.status = 400;
     throw error;
@@ -344,7 +342,7 @@ router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
       releaseTokenReservation(admission.reservation?.id);
       return res.status(error.status || 409).json({
         error: error.message,
-        submission: { id: submissionId, prompt, mode, isGoal: mode === "goal", status: "failed", error: error.message },
+        submission: { id: submissionId, prompt, mode, status: "failed", error: error.message },
       });
     }
     resetOneShotMode(session.id, mode);

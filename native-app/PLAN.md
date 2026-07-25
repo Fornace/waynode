@@ -127,7 +127,7 @@ Three lanes, by app state:
 
 ### Lane A — App in foreground (live)
 ```
-POST /api/sessions/:id/message {prompt, isGoal}   → fire-and-forget (200 ok)
+POST /api/sessions/:id/message {prompt, mode}     → fire-and-forget (200 ok)
 GET  /api/sessions/:id/stream                     → SSE: sync snapshot, then tokens/status/errors
 ```
 The agent runs on the server. Tokens stream into a TCA reducer. If you navigate
@@ -251,7 +251,7 @@ where `ticket` is minted by the app from its bearer token via a tiny
 | Spaces list/get/create/delete/pull | `/api/spaces*` | ✅ |
 | Clone progress (SSE) | `/api/spaces/:id/clone-events` | ✅ |
 | Sessions list/get/create/delete/archive | `/api/spaces/:id/sessions`, `/api/sessions/:id` | ✅ |
-| **Send message** (fire-and-forget) | `POST /api/sessions/:id/message` `{prompt,isGoal}` | ✅ |
+| **Send message** (fire-and-forget) | `POST /api/sessions/:id/message` `{prompt,mode}` | ✅ |
 | Queue follow-up | `POST /api/sessions/:id/queue` | ✅ |
 | Abort turn | `POST /api/sessions/:id/abort` | ✅ |
 | Switch model (live RPC) | `POST /api/sessions/:id/model` | ✅ |

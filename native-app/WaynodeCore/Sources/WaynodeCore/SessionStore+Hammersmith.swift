@@ -23,18 +23,10 @@ extension SessionStore {
         for job in jobs { reducer.upsertHammersmithRun(job) }
     }
 
+    /// Convenience spelling of `send(_:mode:)` — the draft discipline (retry
+    /// reuse, archived gate) lives there so both surfaces behave identically.
     public func sendHammersmith(_ prompt: String) async {
-        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let draft: SubmissionDraft
-        if let failed = reducer.submissionState.failedDraft,
-           failed.prompt == trimmed, failed.kind == .hammersmith {
-            draft = SubmissionDraft(id: failed.id, prompt: trimmed, isGoal: false, kind: .hammersmith)
-        } else {
-            reducer.discardFailedDraft()
-            draft = SubmissionDraft(id: UUID().uuidString, prompt: trimmed, isGoal: false, kind: .hammersmith)
-        }
-        await submitHammersmith(draft)
+        await send(prompt, mode: .hammersmith)
     }
 
     func submitHammersmith(_ draft: SubmissionDraft) async {
@@ -53,22 +45,25 @@ extension SessionStore {
             )
             guard response.ok else {
                 reducer.reconcileSubmission(Submission(
-                    id: draft.id, prompt: draft.prompt, isGoal: false,
+                    id: draft.id, prompt: draft.prompt, mode: .hammersmith,
                     status: .failed, error: "Server rejected the job"
-                ), accepted: false, kind: .hammersmith)
+                ), accepted: false)
                 sendError = "Job not delegated. Server rejected the job Your draft is ready to retry."
                 return
             }
-            let acknowledged = response.submission ?? Submission(
-                id: draft.id, prompt: draft.prompt, isGoal: false, status: .completed
+            var acknowledged = response.submission ?? Submission(
+                id: draft.id, prompt: draft.prompt, mode: .hammersmith, status: .completed
             )
-            reducer.reconcileSubmission(acknowledged, kind: .hammersmith)
+            // Keep the row's mode on the endpoint that produced it, so a retry
+            // of a later failure still routes back to /hammersmith.
+            acknowledged.mode = .hammersmith
+            reducer.reconcileSubmission(acknowledged)
             if let job = response.job { reducer.upsertHammersmithRun(job) }
         } catch {
             reducer.reconcileSubmission(Submission(
-                id: draft.id, prompt: draft.prompt, isGoal: false,
+                id: draft.id, prompt: draft.prompt, mode: .hammersmith,
                 status: .failed, error: error.localizedDescription
-            ), accepted: false, kind: .hammersmith)
+            ), accepted: false)
             sendError = "Job not delegated. \(error.localizedDescription) Your draft is ready to retry."
         }
     }

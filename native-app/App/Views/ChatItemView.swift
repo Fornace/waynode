@@ -39,11 +39,11 @@ struct UserMessageView: View {
         HStack(alignment: .top, spacing: 8) {
             Spacer(minLength: 48)
             VStack(alignment: .leading, spacing: 6) {
-                if message.isGoal {
+                if let badge = message.mode.badge {
                     HStack(spacing: 4) {
-                        Image(systemName: "target")
+                        Image(systemName: badge.symbol)
                             .font(.caption2)
-                        Text("Goal")
+                        Text(badge.label)
                             .font(.caption2.bold())
                             .textCase(.uppercase)
                     }
@@ -81,7 +81,27 @@ struct UserMessageView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("You: \(message.content)")
-        .accessibilityHint(message.isGoal ? "Goal request" : "Your message")
+        .accessibilityHint(message.mode.accessibilityHint)
+    }
+}
+
+/// How a submission mode presents itself on the user's own bubble. Chat is the
+/// unmarked default; goal and swarm earn a badge because they behave differently.
+private extension SubmissionMode {
+    var badge: (label: String, symbol: String)? {
+        switch self {
+        case .message: nil
+        case .goal: ("Goal", "target")
+        case .hammersmith: ("Swarm", "person.3.sequence.fill")
+        }
+    }
+
+    var accessibilityHint: String {
+        switch self {
+        case .message: "Your message"
+        case .goal: "Goal request"
+        case .hammersmith: "Swarm job request"
+        }
     }
 }
 

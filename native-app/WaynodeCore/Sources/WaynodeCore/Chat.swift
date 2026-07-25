@@ -58,11 +58,11 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
     public struct UserItem: Hashable, Sendable, Identifiable {
         public var id: String
         public var content: String
-        public var isGoal: Bool
+        public var mode: SubmissionMode
         public var submissionStatus: SubmissionStatus?
         public var sentAt: Date?
-        public init(id: String, content: String, isGoal: Bool = false, submissionStatus: SubmissionStatus? = nil, sentAt: Date? = Date()) {
-            self.id = id; self.content = content; self.isGoal = isGoal
+        public init(id: String, content: String, mode: SubmissionMode = .message, submissionStatus: SubmissionStatus? = nil, sentAt: Date? = Date()) {
+            self.id = id; self.content = content; self.mode = mode
             self.submissionStatus = submissionStatus; self.sentAt = sentAt
         }
     }
@@ -118,45 +118,8 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
     }
 }
 
-public enum SubmissionStatus: String, Codable, Sendable, Hashable {
-    case sending, queued, starting, running, completed, failed, cancelled
-}
-
-public struct Submission: Codable, Sendable, Hashable, Identifiable {
-    public var id: String
-    public var prompt: String
-    public var isGoal: Bool
-    public var status: SubmissionStatus
-    public var error: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, prompt, status, error
-        case isGoal = "isGoal"
-    }
-
-    public init(id: String, prompt: String, isGoal: Bool, status: SubmissionStatus, error: String? = nil) {
-        self.id = id
-        self.prompt = prompt
-        self.isGoal = isGoal
-        self.status = status
-        self.error = error
-    }
-}
-
-public struct SubmissionDraft: Sendable, Hashable {
-    public enum Kind: String, Sendable, Hashable { case message, queue, hammersmith }
-    public var id: String
-    public var prompt: String
-    public var isGoal: Bool
-    public var kind: Kind
-
-    public init(id: String, prompt: String, isGoal: Bool, kind: Kind) {
-        self.id = id
-        self.prompt = prompt
-        self.isGoal = isGoal
-        self.kind = kind
-    }
-}
+// Submission, SubmissionDraft, SubmissionMode and SubmissionStatus live in
+// Submission.swift — the canonical submission vocabulary shared with the server.
 
 // MARK: SSE event wire format
 
@@ -253,7 +216,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
             // We build a SyncSnapshot from the flat fields. partialText becomes an assistant item.
             var items: [SyncSnapshot.WireItem] = []
             if let partial = try c.decodeIfPresent(String.self, forKey: .partialText), !partial.isEmpty {
-                items.append(SyncSnapshot.WireItem(role: "assistant", content: nil, id: nil, isGoal: nil, text: partial, thinking: nil, blocks: nil))
+                items.append(SyncSnapshot.WireItem(role: "assistant", content: nil, id: nil, mode: nil, text: partial, thinking: nil, blocks: nil))
             }
             // tools are currently never populated server-side (liveTools is always []),
             // but decode defensively if present.
@@ -292,7 +255,7 @@ public struct SyncSnapshot: Codable, Equatable, Sendable {
         public var role: String
         public var content: String?
         public var id: String?
-        public var isGoal: Bool?
+        public var mode: SubmissionMode?
         public var text: String?
         public var thinking: String?
         public var blocks: [WireBlock]?

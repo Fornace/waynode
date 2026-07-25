@@ -6,8 +6,8 @@ public protocol SessionTransport: Sendable {
     func getMessages(_ sessionId: String) async throws -> [APIClient.HistoryMessage]
     func getSession(_ id: String) async throws -> Session
     func getSessionState(_ sessionId: String) async throws -> APIClient.StateResponse
-    func sendMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse
-    func queueMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse
+    func sendMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse
+    func queueMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse
     func abortTurn(_ sessionId: String) async throws -> APIClient.AbortResponse
     func getGoalStatus(_ sessionId: String) async throws -> GoalStatus
     func uploadFiles(_ spaceId: String, files: [APIClient.UploadFile]) async throws -> APIClient.UploadResponse
@@ -24,7 +24,6 @@ extension APIClient: SessionTransport {
         public var role: String
         public var id: String?
         public var content: String?
-        public var isGoal: Bool?
         public var text: String?
         public var thinking: String?
         public var key: String?
@@ -35,38 +34,19 @@ extension APIClient: SessionTransport {
         try await request("/api/sessions/\(sessionId)/messages")
     }
 
+    /// Body for POST /api/sessions/:id/message and .../queue — `{prompt, mode,
+    /// submissionId}`, the server's canonical submission shape. These endpoints
+    /// carry `message`/`goal`; hammersmith has its own endpoint (see
+    /// APIClient+Hammersmith).
     public struct SendMessageBody: Encodable, Sendable {
         public var prompt: String
-        public var isGoal: Bool
+        public var mode: SubmissionMode
         public var submissionId: String
 
-        public init(prompt: String, isGoal: Bool, submissionId: String) {
+        public init(prompt: String, mode: SubmissionMode, submissionId: String) {
             self.prompt = prompt
-            self.isGoal = isGoal
+            self.mode = mode
             self.submissionId = submissionId
-        }
-
-        /// Canonical submission mode the server prefers. The chat endpoints only ever
-        /// carry `message`/`goal` (hammersmith has its own delegation endpoint).
-        public var mode: String { isGoal ? "goal" : "message" }
-
-        enum CodingKeys: String, CodingKey {
-            case prompt
-            case mode
-            case isGoal
-            case submissionId
-        }
-
-        // Send the canonical `mode` string (matching the web client and server
-        // contract) and retain the legacy `isGoal` boolean so an older server that
-        // predates the `mode` field still resolves goal turns instead of silently
-        // downgrading them to a plain message.
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(prompt, forKey: .prompt)
-            try container.encode(mode, forKey: .mode)
-            try container.encode(isGoal, forKey: .isGoal)
-            try container.encode(submissionId, forKey: .submissionId)
         }
     }
 
@@ -78,20 +58,20 @@ extension APIClient: SessionTransport {
     }
 
     public func sendMessage(
-        _ sessionId: String, prompt: String, isGoal: Bool = false, submissionId: String
+        _ sessionId: String, prompt: String, mode: SubmissionMode = .message, submissionId: String
     ) async throws -> OkResponse {
         try await request(
             "/api/sessions/\(sessionId)/message", method: "POST",
-            body: SendMessageBody(prompt: prompt, isGoal: isGoal, submissionId: submissionId)
+            body: SendMessageBody(prompt: prompt, mode: mode, submissionId: submissionId)
         )
     }
 
     public func queueMessage(
-        _ sessionId: String, prompt: String, isGoal: Bool = false, submissionId: String
+        _ sessionId: String, prompt: String, mode: SubmissionMode = .message, submissionId: String
     ) async throws -> OkResponse {
         try await request(
             "/api/sessions/\(sessionId)/queue", method: "POST",
-            body: SendMessageBody(prompt: prompt, isGoal: isGoal, submissionId: submissionId)
+            body: SendMessageBody(prompt: prompt, mode: mode, submissionId: submissionId)
         )
     }
 

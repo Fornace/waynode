@@ -167,7 +167,7 @@ SessionScene {
       }
 
       // ── Input bar (FUNCTIONAL layer → Liquid Glass) ──
-      MessageInputBar(text, isStreaming, isGoal)
+      MessageInputBar(text, isStreaming, mode)
           .background(.regularMaterial)             // glass input dock
           .safeAreaInset(edge: .bottom)
   }
@@ -213,7 +213,7 @@ HStack {
 .background(.regularMaterial)                       // ← the glass dock
 ```
 
-**Goal mode:** a toggle `Button { isGoal.toggle() }` (`.buttonStyle(.glass)`,
+**Goal mode:** a toggle that flips `mode` between `.message` and `.goal` (`.buttonStyle(.glass)`,
 tinted `.accentColor` when on) sitting left of the input — label `target` SF symbol.
 When on, `send()` hits the goal endpoint. While a goal is active, `ModelGoalBar`
 shows a tappable **goal pill** (objective + token usage + elapsed) that opens a

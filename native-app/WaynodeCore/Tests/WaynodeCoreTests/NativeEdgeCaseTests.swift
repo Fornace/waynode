@@ -71,7 +71,7 @@ struct NativeEdgeCaseTests {
 
         // Optimistic send appends a user row BEFORE GET /messages returns.
         _ = store.reducer.reduce(.submission(.init(
-            id: "optimistic", prompt: "new message", isGoal: false, status: .sending
+            id: "optimistic", prompt: "new message", mode: .message, status: .sending
         )))
         #expect(!store.reducer.items.isEmpty)
 
@@ -159,7 +159,7 @@ struct NativeEdgeCaseTests {
         let store = SessionStore(sessionId: "s", spaceId: "sp", api: transport)
         store.isSending = true  // simulate an in-flight submit
 
-        await store.sendMessage("concurrent draft")
+        await store.send("concurrent draft")
 
         // Before the fix: silent return, sendError nil, draft dropped.
         #expect(store.sendError != nil)
@@ -224,7 +224,7 @@ struct NativeEdgeCaseTests {
             piSessionDir: "", archived: true, createdAt: "", updatedAt: ""
         )
 
-        await store.sendMessage("hello archived")
+        await store.send("hello archived")
 
         #expect(store.sendError?.lowercased().contains("archived") == true)
         #expect(store.failedDraft?.prompt == "hello archived")
@@ -259,16 +259,16 @@ private actor NativeEdgeTransport: SessionTransport {
         .init(active: false, done: true, submissions: [])
     }
 
-    func sendMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse {
+    func sendMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse {
         sendCalls.append(prompt)
         return .init(ok: true, queued: false,
-                     submission: .init(id: submissionId, prompt: prompt, isGoal: isGoal, status: .starting),
+                     submission: .init(id: submissionId, prompt: prompt, mode: mode, status: .starting),
                      duplicate: false)
     }
 
-    func queueMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse {
+    func queueMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse {
         .init(ok: true, queued: true,
-              submission: .init(id: submissionId, prompt: prompt, isGoal: isGoal, status: .queued),
+              submission: .init(id: submissionId, prompt: prompt, mode: mode, status: .queued),
               duplicate: false)
     }
 

@@ -25,14 +25,14 @@ function handleWith(commands, send = async (command) => ({ success: true, comman
 try {
   const commands = [];
   const handle = handleWith(commands);
-  const first = handle.sendPrompt("first", false, "first-id");
+  const first = handle.sendPrompt("first", "message", "first-id");
   await Promise.resolve();
   normalizeAgentEvent(handle, { type: "agent_start" });
-  const goal = handle.queueFollowUp("ship it", true, "goal-id");
-  const duplicate = handle.queueFollowUp("ship it", true, "goal-id");
+  const goal = handle.queueFollowUp("ship it", "goal", "goal-id");
+  const duplicate = handle.queueFollowUp("ship it", "goal", "goal-id");
   assert.equal(commands.filter((command) => command.type === "follow_up").length, 1);
   assert.match(commands.find((command) => command.type === "follow_up").message, /create_goal/);
-  assert.equal(handle.getSubmission("goal-id").isGoal, true);
+  assert.equal(handle.getSubmission("goal-id").mode, "goal");
 
   handle._onAgentEnd();
   assert.equal((await first).status, "completed");
@@ -44,7 +44,7 @@ try {
 
   const abortCommands = [];
   const aborting = handleWith(abortCommands);
-  const cancelled = aborting.sendPrompt("stop me", false, "cancel-id");
+  const cancelled = aborting.sendPrompt("stop me", "message", "cancel-id");
   await Promise.resolve();
   await aborting.abort();
   aborting._onAgentEnd();
@@ -52,8 +52,8 @@ try {
 
   const failedCommands = [];
   const failing = handleWith(failedCommands, async () => { throw new Error("command rejected"); });
-  await assert.rejects(failing.sendPrompt("retry", false, "failed-id"), /command rejected/);
-  assert.equal((await failing.sendPrompt("retry", false, "failed-id")).status, "failed");
+  await assert.rejects(failing.sendPrompt("retry", "message", "failed-id"), /command rejected/);
+  assert.equal((await failing.sendPrompt("retry", "message", "failed-id")).status, "failed");
   assert.equal(failedCommands.length, 1, "retrying one id cannot duplicate an RPC command");
   console.log("RPC submission lifecycle regression passed");
 } finally {

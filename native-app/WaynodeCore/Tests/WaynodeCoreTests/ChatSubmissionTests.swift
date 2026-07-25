@@ -6,17 +6,17 @@ import Testing
 struct ChatSubmissionTests {
     @Test("SSE submission and sync preserve IDs, goal mode, and streaming truth")
     func decodesWireTruth() throws {
-        let submissionJSON = Data(#"{"type":"submission","submission":{"id":"s1","prompt":"ship it","isGoal":true,"status":"queued"}}"#.utf8)
+        let submissionJSON = Data(#"{"type":"submission","submission":{"id":"s1","prompt":"ship it","mode":"goal","status":"queued"}}"#.utf8)
         let event = try JSONDecoder().decode(SSEEvent.self, from: submissionJSON)
         guard case .submission(let submission) = event.kind else {
             Issue.record("Expected submission event")
             return
         }
         #expect(submission.id == "s1")
-        #expect(submission.isGoal)
+        #expect(submission.mode == .goal)
         #expect(submission.status == .queued)
 
-        let syncJSON = Data(#"{"type":"sync","streaming":false,"partialText":"","submissions":[{"id":"s1","prompt":"ship it","isGoal":true,"status":"completed"}]}"#.utf8)
+        let syncJSON = Data(#"{"type":"sync","streaming":false,"partialText":"","submissions":[{"id":"s1","prompt":"ship it","mode":"goal","status":"completed"}]}"#.utf8)
         let sync = try JSONDecoder().decode(SSEEvent.self, from: syncJSON)
         guard case .sync(let snapshot) = sync.kind else {
             Issue.record("Expected sync event")
@@ -29,27 +29,28 @@ struct ChatSubmissionTests {
     @Test("Optimistic, acknowledgement, and SSE updates reconcile one row")
     func reconcilesOneRow() {
         var reducer = ChatReducer()
-        let draft = SubmissionDraft(id: "s1", prompt: "Fix it", isGoal: true, kind: .queue)
+        let draft = SubmissionDraft(id: "s1", prompt: "Fix it", mode: .goal, queued: true)
+        #expect(draft.kind == .queue)
         reducer.appendSubmission(draft)
-        reducer.reconcileSubmission(.init(id: "s1", prompt: "Fix it", isGoal: true, status: .queued))
-        _ = reducer.reduce(.submission(.init(id: "s1", prompt: "Fix it", isGoal: true, status: .running)))
-        _ = reducer.reduce(.submission(.init(id: "s1", prompt: "Fix it", isGoal: true, status: .completed)))
+        reducer.reconcileSubmission(.init(id: "s1", prompt: "Fix it", mode: .goal, status: .queued))
+        _ = reducer.reduce(.submission(.init(id: "s1", prompt: "Fix it", mode: .goal, status: .running)))
+        _ = reducer.reduce(.submission(.init(id: "s1", prompt: "Fix it", mode: .goal, status: .completed)))
 
         #expect(reducer.items.count == 1)
         guard case .user(let user) = reducer.items[0] else { return }
         #expect(user.id == "s1")
-        #expect(user.isGoal)
+        #expect(user.mode == .goal)
         #expect(user.submissionStatus == .completed)
     }
 
     @Test("Rejected optimistic row is removed and retry cannot duplicate")
     func rejectionAndRetry() {
         var reducer = ChatReducer()
-        let draft = SubmissionDraft(id: "s1", prompt: "Try this", isGoal: false, kind: .queue)
+        let draft = SubmissionDraft(id: "s1", prompt: "Try this", mode: .message, queued: true)
         reducer.appendSubmission(draft)
         reducer.reconcileSubmission(
-            .init(id: "s1", prompt: draft.prompt, isGoal: false, status: .failed, error: "full"),
-            accepted: false, kind: .queue
+            .init(id: "s1", prompt: draft.prompt, mode: .message, status: .failed, error: "full"),
+            accepted: false, queued: true
         )
         #expect(reducer.items.isEmpty)
         #expect(reducer.submissionState.failedDraft == draft)
@@ -57,7 +58,7 @@ struct ChatSubmissionTests {
         reducer.appendSubmission(draft)
         reducer.appendSubmission(draft)
         #expect(reducer.items.count == 1)
-        reducer.reconcileSubmission(.init(id: "s1", prompt: draft.prompt, isGoal: false, status: .queued), kind: .queue)
+        reducer.reconcileSubmission(.init(id: "s1", prompt: draft.prompt, mode: .message, status: .queued), queued: true)
         #expect(reducer.items.count == 1)
         #expect(reducer.submissionState.failedDraft == nil)
     }
@@ -66,7 +67,7 @@ struct ChatSubmissionTests {
     func lifecycleTruth() {
         var reducer = ChatReducer()
         let make = { (status: SubmissionStatus) in
-            Submission(id: "s1", prompt: "Run", isGoal: false, status: status)
+            Submission(id: "s1", prompt: "Run", mode: .message, status: status)
         }
         reducer.reconcileSubmission(make(.queued))
         #expect(reducer.submissionState.queuedCount == 1)
@@ -83,11 +84,11 @@ struct ChatSubmissionTests {
 
     @Test("Native request body uses server camel-case keys")
     func requestBodyKeys() throws {
-        let body = APIClient.SendMessageBody(prompt: "goal", isGoal: true, submissionId: "s1")
+        let body = APIClient.SendMessageBody(prompt: "goal", mode: .goal, submissionId: "s1")
         let object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
-        #expect(object["isGoal"] as? Bool == true)
+        #expect(object["mode"] as? String == "goal")
         #expect(object["submissionId"] as? String == "s1")
-        #expect(object["is_goal"] == nil)
+        #expect(object["submission_id"] == nil)
     }
 }
 
@@ -99,13 +100,13 @@ struct SessionStoreSubmissionTests {
         let transport = MockSessionTransport()
         await transport.setSendMode(.busy)
         let store = SessionStore(sessionId: "session", spaceId: "space", api: transport)
-        await store.sendMessage("Finish it", isGoal: true)
+        await store.send("Finish it", mode: .goal)
 
         let calls = await transport.calls
         #expect(calls.count == 2)
         #expect(calls.map(\.kind) == [.message, .queue])
         #expect(calls[0].id == calls[1].id)
-        #expect(calls.allSatisfy { $0.isGoal })
+        #expect(calls.allSatisfy { $0.mode == .goal })
         #expect(store.reducer.items.count == 1)
     }
 
@@ -116,16 +117,16 @@ struct SessionStoreSubmissionTests {
         await transport.setQueueMode(.failure("Queue is full"))
         let store = SessionStore(sessionId: "session", spaceId: "space", api: transport)
         _ = store.reducer.reduce(.submission(.init(
-            id: "running", prompt: "First", isGoal: false, status: .running
+            id: "running", prompt: "First", mode: .message, status: .running
         )))
 
-        await store.sendMessage("Follow up")
+        await store.send("Follow up")
         let failed = store.failedDraft
         #expect(failed?.prompt == "Follow up")
         #expect(!store.reducer.items.contains { $0.id == failed?.id })
 
         await transport.setQueueMode(.success)
-        await store.sendMessage("Follow up")
+        await store.send("Follow up")
         #expect(store.reducer.items.filter { $0.id == failed?.id }.count == 1)
         #expect(store.failedDraft == nil)
     }
@@ -150,7 +151,7 @@ struct SessionStoreSubmissionTests {
         await transport.setState(.init(active: false, done: true, submissions: []))
         let store = SessionStore(sessionId: "session", spaceId: "space", api: transport)
         _ = store.reducer.reduce(.submission(.init(
-            id: "running", prompt: "Work", isGoal: false, status: .running
+            id: "running", prompt: "Work", mode: .message, status: .running
         )))
         #expect(store.isRunActive)
 
@@ -168,7 +169,7 @@ struct SessionStoreSubmissionTests {
         await transport.setAbortCancelled(false)
         let store = SessionStore(sessionId: "session", spaceId: "space", api: transport)
         _ = store.reducer.reduce(.submission(.init(
-            id: "running", prompt: "Work", isGoal: false, status: .running
+            id: "running", prompt: "Work", mode: .message, status: .running
         )))
         #expect(store.isRunActive)
 
@@ -179,24 +180,24 @@ struct SessionStoreSubmissionTests {
 }
 
 private actor MockSessionTransport: SessionTransport {
-    enum Mode: Sendable { case success, busy, failure(String) }
+    enum Outcome: Sendable { case success, busy, failure(String) }
     struct Call: Sendable {
         let kind: SubmissionDraft.Kind
         let id: String
-        let isGoal: Bool
+        let mode: SubmissionMode
     }
 
     private(set) var calls: [Call] = []
-    private var sendMode: Mode = .success
-    private var queueMode: Mode = .success
+    private var sendOutcome: Outcome = .success
+    private var queueOutcome: Outcome = .success
     private var historyFails = false
     private var abortCancelled = false
     private var stateResponse = APIClient.StateResponse(active: false, done: true, submissions: [])
 
     nonisolated func makeURL(_ path: String) -> URL { URL(string: "https://example.test\(path)")! }
     func currentToken() -> String? { "token" }
-    func setSendMode(_ mode: Mode) { sendMode = mode }
-    func setQueueMode(_ mode: Mode) { queueMode = mode }
+    func setSendMode(_ outcome: Outcome) { sendOutcome = outcome }
+    func setQueueMode(_ outcome: Outcome) { queueOutcome = outcome }
     func setHistoryFailure(_ value: Bool) { historyFails = value }
     func setAbortCancelled(_ value: Bool) { abortCancelled = value }
     func setState(_ response: APIClient.StateResponse) { stateResponse = response }
@@ -214,14 +215,14 @@ private actor MockSessionTransport: SessionTransport {
         stateResponse
     }
 
-    func sendMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse {
-        calls.append(.init(kind: .message, id: submissionId, isGoal: isGoal))
-        return try response(for: sendMode, id: submissionId, prompt: prompt, isGoal: isGoal, queued: false)
+    func sendMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse {
+        calls.append(.init(kind: .message, id: submissionId, mode: mode))
+        return try response(for: sendOutcome, id: submissionId, prompt: prompt, mode: mode, queued: false)
     }
 
-    func queueMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse {
-        calls.append(.init(kind: .queue, id: submissionId, isGoal: isGoal))
-        return try response(for: queueMode, id: submissionId, prompt: prompt, isGoal: isGoal, queued: true)
+    func queueMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse {
+        calls.append(.init(kind: .queue, id: submissionId, mode: mode))
+        return try response(for: queueOutcome, id: submissionId, prompt: prompt, mode: mode, queued: true)
     }
 
     func abortTurn(_ sessionId: String) async throws -> APIClient.AbortResponse {
@@ -231,12 +232,12 @@ private actor MockSessionTransport: SessionTransport {
     func getGoalStatus(_ sessionId: String) async throws -> GoalStatus { GoalStatus() }
 
     private func response(
-        for mode: Mode, id: String, prompt: String, isGoal: Bool, queued: Bool
+        for outcome: Outcome, id: String, prompt: String, mode: SubmissionMode, queued: Bool
     ) throws -> APIClient.OkResponse {
-        switch mode {
+        switch outcome {
         case .success:
             return .init(ok: true, queued: queued, submission: .init(
-                id: id, prompt: prompt, isGoal: isGoal, status: queued ? .queued : .starting
+                id: id, prompt: prompt, mode: mode, status: queued ? .queued : .starting
             ), duplicate: false)
         case .busy:
             throw APIClient.APIError(statusCode: 409, message: "busy")

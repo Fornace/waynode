@@ -72,11 +72,11 @@ extension ChatReducerTests {
     @Test("appendUser adds a user item")
     func appendUser() {
         var r = ChatReducer()
-        r.appendUser("test message", isGoal: true)
+        r.appendUser("test message", mode: .goal)
         #expect(r.items.count == 1)
         if case .user(let u) = r.items[0] {
             #expect(u.content == "test message")
-            #expect(u.isGoal == true)
+            #expect(u.mode == .goal)
         }
     }
 
@@ -290,7 +290,7 @@ struct SSEDecodingTests {
         #expect(r.isStreaming == false)
         if case .user(let u) = r.items[0] {
             #expect(u.content == "Reply with exactly: NATIVE-E2E-OK")
-            #expect(u.isGoal == false)
+            #expect(u.mode == .message)
         } else {
             Issue.record("item[0] should be user message")
         }

@@ -35,7 +35,6 @@ export async function submitDraft(
     body: JSON.stringify({
       prompt: draft.prompt,
       mode: draft.mode,
-      isGoal: draft.isGoal,
       submissionId: draft.id,
     }),
   });
@@ -70,7 +69,7 @@ export async function loadHistoryItems(sessionId: string): Promise<ChatItem[]> {
     const jobs = await jobsResponse.json() as HammersmithRun[];
     for (const job of jobs) {
       const submission = submissionFromHammersmithRun({ ...job, freshness: "live" });
-      items.push({ id: submission.id, role: "user", content: submission.prompt, mode: "hammersmith", isGoal: false, submissionStatus: "completed", sentAt: job.createdAt });
+      items.push({ id: submission.id, role: "user", content: submission.prompt, mode: "hammersmith", submissionStatus: "completed", sentAt: job.createdAt });
       items.push({ id: `hammersmith-${job.id}`, role: "hammersmith-run", initiatingItemId: submission.id, run: { ...job, freshness: "live" }, sentAt: job.createdAt });
     }
   }

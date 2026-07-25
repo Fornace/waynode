@@ -119,7 +119,7 @@ export function ChatTab({ session }: ChatTabProps) {
     if (restoredDraftId.current === failed.id) return;
     restoredDraftId.current = failed.id;
     setInput(failed.prompt);
-    setComposerMode(failed.mode ?? (failed.isGoal ? "goal" : "message"));
+    setComposerMode(failed.mode);
   }, [state.failedDraft]);
 
   useEffect(() => { drafts.set(session.id, input); }, [session.id, input]);

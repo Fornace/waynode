@@ -172,7 +172,7 @@ export function ChangesPanel({ space, sessionId, snap, onChange, onClose, onIssu
 
   // ── Issue builders: drop a system msg in chat + show an inline card ──
   const note = (text: string) => store.injectSystem(sessionId, text);
-  const askPi = (prompt: string) => { store.send(sessionId, prompt, false); onClose(); onIssue(null); };
+  const askPi = (prompt: string) => { store.send(sessionId, prompt, "message"); onClose(); onIssue(null); };
 
   const raiseRebaseConflict = (files: string[], _out: string) => {
     const cur = snap.currentBranch || "current";

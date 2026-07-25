@@ -24,7 +24,7 @@ struct HammersmithWireTests {
 
     @Test("hammersmith_run SSE decodes run from the submission job key")
     func hammersmithRunEventDecoding() throws {
-        let json = Data(#"{"type":"hammersmith_run","submission":{"id":"s1","prompt":"do the job","mode":"hammersmith","isGoal":false,"status":"completed","createdAt":"2026-07-18T00:00:00Z","job":{"id":"j1","submissionId":"s1","sessionId":"sess","spaceId":"sp","description":"do the job","lifecycle":"running","totalTasks":3,"checkedTasks":1,"passedTasks":1,"failedTasks":0,"updatedAt":"2026-07-18T00:00:01Z","createdAt":"2026-07-18T00:00:00Z"}}}"#.utf8)
+        let json = Data(#"{"type":"hammersmith_run","submission":{"id":"s1","prompt":"do the job","mode":"hammersmith","status":"completed","createdAt":"2026-07-18T00:00:00Z","job":{"id":"j1","submissionId":"s1","sessionId":"sess","spaceId":"sp","description":"do the job","lifecycle":"running","totalTasks":3,"checkedTasks":1,"passedTasks":1,"failedTasks":0,"updatedAt":"2026-07-18T00:00:01Z","createdAt":"2026-07-18T00:00:00Z"}}}"#.utf8)
         let event = try JSONDecoder().decode(SSEEvent.self, from: json)
         guard case .hammersmithRun(let submission, let run) = event.kind else {
             Issue.record("Expected hammersmithRun event")
@@ -39,7 +39,7 @@ struct HammersmithWireTests {
 
     @Test("hammersmith_run without a job decodes to unknown")
     func hammersmithRunMissingJob() throws {
-        let json = Data(#"{"type":"hammersmith_run","submission":{"id":"s1","prompt":"do the job","isGoal":false,"status":"completed"}}"#.utf8)
+        let json = Data(#"{"type":"hammersmith_run","submission":{"id":"s1","prompt":"do the job","status":"completed"}}"#.utf8)
         let event = try JSONDecoder().decode(SSEEvent.self, from: json)
         #expect(event.kind == .unknown)
     }
@@ -71,7 +71,7 @@ struct HammersmithReducerTests {
     func firstEventAppends() {
         var reducer = ChatReducer()
         let changed = reducer.reduce(.hammersmithRun(
-            submission: Submission(id: "s1", prompt: "do the job", isGoal: false, status: .completed),
+            submission: Submission(id: "s1", prompt: "do the job", mode: .hammersmith, status: .completed),
             run: run("j1")
         ))
         #expect(changed)
@@ -214,12 +214,12 @@ private actor MockHammersmithTransport: HammersmithTransport {
         .init(active: false, done: true, submissions: [])
     }
 
-    func sendMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse {
-        .init(ok: true, queued: false, submission: .init(id: submissionId, prompt: prompt, isGoal: isGoal, status: .starting), duplicate: false)
+    func sendMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse {
+        .init(ok: true, queued: false, submission: .init(id: submissionId, prompt: prompt, mode: mode, status: .starting), duplicate: false)
     }
 
-    func queueMessage(_ sessionId: String, prompt: String, isGoal: Bool, submissionId: String) async throws -> APIClient.OkResponse {
-        .init(ok: true, queued: true, submission: .init(id: submissionId, prompt: prompt, isGoal: isGoal, status: .queued), duplicate: false)
+    func queueMessage(_ sessionId: String, prompt: String, mode: SubmissionMode, submissionId: String) async throws -> APIClient.OkResponse {
+        .init(ok: true, queued: true, submission: .init(id: submissionId, prompt: prompt, mode: mode, status: .queued), duplicate: false)
     }
 
     func abortTurn(_ sessionId: String) async throws -> APIClient.AbortResponse {
@@ -238,7 +238,7 @@ private actor MockHammersmithTransport: HammersmithTransport {
         if let failure { throw failure }
         return HammersmithSendResponse(
             ok: true,
-            submission: Submission(id: submissionId, prompt: prompt, isGoal: false, status: .completed),
+            submission: Submission(id: submissionId, prompt: prompt, mode: .hammersmith, status: .completed),
             job: Self.job(id: "j1", submissionId: submissionId)
         )
     }

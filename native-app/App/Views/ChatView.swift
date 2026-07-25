@@ -79,26 +79,17 @@ struct ChatView: View {
                     isRunActive: store.isRunActive,
                     isAttaching: isUploadingAttachments,
                     error: attachmentError ?? store.sendError ?? store.reducer.lastError,
-                    isGoalActive: store.goalStatus.status == .active,
+                    isGoalRunActive: store.goalStatus.status == .active,
                     hammersmithAvailable: store.hammersmithCapability?.available == true,
                     isFocused: $composerFocused,
                     onAttach: { showingAttachmentPicker = true },
-                    onSend: { prompt, isGoal in
+                    onSend: { prompt, mode in
                         Task {
-                            await store.sendMessage(prompt, isGoal: isGoal)
+                            // One call for every mode — the store maps mode to
+                            // endpoint, so chat, goal and swarm cannot diverge.
+                            await store.send(prompt, mode: mode)
                             // Keep the user's draft when delivery fails so
                             // reconnecting never destroys work they typed.
-                            if store.sendError == nil {
-                                composerText = ""
-                                autoScroll = true
-                            } else {
-                                composerFocused = true
-                            }
-                        }
-                    },
-                    onSendHammersmith: { prompt in
-                        Task {
-                            await store.sendHammersmith(prompt)
                             if store.sendError == nil {
                                 composerText = ""
                                 autoScroll = true

@@ -219,7 +219,7 @@ router.patch("/api/hammersmith/settings", requireAuth, async (req, res) => {
 function submissionFor(job, publicJob) {
   return {
     id: job.submission_id, prompt: job.job_description, mode: "hammersmith",
-    isGoal: false, status: "completed", createdAt: job.created_at, jobId: job.id, job: publicJob,
+    status: "completed", createdAt: job.created_at, jobId: job.id, job: publicJob,
   };
 }
 

@@ -9,7 +9,7 @@ const empty = { items: [], failedDraft: null, queuedCount: 0, activeStatus: null
 const goal = {
   id: "goal-1",
   prompt: "finish the release",
-  isGoal: true,
+  mode: "goal",
   kind: "message",
   sentAt: "2026-07-15T12:00:00.000Z",
 };
@@ -20,15 +20,15 @@ assert.equal(view.items[0].submissionStatus, "sending");
 assert.equal(view.items[0].sentAt, goal.sentAt, "optimistic time is the actual send time");
 
 view = reconcileSubmission(view, {
-  id: goal.id, prompt: goal.prompt, isGoal: true, status: "queued",
+  id: goal.id, prompt: goal.prompt, mode: "goal", status: "queued",
 }, { kind: "queue" });
 assert.equal(view.items.length, 1, "queue acknowledgement reconciles the optimistic row");
-assert.equal(view.items[0].isGoal, true, "goal intent survives queue acknowledgement");
+assert.equal(view.items[0].mode, "goal", "goal intent survives queue acknowledgement");
 assert.equal(view.items[0].sentAt, goal.sentAt, "queue acknowledgement preserves send time");
 assert.equal(view.queuedCount, 1);
 
 view = reconcileSubmission(view, {
-  id: goal.id, prompt: goal.prompt, isGoal: true, status: "failed", error: "Queue full",
+  id: goal.id, prompt: goal.prompt, mode: "goal", status: "failed", error: "Queue full",
 }, { accepted: false, kind: "queue" });
 assert.equal(view.items.length, 0, "rejected optimistic row is removed");
 assert.deepEqual(view.failedDraft, { ...goal, kind: "queue" });
@@ -39,18 +39,18 @@ view = optimisticSubmission(view, retryDraft);
 view = optimisticSubmission(view, retryDraft);
 assert.equal(view.items.length, 1, "retry cannot append duplicate optimistic rows");
 view = reconcileSubmission(view, {
-  id: goal.id, prompt: goal.prompt, isGoal: true, status: "starting",
+  id: goal.id, prompt: goal.prompt, mode: "goal", status: "starting",
 }, { kind: "queue" });
 assert.equal(view.failedDraft, null);
 assert.equal(view.items[0].submissionStatus, "starting");
 view = reconcileSubmission(view, {
-  id: goal.id, prompt: goal.prompt, isGoal: true, status: "completed",
+  id: goal.id, prompt: goal.prompt, mode: "goal", status: "completed",
 }, { kind: "queue" });
 assert.equal(view.items.length, 1);
 assert.equal(view.activeStatus, null);
 
 view = reconcileSubmission(view, {
-  id: "run-failed", prompt: "try the build", isGoal: false, status: "failed", error: "Agent exited",
+  id: "run-failed", prompt: "try the build", mode: "message", status: "failed", error: "Agent exited",
 });
 assert.equal(view.items.some((item) => item.id === "run-failed"), true, "accepted failed turns remain honest history");
 assert.notEqual(view.failedDraft.id, "run-failed", "execution retry gets a fresh server id");

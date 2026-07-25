@@ -74,7 +74,7 @@ assert.match(manifest.tasks[0].check, /\[ -d node_modules \]/); // npm gates wai
 assert.deepEqual(manifest.tasks[0].expect_files, []);
 assert.ok(manifest.tasks[0].verified.length > 40);
 assert.throws(() => normalizeSubmissionMode("surprise"), /Unknown submission mode/);
-assert.equal(normalizeSubmissionMode(true), "goal", "legacy isGoal remains compatible");
+assert.throws(() => normalizeSubmissionMode(true), /Unknown submission mode/, "the legacy boolean dialect is gone");
 writeFileSync(join(repo, "package.json"), '{"scripts":{"test":"exit 7"}}'); // would fail if gates ran
 execFileSync("/bin/sh", ["-c", manifest.tasks[0].check], { cwd: repo, stdio: "pipe" });
 rmSync(join(repo, "package.json"));

@@ -48,7 +48,7 @@ try {
   });
   await handle.start();
   console.log("[live-agent] RPC ready");
-  const completion = handle.sendPrompt("Reply with exactly LIVE_AGENT_OK", false, "live-submission");
+  const completion = handle.sendPrompt("Reply with exactly LIVE_AGENT_OK", "message", "live-submission");
   const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("live agent turn timed out")), 30000));
   await Promise.race([completion, timeout]);
   assert.equal(handle.liveText.trim(), "LIVE_AGENT_OK");

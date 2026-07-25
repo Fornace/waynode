@@ -114,25 +114,6 @@ export const api = {
       sessionSlug: string | null;
     }>(`/api/resolve?space=${encodeURIComponent(spaceShort)}${sessionShort ? `&session=${encodeURIComponent(sessionShort)}` : ""}`),
 
-  sendMessage: (sessionId: string, prompt: string, isGoal: boolean) => {
-    return new EventSource(
-      `/api/sessions/${sessionId}/message?prompt=${encodeURIComponent(prompt)}&isGoal=${isGoal}`,
-      { withCredentials: true }
-    );
-  },
-
-  sendMessagePOST: async (sessionId: string, prompt: string, mode: ComposerMode) => {
-    return fetch(`/api/sessions/${sessionId}/message`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...getAuthHeaders(),
-      },
-      body: JSON.stringify({ prompt, mode, isGoal: mode === "goal" }),
-    });
-  },
-
   settings: {
     get: () => fetchJSON<Record<string, string>>("/api/settings"),
     patch: (settings: Record<string, string>) =>

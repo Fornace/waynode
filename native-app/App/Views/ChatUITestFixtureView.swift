@@ -16,7 +16,7 @@ struct ChatUITestFixtureView: View {
             fixture.didLoadHistory = true
             _ = fixture.reducer.reduce(.submission(.init(
                 id: "ui-running", prompt: "Audit every detail",
-                isGoal: false, status: .running
+                mode: .message, status: .running
             )))
         }
         _store = State(initialValue: fixture)

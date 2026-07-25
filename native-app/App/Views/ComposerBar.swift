@@ -21,16 +21,18 @@ struct ComposerBar: View {
     let isRunActive: Bool
     let isAttaching: Bool
     let error: String?
-    let isGoalActive: Bool
+    /// A goal run is currently executing on the server (distinct from the
+    /// composer's own mode — a goal keeps running while you type a follow-up).
+    let isGoalRunActive: Bool
     let hammersmithAvailable: Bool
     var isFocused: FocusState<Bool>.Binding
     var onAttach: () -> Void
-    var onSend: (String, Bool) -> Void
-    var onSendHammersmith: (String) -> Void
+    /// The composer speaks the server's submission vocabulary: the picked mode
+    /// is handed straight through, and the store decides which endpoint it hits.
+    var onSend: (String, SubmissionMode) -> Void
     var onAbort: () -> Void
 
-    private enum ComposerMode { case message, goal, hammersmith }
-    @State private var composerMode: ComposerMode = .message
+    @State private var mode: SubmissionMode = .message
 
     /// Everything the bar animates on, as one Equatable value — drives a
     /// single .animation node instead of five stacked whole-bar transactions.
@@ -38,29 +40,26 @@ struct ComposerBar: View {
         let hasError: Bool
         let isSending: Bool
         let isRunActive: Bool
-        let isGoalActive: Bool
-        let mode: ComposerMode
+        let isGoalRunActive: Bool
+        let mode: SubmissionMode
     }
     private var barPhase: BarPhase {
         .init(hasError: error != nil, isSending: isSending, isRunActive: isRunActive,
-              isGoalActive: isGoalActive, mode: composerMode)
+              isGoalRunActive: isGoalRunActive, mode: mode)
     }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var isGoalMode: Bool { composerMode == .goal }
-    private var isHammersmithMode: Bool { composerMode == .hammersmith }
 
     var body: some View {
         VStack(spacing: 0) {
             // Mode Picker
-            Picker("Send Mode", selection: $composerMode) {
+            Picker("Send Mode", selection: $mode) {
                 Label("Chat", systemImage: "bubble.left.and.bubble.right")
-                    .tag(ComposerMode.message)
+                    .tag(SubmissionMode.message)
                 Label("Goal", systemImage: "target")
-                    .tag(ComposerMode.goal)
+                    .tag(SubmissionMode.goal)
                 if hammersmithAvailable {
                     Label("Swarm", systemImage: "person.3.sequence")
-                        .tag(ComposerMode.hammersmith)
+                        .tag(SubmissionMode.hammersmith)
                 }
             }
             .pickerStyle(.segmented)
@@ -89,7 +88,7 @@ struct ComposerBar: View {
             }
 
             // Goal-mode hint strip
-            if isGoalMode {
+            if mode == .goal {
                 HStack(spacing: 6) {
                     Image(systemName: "target")
                         .font(.caption2)
@@ -105,7 +104,7 @@ struct ComposerBar: View {
             }
 
             // Hammersmith-mode hint strip
-            if isHammersmithMode {
+            if mode == .hammersmith {
                 HStack(spacing: 6) {
                     Image(systemName: "person.3.sequence.fill")
                         .font(.caption2)
@@ -192,7 +191,7 @@ struct ComposerBar: View {
         // stacked whole-bar transactions — same insert/remove transitions.
         .animation(reduceMotion ? nil : .smooth, value: barPhase)
         .onChange(of: hammersmithAvailable) { _, available in
-            if !available, isHammersmithMode { composerMode = .message }
+            if !available, mode == .hammersmith { mode = .message }
         }
     }
 
@@ -200,11 +199,11 @@ struct ComposerBar: View {
 
     @ViewBuilder
     private var sendOrAbortButton: some View {
-        if isRunActive || isGoalActive {
+        if isRunActive || isGoalRunActive {
             HStack(spacing: 0) {
                 if canSend {
                     Button { send() } label: {
-                        Image(systemName: isGoalMode ? "target" : "text.badge.plus")
+                        Image(systemName: mode == .goal ? "target" : "text.badge.plus")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.accentColor)
                             .symbolEffect(.bounce, value: canSend)
@@ -212,7 +211,7 @@ struct ComposerBar: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isSending)
-                    .accessibilityLabel(isGoalMode ? "Queue goal" : "Queue message")
+                    .accessibilityLabel(mode == .goal ? "Queue goal" : "Queue message")
                     .accessibilityIdentifier("composer.queue")
                     .accessibilityHint("Adds this draft after the active run")
                     .frame(minWidth: 44, minHeight: 44)
@@ -226,7 +225,7 @@ struct ComposerBar: View {
             }
             .buttonStyle(.plain)
             .transition(.scale.combined(with: .opacity))
-            .accessibilityLabel(isGoalActive ? "Abort goal" : "Stop generation")
+            .accessibilityLabel(isGoalRunActive ? "Abort goal" : "Stop generation")
             .accessibilityIdentifier("composer.stop")
             .frame(minWidth: 44, minHeight: 44)
             }
@@ -259,10 +258,10 @@ struct ComposerBar: View {
     }
 
     private var placeholder: String {
-        if isRunActive || isGoalActive { return "Add a follow-up…" }
+        if isRunActive || isGoalRunActive { return "Add a follow-up…" }
         if isSending { return "Sending…" }
-        if isHammersmithMode { return "Describe the job…" }
-        if isGoalMode { return "Describe the goal…" }
+        if mode == .hammersmith { return "Describe the job…" }
+        if mode == .goal { return "Describe the goal…" }
         return "Message"
     }
 
@@ -270,14 +269,11 @@ struct ComposerBar: View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         Haptics.light()
-        if isHammersmithMode {
-            onSendHammersmith(trimmed)
-            withAnimation(reduceMotion ? nil : .smooth) { composerMode = .message }
-        } else {
-            onSend(trimmed, isGoalMode)
-            if isGoalMode {
-                withAnimation(reduceMotion ? nil : .smooth) { composerMode = .message }
-            }
+        onSend(trimmed, mode)
+        // Goal and swarm are one-shot: the server resets composer_mode after a
+        // non-chat submission, so the bar drops back to chat to match.
+        if mode != .message {
+            withAnimation(reduceMotion ? nil : .smooth) { mode = .message }
         }
         // Keep focus so the keyboard stays open for the next message
         isFocused.wrappedValue = true

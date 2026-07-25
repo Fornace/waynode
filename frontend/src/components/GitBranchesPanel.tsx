@@ -82,7 +82,7 @@ export function BranchesPanel({ space, sessionId, snap, onChange, onClose, onIss
 
   // ── Issue builders (mirror ChangesPanel) ──
   const note = (text: string) => store.injectSystem(sessionId, text);
-  const askPi = (prompt: string) => { store.send(sessionId, prompt, false); onClose(); onIssue(null); };
+  const askPi = (prompt: string) => { store.send(sessionId, prompt, "message"); onClose(); onIssue(null); };
 
   const raiseMergeConflict = (target: string, files: string[]) => {
     note(`🔀 Merge conflict: merging \`${target}\` into \`${cur}\` conflicted in ${files.length} file(s): ${files.join(", ")}. The merge was aborted; the repo is clean.`);

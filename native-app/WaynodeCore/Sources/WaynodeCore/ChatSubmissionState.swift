@@ -11,19 +11,15 @@ public struct ChatSubmissionState: Sendable, Equatable {
         items: inout [ChatItem],
         submission: Submission,
         accepted: Bool = true,
-        kind: SubmissionDraft.Kind = .message
+        queued: Bool = false
     ) {
-        let draft = SubmissionDraft(
-            id: submission.id, prompt: submission.prompt,
-            isGoal: submission.isGoal, kind: kind
-        )
         let index = items.firstIndex { item in
             if case .user(let user) = item { return user.id == submission.id }
             return false
         } ?? items.lastIndex { item in
             guard case .user(let user) = item else { return false }
             return user.content == submission.prompt
-                && user.isGoal == submission.isGoal
+                && user.mode == submission.mode
                 && user.submissionStatus?.isPending == true
         }
         if !accepted && submission.status == .failed {
@@ -37,16 +33,19 @@ public struct ChatSubmissionState: Sendable, Equatable {
             }
             let user = ChatItem.user(.init(
                 id: submission.id, content: submission.prompt,
-                isGoal: submission.isGoal, submissionStatus: submission.status,
+                mode: submission.mode, submissionStatus: submission.status,
                 sentAt: sentAt
             ))
             if let index { items[index] = user } else { items.append(user) }
         }
 
         if submission.status == .failed {
+            // An accepted-then-failed submission needs a fresh id (the server
+            // already owns the old one); a rejected one keeps its id so a retry
+            // is idempotent.
             failedDraft = SubmissionDraft(
-                id: accepted ? UUID().uuidString : draft.id,
-                prompt: draft.prompt, isGoal: draft.isGoal, kind: draft.kind
+                id: accepted ? UUID().uuidString : submission.id,
+                prompt: submission.prompt, mode: submission.mode, queued: queued
             )
         } else if failedDraft?.id == submission.id {
             failedDraft = nil
@@ -67,7 +66,7 @@ public struct ChatSubmissionState: Sendable, Equatable {
             items[index] = .user(.init(
                 id: user.id,
                 content: user.content,
-                isGoal: user.isGoal,
+                mode: user.mode,
                 submissionStatus: .completed,
                 sentAt: user.sentAt
             ))

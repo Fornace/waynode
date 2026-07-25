@@ -115,7 +115,7 @@ try {
   const args = getPiArgs({
     session: { id: "waynode-session", provider: "openai", model: "openai/gpt-4.1", pi_session_dir: root },
     prompt: "hello",
-    isGoal: false,
+    mode: "message",
   });
   assert.equal(args[args.indexOf("--model") + 1], "openai/gpt-4.1");
   assert.ok(args.includes("--no-approve"), "headless agents never wait for project trust input");
@@ -133,7 +133,7 @@ try {
   const historicArgs = getPiArgs({
     session: { id: "waynode-session", provider: "openai", model: "gpt-4.1", pi_session_dir: root },
     prompt: "continue",
-    isGoal: false,
+    mode: "message",
   });
   assert.ok(historicArgs.includes("--continue"), "historic pi sessions retain their original generated ID");
 
