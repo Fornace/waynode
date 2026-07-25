@@ -70,7 +70,7 @@ function reservationRow(id) {
 try {
   // (a) The $8.99/mo plan definition.
   assert.equal(PLANS.hammersmith.price, 8.99);
-  assert.equal(PLANS.hammersmith.tokensPerMonth, 5_000_000);
+  assert.equal(PLANS.hammersmith.tokensPerMonth, 50_000_000);
 
   // (b) The four price envs must keep billing enabled (priceIds trap guard).
   assert.equal(billingEnabled, true);
@@ -275,7 +275,8 @@ try {
   updateHammersmithJob(jobTwo.id, { lifecycle: "stopped", finished_at: new Date().toISOString() });
   assert.equal(reservationRow(reservationTwo.id), undefined, "stop releases the reservation");
 
-  recordTokenUsage(entitledOrg.id, 5_000_000);
+  // Burn the whole allowance, whatever it is, so this stays true if the plan changes.
+  recordTokenUsage(entitledOrg.id, PLANS.hammersmith.tokensPerMonth);
   assert.throws(
     () => reserveTokenQuota(entitledOrg.id, `hammersmith:${randomUUID()}`, expectedReservationTokens),
     (error) => error instanceof BillingAdmissionError && error.status === 402,

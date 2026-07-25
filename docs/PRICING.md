@@ -147,8 +147,11 @@ currently enforced.
 ### Hammersmith verified-swarm tier — $8.99/mo (LIVE)
 
 Alongside the three team tiers, hosted offers a standalone **Hammersmith**
-plan (`PLANS.hammersmith` in `lib/billing-state.mjs`): **$8.99/mo, 5,000,000
-tokens, 2 GB storage, 1 seat**. It unlocks managed Hammersmith verified-swarm
+plan (`PLANS.hammersmith` in `lib/billing-state.mjs`): **$8.99/mo, 50,000,000
+tokens, 2 GB storage, 1 seat**. The allowance is deliberately far above the team
+tiers: a verified-swarm run spends tokens across parallel workers and retries,
+so a per-seat chat budget would exhaust in a handful of jobs. It unlocks managed
+Hammersmith verified-swarm
 runs for one organization's sessions on hosted — send a message in
 hammersmith mode and it is executed as a job description whose tasks pass
 only when their executed checks exit 0. This tier is **live**: the Stripe
