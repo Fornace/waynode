@@ -128,7 +128,9 @@ try {
     prompt: "finish the task",
     mode: "goal",
   });
-  assert.ok(goalArgs[goalArgs.indexOf("-p") + 1].includes("create_goal"), "goal mode still requests the create_goal lifecycle");
+  const goalPrompt = goalArgs[goalArgs.indexOf("-p") + 1];
+  assert.ok(goalPrompt.includes("create_goal"), "goal mode still requests the create_goal lifecycle");
+  assert.match(goalPrompt, /token_budget 50000000/);
   writeFileSync(join(root, "historic.jsonl"), "");
   const historicArgs = getPiArgs({
     session: { id: "waynode-session", provider: "openai", model: "gpt-4.1", pi_session_dir: root },
