@@ -25,10 +25,13 @@
 		2880115F18769261C6BE0BBE /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 26B83464C0A62DBEC630A979 /* SwiftTerm */; };
 		2907A1104C460EA1C32AEF68 /* AccountDeletionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385288101432DF6B9FDAD416 /* AccountDeletionSheet.swift */; };
 		2AD75EE640D4C061F3B57605 /* GitUITestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AEBE3414F5C093745FB03A /* GitUITestFixtures.swift */; };
+		2C8B6DDC5DFAFD558220960F /* ChatEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A238E17489ACA713DC2A8DF /* ChatEnvironment.swift */; };
 		30BF80813276787371BFA285 /* SignedKeychainSmokeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A35A5B18C018530CBCC7E154 /* SignedKeychainSmokeView.swift */; };
 		3242D8B40E03F82832E91651 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B76EABB353F48ADBB9E9A5A /* ChatView.swift */; };
+		34ED0E4C4F81F991B9F40E6F /* ChatEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A238E17489ACA713DC2A8DF /* ChatEnvironment.swift */; };
 		370881664556AF549C6AB785 /* SessionsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B759E8CE22B0B375BB475282 /* SessionsList.swift */; };
 		378E3BDE6B7EB9F5DE102BB8 /* ChatTranscriptRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6A987D9CE9EBA58B250DB9 /* ChatTranscriptRow.swift */; };
+		4A03545847C35ECD1805D1F4 /* HammersmithRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBB77BC7FEDB5778C218EC0 /* HammersmithRunView.swift */; };
 		511063DFBF6C807AFEA9CCAA /* SpacesSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B382C33134DF897FD4C618 /* SpacesSidebar.swift */; };
 		53CAC93A9C8C27E9B2644D6A /* CloneSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3597634E9CD330E43026BD8B /* CloneSheet.swift */; };
 		557B7CFDBF2BBF7E351B8C72 /* SignedKeychainUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D7AE1B68CED2FAB3490786 /* SignedKeychainUITests.swift */; };
@@ -38,6 +41,7 @@
 		611826129E9868BDAAD1FA6B /* CodeHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6ACEC5FF8A17F8035E717B6 /* CodeHighlighter.swift */; };
 		611D7D0D7CAA88B78EB338A8 /* SessionsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B759E8CE22B0B375BB475282 /* SessionsList.swift */; };
 		619282D7EC37F0CF5004F59C /* NewTokenSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69176506DF3F62FCAF2C3AC9 /* NewTokenSheet.swift */; };
+		671E58F890BC30D28D79704B /* IPadResponsiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7BF91AD89D3B7A32C057F4 /* IPadResponsiveUITests.swift */; };
 		6BE03234E903BBEB2BFAE55E /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */; };
 		6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A89D5250119F107505CA318 /* GitInspector.swift */; };
 		72366E0D6B8AEF5D8695ECA5 /* WaynodeCore in Frameworks */ = {isa = PBXBuildFile; productRef = F5268DD29E00B74954BFAA63 /* WaynodeCore */; };
@@ -53,12 +57,10 @@
 		89ED4A1123BF82E715F6576F /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */; };
 		8A88588B54A51A69FB853FD0 /* ChatUITestFixtureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C6CD2135BFD61792040C7C /* ChatUITestFixtureView.swift */; };
 		8B20CEA23B95339948E763BA /* WorkbenchDeletionAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C94E539B91186E5F8B46D06 /* WorkbenchDeletionAlerts.swift */; };
-		8C78646530118F56009B0AC1 /* GitActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C78646430118F56009B0AC1 /* GitActivityViews.swift */; };
-		8C78646630118F56009B0AC1 /* GitActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C78646430118F56009B0AC1 /* GitActivityViews.swift */; };
 		8F2398B7E68E36C7C7402C28 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF14352DE276CEE0FD2DEEC /* RootView.swift */; };
 		8F8E2166148B1A17C4D4E71E /* GitTerminalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B295EE18F924453E6C38B40 /* GitTerminalUITests.swift */; };
-		93C0B6F45DBA42D8A62BCA91 /* IPadResponsiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12408235CB744178BE2C4B79 /* IPadResponsiveUITests.swift */; };
 		98E820915573A77B9B630B2A /* GitInspectorActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F44015822997D1676D53F725 /* GitInspectorActions.swift */; };
+		9BEB1BD98504CEC146DB6987 /* GitActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9235C5CC849EE8984DBB26E5 /* GitActivityViews.swift */; };
 		9C45762E65530AC34FF85F9E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF14352DE276CEE0FD2DEEC /* RootView.swift */; };
 		9F64BCDAD6E51AD695460D9F /* WaynodeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB96574A2B818018ABF92D7 /* WaynodeUITests.swift */; };
 		A8F8603A7DFFD882AA7D9018 /* CloneSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3597634E9CD330E43026BD8B /* CloneSheet.swift */; };
@@ -68,6 +70,7 @@
 		AD06B8C7096720EA43E77579 /* WaynodeCore in Frameworks */ = {isa = PBXBuildFile; productRef = 94F593349EDED17C7E44778A /* WaynodeCore */; };
 		ADB414EA39D8019472EA5804 /* ServerConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52CD7C4669DEE047A23455C5 /* ServerConfigSheet.swift */; };
 		AE191512F5215F11AB645AB2 /* ChatTranscriptRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6A987D9CE9EBA58B250DB9 /* ChatTranscriptRow.swift */; };
+		B0B559938B6476BA0BD7623D /* ChatReasoningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A50B149EA9A56E0DDC54033 /* ChatReasoningView.swift */; };
 		B257386356F666BC2BDC4C89 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD24C4235EFD2CABF8A6565 /* MainView.swift */; };
 		B5329A7A258370D1D7977F8B /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = A76E7980DB05D0E5B6CB1AB0 /* SwiftTerm */; };
 		B65C3DA24E69FD7E52ED8E8B /* AccountUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 599CD4F25FF9DEF589C4B8F4 /* AccountUITests.swift */; };
@@ -77,8 +80,11 @@
 		C443CB0479232AB4B92DFA16 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B76EABB353F48ADBB9E9A5A /* ChatView.swift */; };
 		C4A9BA01DB4356780199C591 /* ServerConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52CD7C4669DEE047A23455C5 /* ServerConfigSheet.swift */; };
 		C54BD14AA6CFE0287ED26646 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */; };
+		C68A57CF65DADC03E7DBE450 /* AuthBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = E918466282D25DDD3D60E04A /* AuthBranding.swift */; };
+		C9777B099D88A408F40D063A /* HammersmithRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBB77BC7FEDB5778C218EC0 /* HammersmithRunView.swift */; };
 		CB9C5DEA137F93099D3DC160 /* PlatformUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */; };
 		CC08168B051773A3058011EA /* ChatItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */; };
+		CE804533B606BE7AA69EFF45 /* GitActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9235C5CC849EE8984DBB26E5 /* GitActivityViews.swift */; };
 		D282255D1CDB4300EC8D75A9 /* SessionDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156A741D0EA8E9804E056580 /* SessionDetail.swift */; };
 		D445BFA0F669F13B6334FC75 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7365BF994B13B6120DA3165B /* Assets.xcassets */; };
 		D7A12269D5E235CA2A1DF994 /* AccountScene+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EDBB5991A1EE64E7425BCC1 /* AccountScene+Actions.swift */; };
@@ -87,11 +93,13 @@
 		DB45C6EA9D1B840B387FD457 /* WaynodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9668F08A2E898BABC66081 /* WaynodeApp.swift */; };
 		DEE31357FAE78BA8E2ACF89F /* MacCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BB391A6701D7234FA1C777A /* MacCommands.swift */; };
 		DF98A1394273C42607CD99A1 /* SessionDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156A741D0EA8E9804E056580 /* SessionDetail.swift */; };
+		E2D557737FE90AF18BC055C1 /* AuthBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = E918466282D25DDD3D60E04A /* AuthBranding.swift */; };
 		E6F247329523B034DB67E46A /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD24C4235EFD2CABF8A6565 /* MainView.swift */; };
 		EC9C99D24620314E6B161D29 /* ChatItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */; };
 		ECD447CC6B9B8F3932F6F4C8 /* AccountScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4429524F93F2D7BAD0B11C7F /* AccountScene.swift */; };
 		EF7DDCEFE3EBB7368D1EF045 /* NativeTerminalSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */; };
 		F34D246BCD7F14B711BB5191 /* AccountScene+Deletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1F09CAE9FCEC894FD3C8321 /* AccountScene+Deletion.swift */; };
+		FF8245B8C8553D76A4BB2E15 /* ChatReasoningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A50B149EA9A56E0DDC54033 /* ChatReasoningView.swift */; };
 		FFE5E8B2BC18D254252578D5 /* WorkbenchDeletionAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C94E539B91186E5F8B46D06 /* WorkbenchDeletionAlerts.swift */; };
 /* End PBXBuildFile section */
 
@@ -117,13 +125,13 @@
 		05DEA2882D8C1DF151489327 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0ADED7FBF7E899002F98DF79 /* AuthPresentationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthPresentationProvider.swift; sourceTree = "<group>"; };
 		0B954C00B60D3DB33B2A804F /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
-		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
-		12408235CB744178BE2C4B79 /* IPadResponsiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadResponsiveUITests.swift; sourceTree = "<group>"; };
+		0BF9F27A3F277D070EC66A8B /* WaynodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WaynodeCore; path = WaynodeCore; sourceTree = SOURCE_ROOT; };
 		156A741D0EA8E9804E056580 /* SessionDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetail.swift; sourceTree = "<group>"; };
 		15C126CDC5053D0E96900F0D /* NativeTerminalSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTerminalSurface.swift; sourceTree = "<group>"; };
 		3597634E9CD330E43026BD8B /* CloneSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloneSheet.swift; sourceTree = "<group>"; };
 		385288101432DF6B9FDAD416 /* AccountDeletionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionSheet.swift; sourceTree = "<group>"; };
 		3944CAE129988D6D291B376D /* Waynode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Waynode.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3A7BF91AD89D3B7A32C057F4 /* IPadResponsiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadResponsiveUITests.swift; sourceTree = "<group>"; };
 		3C9668F08A2E898BABC66081 /* WaynodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaynodeApp.swift; sourceTree = "<group>"; };
 		3D0A09FFD74E870FA41A7979 /* PlatformUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformUtilities.swift; sourceTree = "<group>"; };
 		4429524F93F2D7BAD0B11C7F /* AccountScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountScene.swift; sourceTree = "<group>"; };
@@ -140,6 +148,7 @@
 		64B258BBB8DC91D24A4F197F /* WaynodeMacUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaynodeMacUITests.swift; sourceTree = "<group>"; };
 		69176506DF3F62FCAF2C3AC9 /* NewTokenSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTokenSheet.swift; sourceTree = "<group>"; };
 		6B962F05F986A65E972E9A7F /* WaynodeUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaynodeUITestCase.swift; sourceTree = "<group>"; };
+		6BBB77BC7FEDB5778C218EC0 /* HammersmithRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HammersmithRunView.swift; sourceTree = "<group>"; };
 		7365BF994B13B6120DA3165B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		76C6CD2135BFD61792040C7C /* ChatUITestFixtureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatUITestFixtureView.swift; sourceTree = "<group>"; };
 		7A89D5250119F107505CA318 /* GitInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitInspector.swift; sourceTree = "<group>"; };
@@ -147,9 +156,11 @@
 		7EDBB5991A1EE64E7425BCC1 /* AccountScene+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountScene+Actions.swift"; sourceTree = "<group>"; };
 		88CF5AEFDBBFC6C0D9E40A8F /* SessionSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSettingsSheet.swift; sourceTree = "<group>"; };
 		8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
-		8C78646430118F56009B0AC1 /* GitActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitActivityViews.swift; sourceTree = "<group>"; };
+		9235C5CC849EE8984DBB26E5 /* GitActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitActivityViews.swift; sourceTree = "<group>"; };
 		92F9A894B5CC7EC58EDBCBA3 /* WaynodeMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WaynodeMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		973570FC4313CD06E6FCF0E4 /* ChatStatusViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStatusViews.swift; sourceTree = "<group>"; };
+		9A238E17489ACA713DC2A8DF /* ChatEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatEnvironment.swift; sourceTree = "<group>"; };
+		9A50B149EA9A56E0DDC54033 /* ChatReasoningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatReasoningView.swift; sourceTree = "<group>"; };
 		9A6A987D9CE9EBA58B250DB9 /* ChatTranscriptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTranscriptRow.swift; sourceTree = "<group>"; };
 		9B295EE18F924453E6C38B40 /* GitTerminalUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitTerminalUITests.swift; sourceTree = "<group>"; };
 		9CB96574A2B818018ABF92D7 /* WaynodeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaynodeUITests.swift; sourceTree = "<group>"; };
@@ -160,6 +171,7 @@
 		BAF14352DE276CEE0FD2DEEC /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		D2EDECA98CC2D4733656BBE1 /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
 		E6ACEC5FF8A17F8035E717B6 /* CodeHighlighter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeHighlighter.swift; sourceTree = "<group>"; };
+		E918466282D25DDD3D60E04A /* AuthBranding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthBranding.swift; sourceTree = "<group>"; };
 		E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
 		F1F09CAE9FCEC894FD3C8321 /* AccountScene+Deletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountScene+Deletion.swift"; sourceTree = "<group>"; };
 		F2E0D13732D4DEF87745317D /* WaynodeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WaynodeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -219,8 +231,11 @@
 				4429524F93F2D7BAD0B11C7F /* AccountScene.swift */,
 				7EDBB5991A1EE64E7425BCC1 /* AccountScene+Actions.swift */,
 				F1F09CAE9FCEC894FD3C8321 /* AccountScene+Deletion.swift */,
+				E918466282D25DDD3D60E04A /* AuthBranding.swift */,
 				0B954C00B60D3DB33B2A804F /* AuthView.swift */,
+				9A238E17489ACA713DC2A8DF /* ChatEnvironment.swift */,
 				4FFF0E8F5450862B496B8B32 /* ChatItemView.swift */,
+				9A50B149EA9A56E0DDC54033 /* ChatReasoningView.swift */,
 				973570FC4313CD06E6FCF0E4 /* ChatStatusViews.swift */,
 				9A6A987D9CE9EBA58B250DB9 /* ChatTranscriptRow.swift */,
 				76C6CD2135BFD61792040C7C /* ChatUITestFixtureView.swift */,
@@ -228,10 +243,12 @@
 				3597634E9CD330E43026BD8B /* CloneSheet.swift */,
 				E6ACEC5FF8A17F8035E717B6 /* CodeHighlighter.swift */,
 				FBB6FF6DE0785843AA592F9C /* ComposerBar.swift */,
+				9235C5CC849EE8984DBB26E5 /* GitActivityViews.swift */,
 				7A89D5250119F107505CA318 /* GitInspector.swift */,
 				F44015822997D1676D53F725 /* GitInspectorActions.swift */,
 				F978E1E246E01CDE8C35D4E3 /* GitInspectorSupportingViews.swift */,
 				A1AEBE3414F5C093745FB03A /* GitUITestFixtures.swift */,
+				6BBB77BC7FEDB5778C218EC0 /* HammersmithRunView.swift */,
 				7CD24C4235EFD2CABF8A6565 /* MainView.swift */,
 				D2EDECA98CC2D4733656BBE1 /* MarkdownParser.swift */,
 				E982ED58E4446AB6D0513DB7 /* MarkdownView.swift */,
@@ -246,7 +263,6 @@
 				54B382C33134DF897FD4C618 /* SpacesSidebar.swift */,
 				8B2F80FFA30EEAAA2AA9C999 /* TerminalView.swift */,
 				4C94E539B91186E5F8B46D06 /* WorkbenchDeletionAlerts.swift */,
-				8C78646430118F56009B0AC1 /* GitActivityViews.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -273,7 +289,7 @@
 				52147AB2688DA52097A2B06E /* AccountDeletionUITests.swift */,
 				599CD4F25FF9DEF589C4B8F4 /* AccountUITests.swift */,
 				9B295EE18F924453E6C38B40 /* GitTerminalUITests.swift */,
-				12408235CB744178BE2C4B79 /* IPadResponsiveUITests.swift */,
+				3A7BF91AD89D3B7A32C057F4 /* IPadResponsiveUITests.swift */,
 				02D7AE1B68CED2FAB3490786 /* SignedKeychainUITests.swift */,
 				6B962F05F986A65E972E9A7F /* WaynodeUITestCase.swift */,
 				9CB96574A2B818018ABF92D7 /* WaynodeUITests.swift */,
@@ -461,9 +477,12 @@
 				D7A12269D5E235CA2A1DF994 /* AccountScene+Actions.swift in Sources */,
 				F34D246BCD7F14B711BB5191 /* AccountScene+Deletion.swift in Sources */,
 				ECD447CC6B9B8F3932F6F4C8 /* AccountScene.swift in Sources */,
+				E2D557737FE90AF18BC055C1 /* AuthBranding.swift in Sources */,
 				A9C5A8CAA20FD8D6A59CFBDA /* AuthPresentationProvider.swift in Sources */,
 				8196B94F707152451EE06469 /* AuthView.swift in Sources */,
+				2C8B6DDC5DFAFD558220960F /* ChatEnvironment.swift in Sources */,
 				EC9C99D24620314E6B161D29 /* ChatItemView.swift in Sources */,
+				FF8245B8C8553D76A4BB2E15 /* ChatReasoningView.swift in Sources */,
 				1FD0FF736061A527028F2AA3 /* ChatStatusViews.swift in Sources */,
 				AE191512F5215F11AB645AB2 /* ChatTranscriptRow.swift in Sources */,
 				8A88588B54A51A69FB853FD0 /* ChatUITestFixtureView.swift in Sources */,
@@ -471,11 +490,12 @@
 				53CAC93A9C8C27E9B2644D6A /* CloneSheet.swift in Sources */,
 				611826129E9868BDAAD1FA6B /* CodeHighlighter.swift in Sources */,
 				246CD828E4EE647AF2C8BD42 /* ComposerBar.swift in Sources */,
+				9BEB1BD98504CEC146DB6987 /* GitActivityViews.swift in Sources */,
 				809AA3152028564A2034A860 /* GitInspector.swift in Sources */,
 				98E820915573A77B9B630B2A /* GitInspectorActions.swift in Sources */,
-				8C78646630118F56009B0AC1 /* GitActivityViews.swift in Sources */,
 				1D67D0FEC464C5F8FBBFE282 /* GitInspectorSupportingViews.swift in Sources */,
 				7B702D4C0A963B0A66B1B61B /* GitUITestFixtures.swift in Sources */,
+				C9777B099D88A408F40D063A /* HammersmithRunView.swift in Sources */,
 				DEE31357FAE78BA8E2ACF89F /* MacCommands.swift in Sources */,
 				B257386356F666BC2BDC4C89 /* MainView.swift in Sources */,
 				02B9E51080CA3808E0641662 /* MarkdownParser.swift in Sources */,
@@ -512,9 +532,12 @@
 				BA9AD611325C2A6E03674477 /* AccountScene+Actions.swift in Sources */,
 				16D9164CC1E805374942D5C7 /* AccountScene+Deletion.swift in Sources */,
 				C0C99F3EE7F086A282859DA3 /* AccountScene.swift in Sources */,
+				C68A57CF65DADC03E7DBE450 /* AuthBranding.swift in Sources */,
 				582D3A4D189B40EE1855774A /* AuthPresentationProvider.swift in Sources */,
 				000186C4EC52022640BC6843 /* AuthView.swift in Sources */,
+				34ED0E4C4F81F991B9F40E6F /* ChatEnvironment.swift in Sources */,
 				CC08168B051773A3058011EA /* ChatItemView.swift in Sources */,
+				B0B559938B6476BA0BD7623D /* ChatReasoningView.swift in Sources */,
 				06270A9C81EED2D2259C895A /* ChatStatusViews.swift in Sources */,
 				378E3BDE6B7EB9F5DE102BB8 /* ChatTranscriptRow.swift in Sources */,
 				83FCC0CD80C14A600ACD899D /* ChatUITestFixtureView.swift in Sources */,
@@ -522,11 +545,12 @@
 				A8F8603A7DFFD882AA7D9018 /* CloneSheet.swift in Sources */,
 				06F12231474E4FDD4BBA6286 /* CodeHighlighter.swift in Sources */,
 				7C1C2AB7283BDBC7E9DAFAF1 /* ComposerBar.swift in Sources */,
+				CE804533B606BE7AA69EFF45 /* GitActivityViews.swift in Sources */,
 				6E0B7C37339333397F6FB501 /* GitInspector.swift in Sources */,
 				855A8EA61057C7E04B8D24C3 /* GitInspectorActions.swift in Sources */,
-				8C78646530118F56009B0AC1 /* GitActivityViews.swift in Sources */,
 				AAB014B3667DE5BAB8D7B39F /* GitInspectorSupportingViews.swift in Sources */,
 				2AD75EE640D4C061F3B57605 /* GitUITestFixtures.swift in Sources */,
+				4A03545847C35ECD1805D1F4 /* HammersmithRunView.swift in Sources */,
 				7F5A8E64C4AB396AB6C86BE5 /* MacCommands.swift in Sources */,
 				E6F247329523B034DB67E46A /* MainView.swift in Sources */,
 				27FA3D28EDF17A292B5BB7AC /* MarkdownParser.swift in Sources */,
@@ -554,7 +578,7 @@
 				AB0086FE9FD784884574B77F /* AccountDeletionUITests.swift in Sources */,
 				B65C3DA24E69FD7E52ED8E8B /* AccountUITests.swift in Sources */,
 				8F8E2166148B1A17C4D4E71E /* GitTerminalUITests.swift in Sources */,
-				93C0B6F45DBA42D8A62BCA91 /* IPadResponsiveUITests.swift in Sources */,
+				671E58F890BC30D28D79704B /* IPadResponsiveUITests.swift in Sources */,
 				557B7CFDBF2BBF7E351B8C72 /* SignedKeychainUITests.swift in Sources */,
 				0CEE65B3D47075FEDBF85F41 /* WaynodeUITestCase.swift in Sources */,
 				9F64BCDAD6E51AD695460D9F /* WaynodeUITests.swift in Sources */,

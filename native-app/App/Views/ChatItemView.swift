@@ -9,7 +9,7 @@ import WaynodeCore
 struct ChatItemView: View {
     let item: ChatItem
     var onStopHammersmith: ((String) -> Void)? = nil
-    @Environment(\.onStopHammersmith) private var envOnStopHammersmith
+    @Environment(\.onStopHammersmith) private var envOnStopHammersmith: ChatHandler?
 
     var body: some View {
         switch item {
@@ -33,7 +33,7 @@ struct ChatItemView: View {
 
 struct UserMessageView: View {
     let message: ChatItem.UserItem
-    @Environment(\.onEditMessage) private var onEdit
+    @Environment(\.onEditMessage) private var onEdit: ChatHandler?
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
