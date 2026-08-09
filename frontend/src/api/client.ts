@@ -60,6 +60,14 @@ export const api = {
     create: (name: string) => fetchJSON<Org>("/api/orgs", { method: "POST", body: JSON.stringify({ name }) }),
   },
 
+  repos: {
+    create: (provider: "github" | "gitlab", body: { name: string; description?: string; visibility: "private" | "public" }) =>
+      fetchJSON<{ provider: "github" | "gitlab"; id: number; name: string; full_name: string; url: string; html_url: string; default_branch: string; private: boolean }>(`/api/repos/${provider}`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
+
   spaces: {
     list: () => fetchJSON<Space[]>("/api/spaces"),
     get: (id: string) => fetchJSON<Space>(`/api/spaces/${id}`),

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useMemo, type KeyboardEvent as ReactKeyboa
 import type { RepoGroup } from "../types";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { GitHubIcon, GitLabIcon, SearchIcon } from "./RepoProviderIcons";
+import { api } from "../api/client";
+import { RepositoryCreationForm } from "./RepositoryCreationForm";
 
 interface RepoPickerProps {
   onClose: () => void;
@@ -27,6 +29,10 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected,
   const [authUser, setAuthUser] = useState("");
   const [authToken, setAuthToken] = useState("");
   const [showAuth, setShowAuth] = useState(false);
+  const [creatingRepo, setCreatingRepo] = useState(false);
+  const [newRepoName, setNewRepoName] = useState("");
+  const [newRepoDescription, setNewRepoDescription] = useState("");
+  const [newRepoVisibility, setNewRepoVisibility] = useState<"private" | "public">("private");
   const searchRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   // Layer 1: Esc closes this picker; focus trapped so the terminal behind it
@@ -144,6 +150,25 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected,
     }
   };
 
+  const handleCreateRepo = async () => {
+    if (tab === "url" || !newRepoName.trim()) return;
+    setCloning(true);
+    setError("");
+    try {
+      const repo = await api.repos.create(tab, {
+        name: newRepoName.trim(),
+        description: newRepoDescription.trim() || undefined,
+        visibility: newRepoVisibility,
+      });
+      await onClone(repo.url, repo.default_branch);
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCloning(false);
+    }
+  };
+
   const retryCurrent = () => {
     if (tab === "github") loadGithub();
     else if (tab === "gitlab") loadGitlab();
@@ -202,6 +227,23 @@ export function RepoPicker({ onClose, onClone, githubConnected, gitlabConnected,
                     <button type="button" className="repo-search-clear" onClick={() => setSearch("")} aria-label="Clear repository search">Clear</button>
                   )}
                 </div>
+
+                <div className="repo-create-actions">
+                  <button type="button" className="repo-create-toggle" aria-expanded={creatingRepo} onClick={() => setCreatingRepo(!creatingRepo)}>
+                    {creatingRepo ? "Cancel creation" : `Create new ${tab === "github" ? "GitHub repository" : "GitLab project"}`}
+                  </button>
+                </div>
+                {creatingRepo && <RepositoryCreationForm
+                  provider={tab}
+                  name={newRepoName}
+                  description={newRepoDescription}
+                  visibility={newRepoVisibility}
+                  busy={cloning}
+                  onName={setNewRepoName}
+                  onDescription={setNewRepoDescription}
+                  onVisibility={setNewRepoVisibility}
+                  onSubmit={handleCreateRepo}
+                />}
 
                 <div className="repo-list">
                   {loading ? (

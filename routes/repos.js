@@ -3,6 +3,7 @@ import { requireAuth } from "../lib/auth.mjs";
 import { config } from "../lib/config.mjs";
 import db from "../lib/db.mjs";
 import { oauthConnectionStatus, oauthTokenForUser } from "../lib/oauth-tokens.mjs";
+import { createGitHubRepository, createGitLabRepository } from "../lib/provider-repositories.mjs";
 
 const router = Router();
 
@@ -121,6 +122,24 @@ router.get("/api/repos/gitlab", requireAuth, async (req, res) => {
 
 router.get("/api/repos/status", requireAuth, (req, res) => {
   res.json(oauthConnectionStatus(db, req.user.id));
+});
+
+router.post("/api/repos/:provider", requireAuth, async (req, res) => {
+  const { provider } = req.params;
+  if (provider !== "github" && provider !== "gitlab") {
+    return res.status(404).json({ error: "Repository provider is unavailable" });
+  }
+  const token = oauthTokenForUser(db, req.user.id, provider);
+  if (!token) return res.status(409).json({ error: `Connect ${provider === "github" ? "GitHub" : "GitLab"} first` });
+
+  try {
+    const repo = provider === "github"
+      ? await createGitHubRepository(token, req.body)
+      : await createGitLabRepository(token, req.body, config.gitlab.baseUrl);
+    res.status(201).json(repo);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
+  }
 });
 
 export default router;

@@ -4,6 +4,7 @@
 @import "./styles/workspace-identity.css";
 @import "./styles/sidebar-dialogs.css";
 @import "./styles/repo-picker.css";
+@import "./styles/repository-creation.css";
 @import "./styles/admin-model.css";
 @import "./styles/chat-messages.css";
 @import "./styles/chat-composer.css";
