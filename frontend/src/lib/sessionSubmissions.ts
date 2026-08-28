@@ -78,12 +78,14 @@ export function reconcileSubmission(
   if (!accepted && submission.status === "failed") {
     if (pendingIndex >= 0) items.splice(pendingIndex, 1);
   } else {
+    const existing = pendingIndex >= 0 && items[pendingIndex].role === "user"
+      ? items[pendingIndex] as Extract<ChatItem, { role: "user" }> : null;
     const item: ChatItem = {
-      id: submission.id,
+      id: existing?.submissionId === submission.id ? existing.id : submission.id,
       role: "user",
-      content: submission.prompt,
-      sentAt: draft.sentAt,
-      mode: draft.mode,
+      content: existing?.submissionId === submission.id ? existing.content : submission.prompt,
+      sentAt: existing?.sentAt ?? draft.sentAt,
+      mode: existing?.mode ?? draft.mode,
       submissionStatus: submission.status,
       submissionId: submission.id,
     };

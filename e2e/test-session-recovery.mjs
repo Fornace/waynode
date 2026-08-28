@@ -67,6 +67,7 @@ try {
   const promptCommand = commands.find((command) => command.type === "prompt");
   assert.ok(promptCommand, "resume sends a prompt to pi");
   assert.equal(promptCommand.message, resumePromptFor("goal"));
+  assert.equal(handle.getSubmission("sub-goal").prompt, "ship the feature", "user-facing submission keeps the original prompt");
   assert.equal(promptCommand.streamingBehavior, "followUp");
   // …under the ORIGINAL submission id, so clients reconcile instead of duplicate.
   const row = db.prepare("SELECT status FROM submissions WHERE id = 'sub-goal'").get();
