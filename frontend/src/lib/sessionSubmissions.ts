@@ -72,7 +72,7 @@ export function reconcileSubmission(
     kind,
     sentAt: existingSentAt ?? serverSentAt ?? new Date().toISOString(),
   };
-  const index = items.findIndex((item) => item.role === "user" && item.id === submission.id);
+  const index = items.findIndex((item) => item.role === "user" && (item.id === submission.id || item.submissionId === submission.id));
   const pendingIndex = index >= 0 ? index : findPendingSubmissionIndex(items, submission.prompt, normalizedMode);
 
   if (!accepted && submission.status === "failed") {
@@ -85,6 +85,7 @@ export function reconcileSubmission(
       sentAt: draft.sentAt,
       mode: draft.mode,
       submissionStatus: submission.status,
+      submissionId: submission.id,
     };
     if (pendingIndex >= 0) items[pendingIndex] = { ...items[pendingIndex], ...item } as ChatItem;
     else items.push(item);

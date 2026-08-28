@@ -1,15 +1,19 @@
 import { useSyncExternalStore } from "react";
-import type { ChatItem, Block, ComposerMode, HammersmithRun, Submission, SubmissionStatus } from "../types";
+import type { ChatItem, ComposerMode, HammersmithRun, Submission, SubmissionStatus } from "../types";
 import { appendText, appendThinking, appendTool, setToolOutput } from "./sessionBlocks";
-import { abortSession, loadHammersmithRuns, loadHistoryItems, openSessionStream, SubmissionError, submitDraft } from "./sessionTransport";
+import { abortSession, loadEvents, loadHammersmithRuns, openSessionStream, SubmissionError, submitDraft } from "./sessionTransport";
 import {
   newDraft, optimisticSubmission, reconcileSubmission,
   hammersmithFreshness, submissionFromHammersmithRun,
   type SubmissionDraft, type SubmissionView,
 } from "./sessionSubmissions";
+import { liveOverlayItem, mergeEntries, type LiveOverlay, type WireEntry } from "./sessionEntries";
+
 let _idSeq = 0;
 const uid = () => `c${Date.now()}-${_idSeq++}`;
 const eventSentAt = (event: any) => event.createdAt ?? event.created_at ?? event.timestamp ?? new Date().toISOString();
+const LIVE_PREFIX = "live-";
+
 interface SessionState {
   items: ChatItem[]; streaming: boolean; error: string | null; status: string | null;
   loaded: boolean; connection: "connecting" | "connected" | "reconnecting" | "disconnected";
@@ -18,9 +22,9 @@ interface SessionState {
 interface SessionEntry {
   state: SessionState; listeners: Set<() => void>; es: EventSource | null; viewers: number;
   closeTimer: ReturnType<typeof setTimeout> | null;
-  msgIndex: Map<string, number>; // messageId -> items index
   connectionFailures: number; runPoll: ReturnType<typeof setInterval> | null;
   runPollFailures: number; historyPromise: Promise<void> | null;
+  liveEnded: boolean; // the in-flight message received its message_end
 }
 const EMPTY: SessionState = {
   items: [], streaming: false, error: null, status: null, loaded: false,
@@ -33,8 +37,8 @@ function getEntry(sessionId: string): SessionEntry {
   if (!e) {
     e = {
       state: { ...EMPTY, items: [] }, listeners: new Set(), es: null, viewers: 0,
-      closeTimer: null, msgIndex: new Map(), connectionFailures: 0,
-      runPoll: null, runPollFailures: 0, historyPromise: null,
+      closeTimer: null, connectionFailures: 0, runPoll: null, runPollFailures: 0,
+      historyPromise: null, liveEnded: false,
     };
     entries.set(sessionId, e);
   }
@@ -44,37 +48,55 @@ function emit(e: SessionEntry) {
   e.state = { ...e.state };
   for (const l of e.listeners) l();
 }
-// Stable content signature for dedup: id is a per-load transient (historySequence), so dedup by role+text/time.
-function contentKey(item: ChatItem): string {
-  if (item.role === "assistant") return `a:${item.sentAt ?? ""}:${item.blocks.map((b) => b.type === "text" || b.type === "thinking" ? b.text : "").join("|")}`;
-  if (item.role === "hammersmith-run") return `h:${item.run.id}`;
-  if (item.role === "system") return `s:${item.key ?? ""}:${item.content}`;
-  return `u:${item.sentAt ?? ""}:${item.content}`;
+function findLiveIndex(e: SessionEntry): number {
+  return e.state.items.findIndex((item) => item.role === "assistant" && !item.done && item.id.startsWith(LIVE_PREFIX));
 }
-// Rebuild msgIndex from the merged items array so prepended history doesn't drop streaming bubbles.
-function rebuildMsgIndex(e: SessionEntry) {
-  e.msgIndex = new Map();
-  e.state.items.forEach((item, idx) => {
-    if (item.role === "assistant" && !item.done) e.msgIndex.set(item.id, idx);
-  });
-}
-function ensureAssistant(e: SessionEntry, messageId: string, sentAt = new Date().toISOString()): number {
-  const idx = e.msgIndex.get(messageId);
-  if (idx !== undefined) return idx;
+function ensureLive(e: SessionEntry, messageId: string | null, sentAt: string | null): number {
+  const existing = findLiveIndex(e);
+  if (existing >= 0) return existing;
   const items = e.state.items.slice();
-  const newIdx = items.length;
-  items.push({ id: messageId, role: "assistant", blocks: [], done: false, sentAt });
+  items.push({ id: `${LIVE_PREFIX}${messageId ?? uid()}`, role: "assistant", blocks: [], done: false, sentAt, live: true });
   e.state.items = items;
-  e.msgIndex.set(messageId, newIdx);
-  return newIdx;
+  return e.state.items.length - 1;
 }
-function updateAssistant(e: SessionEntry, messageId: string, fn: (blocks: Block[]) => Block[]) {
-  const idx = e.msgIndex.get(messageId);
-  if (idx === undefined) return;
+function updateLive(e: SessionEntry, fn: (item: Extract<ChatItem, { role: "assistant" }>) => Extract<ChatItem, { role: "assistant" }>) {
+  const idx = findLiveIndex(e);
+  if (idx < 0) return;
   const items = e.state.items.slice();
-  const msg = items[idx];
-  if (msg.role !== "assistant") return;
-  items[idx] = { ...msg, blocks: fn(msg.blocks) };
+  items[idx] = fn(items[idx] as Extract<ChatItem, { role: "assistant" }>);
+  e.state.items = items;
+}
+function dropLive(e: SessionEntry) {
+  const idx = findLiveIndex(e);
+  if (idx < 0) return;
+  const items = e.state.items.slice();
+  items.splice(idx, 1);
+  e.state.items = items;
+}
+/** Durable entries: merge by id; an ended live overlay is superseded. */
+function applyEntries(e: SessionEntry, list: WireEntry[]) {
+  const hadLive = findLiveIndex(e) >= 0;
+  const { items, changed } = mergeEntries(e.state.items, list);
+  e.state.items = items;
+  if (hadLive && e.liveEnded && list.some((entry) => entry.role === "assistant" || entry.role === "toolResult")) {
+    dropLive(e);
+    e.liveEnded = false;
+  } else if (changed && findLiveIndex(e) >= 0) {
+    // Keep the live bubble last: persisted items land before it.
+    const idx = findLiveIndex(e);
+    if (idx >= 0 && idx !== e.state.items.length - 1) {
+      const items2 = e.state.items.slice();
+      const [live] = items2.splice(idx, 1);
+      items2.push(live);
+      e.state.items = items2;
+    }
+  }
+}
+function applyDelta(e: SessionEntry, ev: any, fn: (blocks: import("../types").Block[]) => import("../types").Block[]) {
+  const idx = ensureLive(e, ev.messageId ?? null, eventSentAt(ev));
+  const items = e.state.items.slice();
+  const item = items[idx] as Extract<ChatItem, { role: "assistant" }>;
+  items[idx] = { ...item, blocks: fn(item.blocks) };
   e.state.items = items;
 }
 function submissionView(e: SessionEntry): SubmissionView {
@@ -114,126 +136,81 @@ function ensureRunPolling(sessionId: string) {
       e.state.items = e.state.items.map((item) => item.role === "hammersmith-run" && item.run.lifecycle === "running"
         ? { ...item, run: { ...item.run, freshness } } : item);
       emit(e);
-      // Bug 6: stop the interval after a bounded number of consecutive failures.
       if (e.runPollFailures >= 3 && e.runPoll) { clearInterval(e.runPoll); e.runPoll = null; }
     }
   };
   void poll();
   e.runPoll = setInterval(poll, 2500);
 }
-function applyDelta(e: SessionEntry, ev: any, fn: (blocks: Block[]) => Block[]) {
-  ensureAssistant(e, ev.messageId, eventSentAt(ev));
-  updateAssistant(e, ev.messageId, fn);
-  emit(e);
-}
 function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
   switch (ev.type) {
-    case "ping":
-      return;
+    case "ping": return;
     case "connecting": e.connectionFailures = 0; e.state.connection = "connected"; emit(e); return;
     case "sync": {
       e.connectionFailures = 0;
       e.state.connection = "connected";
       e.state.streaming = !!ev.streaming;
+      if (ev.fromStart === false) applyEntries(e, ev.entries || []);
+      else { e.state.items = []; applyEntries(e, ev.entries || []); }
+      if (ev.live) {
+        const overlay = liveOverlayItem(ev.live as LiveOverlay, new Date().toISOString());
+        if (overlay) { e.state.items = [...e.state.items, overlay]; e.liveEnded = false; }
+      } else if (!ev.streaming) dropLive(e);
       for (const submission of ev.submissions || []) applySubmission(e, submission);
-      // The sync snapshot is the server's full active-submission truth. Any
-      // locally-active submission missing from it was lost to a server
-      // restart — settle it as failed so the composer never stays locked
-      // behind a phantom "running" item until page reload. "sending" is
-      // excluded: that's a client-side POST still in flight, unknown to the
-      // server by definition.
       const known = new Set((ev.submissions || []).map((s: Submission) => s.id));
       for (const item of e.state.items) {
-        if (item.role !== "user" || !item.submissionStatus || known.has(item.id)) continue;
+        if (item.role !== "user" || !item.submissionStatus) continue;
+        const itemId = (item as any).submissionId || item.id;
+        if (known.has(itemId)) continue;
         if (!["queued", "starting", "running"].includes(item.submissionStatus)) continue;
         applySubmission(e, {
-          id: item.id, prompt: item.content, mode: item.mode ?? "message",
+          id: itemId, prompt: item.content, mode: item.mode ?? "message",
           status: "failed", error: "The server restarted while this message was in flight. Your draft is ready to retry.",
         });
       }
-      if (ev.streaming && ev.partialText) {
-        const liveIdx = [...e.msgIndex.values()].find((i) => {
-          const m = e.state.items[i];
-          return m && m.role === "assistant" && !m.done;
-        });
-        if (liveIdx === undefined) {
-          const id = `sync-${uid()}`;
-          ensureAssistant(e, id, eventSentAt(ev));
-          updateAssistant(e, id, (b) => appendText(b, ev.partialText));
-        } else {
-          const items = e.state.items.slice();
-          const msg = items[liveIdx];
-          if (msg.role === "assistant") {
-            const replacement: Block = { type: "text", text: ev.partialText };
-            const hadText = msg.blocks.some((b) => b.type === "text");
-            const blocks = hadText ? msg.blocks.map((b) => b.type === "text" ? replacement : b) : [...msg.blocks, replacement];
-            items[liveIdx] = { ...msg, blocks };
-            e.state.items = items;
-          }
-        }
-      }
-      emit(e);
-      return;
+      emit(e); return;
     }
+    case "entries": applyEntries(e, ev.entries || []); emit(e); return;
+    case "queue": e.state.queuedCount = ev.queued ?? 0; emit(e); return;
     case "start":
       e.state.streaming = true;
       e.state.error = null;
-      emit(e);
-      return;
+      emit(e); return;
     case "submission":
       applySubmission(e, ev.submission);
       if (["starting", "running"].includes(ev.submission.status)) e.state.streaming = true;
-      if (ev.submission.status === "starting") e.state.status = "Starting agent…"; if (ev.submission.status === "running") e.state.status = "Agent working";
+      if (ev.submission.status === "starting") e.state.status = "Starting agent…";
+      if (ev.submission.status === "running") e.state.status = "Agent working";
       if (["completed", "failed", "cancelled"].includes(ev.submission.status)) e.state.status = null;
-      emit(e);
-      return;
+      emit(e); return;
     case "hammersmith_run":
       if (ev.submission?.job) {
         applySubmission(e, { ...ev.submission, job: { ...ev.submission.job, freshness: hammersmithFreshness(ev.submission.job) } });
         if (ev.submission.job.lifecycle === "running") ensureRunPolling(ev.submission.job.sessionId);
       }
-      emit(e);
-      return;
+      emit(e); return;
     case "message_start": {
-      // Bug 4: adopt the first real messageId for a sync-created bubble (re-key msgIndex + restamp id).
-      const adopt = !e.msgIndex.has(ev.messageId) && [...e.msgIndex.entries()].find(([k, i]) =>
-        k.startsWith("sync-") && e.state.items[i]?.role === "assistant" && !e.state.items[i]!.done);
-      if (adopt) {
-        const [oldKey, idx] = adopt;
-        e.msgIndex.delete(oldKey);
-        e.msgIndex.set(ev.messageId, idx);
-        const items = e.state.items.slice();
-        items[idx] = { ...items[idx], id: ev.messageId, sentAt: eventSentAt(ev) };
-        e.state.items = items;
-      } else {
-        ensureAssistant(e, ev.messageId, eventSentAt(ev));
-      }
-      emit(e);
-      return;
+      dropLive(e);
+      e.liveEnded = false;
+      ensureLive(e, ev.messageId ?? null, eventSentAt(ev));
+      emit(e); return;
     }
-    case "text_delta":
-      applyDelta(e, ev, (b) => appendText(b, ev.delta || ""));
-      return;
-    case "thinking_delta":
-      applyDelta(e, ev, (b) => appendThinking(b, ev.delta || ""));
-      return;
-    case "tool_start":
-      applyDelta(e, ev, (b) => appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args }));
-      return;
-    case "tool_delta":
-      applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", "running"));
-      return;
-    case "tool_end":
-      applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done"));
-      return;
-    case "status":
-      e.state.status = ev.text || null; emit(e); return;
+    case "text_delta": applyDelta(e, ev, (b) => appendText(b, ev.delta || "")); emit(e); return;
+    case "thinking_delta": applyDelta(e, ev, (b) => appendThinking(b, ev.delta || "")); emit(e); return;
+    case "tool_start": applyDelta(e, ev, (b) => appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args })); emit(e); return;
+    case "tool_delta": applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", "running")); emit(e); return;
+    case "tool_end": applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done")); emit(e); return;
+    case "message_end": e.liveEnded = true; return;
+    case "status": e.state.status = ev.text || null; emit(e); return;
     case "end":
       e.state.streaming = e.state.queuedCount > 0;
       e.state.status = null;
       e.state.items = e.state.items.map((m) => m.role === "assistant" && !m.done ? { ...m, done: true } : m);
-      // Bug 7: if the last viewer left mid-turn, schedule the SSE close now that streaming ended.
       if (e.viewers <= 0) scheduleClose(sessionId);
+      emit(e); return;
+    case "resumed":
+      e.state.items = [...e.state.items, { id: uid(), role: "system", content: `🔄 ${ev.message || "Turn resumed after a server restart."}`, sentAt: new Date().toISOString() }];
+      e.state.streaming = true;
       emit(e); return;
     case "error":
       e.state.streaming = false;
@@ -241,7 +218,7 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
       if (e.viewers <= 0) scheduleClose(sessionId);
       emit(e); return;
     case "session_renamed":
-      for (const l of renameListeners) l(/* sessionId via closure not available */ "", ev.title);
+      for (const l of renameListeners) l(sessionId, ev.title);
       emit(e); return;
   }
 }
@@ -256,7 +233,6 @@ function openStream(sessionId: string) {
   es.onmessage = (msg) => {
     try {
       const ev = JSON.parse(msg.data);
-      if (ev.type === "session_renamed") { for (const l of renameListeners) l(sessionId, ev.title); return; }
       applyEvent(sessionId, e, ev);
     } catch {}
   };
@@ -287,28 +263,27 @@ export function release(sessionId: string) {
   e.viewers = Math.max(0, e.viewers - 1);
   if (e.viewers <= 0) {
     if (!e.state.streaming) scheduleClose(sessionId);
-    // Bug 6: no viewers → stop burning requests on the Hammersmith run poller.
     if (e.runPoll) { clearInterval(e.runPoll); e.runPoll = null; }
   }
 }
 async function loadHistory(sessionId: string) {
   const e = getEntry(sessionId);
-  // Bug 1: in-flight guard so a StrictMode double-mount / fast A→B→A switch never starts two loads.
   if (e.historyPromise) return e.historyPromise;
   const promise = (async () => {
     try {
-      const diskItems = await loadHistoryItems(sessionId);
-      // Bug 1 (content-key dedup): history-N ids are per-load transient; dedup by stable signature.
-      const live = new Set(e.state.items.map(contentKey));
-      const fresh = diskItems.filter((item) => !live.has(contentKey(item)));
-      e.state.items = [...fresh, ...e.state.items];
-      // Bug 2: rebuild msgIndex from the merged items so prepended history doesn't drop streaming bubbles.
-      rebuildMsgIndex(e);
+      const [eventBatch, runs] = await Promise.all([
+        loadEvents(sessionId),
+        loadHammersmithRuns(sessionId).catch(() => [] as HammersmithRun[]),
+      ]);
+      // A full reload starts from the durable projection; any live overlay
+      // from an in-flight turn is re-established by the sync event.
+      e.state.items = [];
+      applyEntries(e, eventBatch.items);
+      applyRuns(e, runs, "live");
       e.state.loaded = true;
       emit(e);
-      if (diskItems.some((item) => item.role === "hammersmith-run" && item.run.lifecycle === "running")) ensureRunPolling(sessionId);
+      if (runs.some((run) => run.lifecycle === "running")) ensureRunPolling(sessionId);
     } catch {
-      // Bug 5: leave loaded=false so retry() can refetch after a healed network.
       e.state.error = "Couldn’t load this conversation. Your saved messages are unchanged.";
       emit(e);
     } finally {

@@ -69,8 +69,8 @@ export type Block =
   | { type: "tool"; id: string; name: string; args: any; output: string; status: ToolStatus; startedAt?: number; endedAt?: number };
 
 export type ChatItem =
-  | { id: string; role: "user"; content: string; sentAt: string | null; mode?: ComposerMode; submissionStatus?: SubmissionStatus }
-  | { id: string; role: "assistant"; blocks: Block[]; done: boolean; sentAt: string | null }
+  | { id: string; role: "user"; content: string; sentAt: string | null; mode?: ComposerMode; submissionStatus?: SubmissionStatus; submissionId?: string }
+  | { id: string; role: "assistant"; blocks: Block[]; done: boolean; sentAt: string | null; live?: boolean }
   | { id: string; role: "system"; content: string; sentAt: string | null; key?: string }
   | { id: string; role: "hammersmith-run"; initiatingItemId: string; run: HammersmithRun; sentAt: string | null };
 

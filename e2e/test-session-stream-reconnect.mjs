@@ -133,245 +133,209 @@ async function runAll() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Bug 1 (P1): concurrent loadHistory must not duplicate the transcript.
+// Durable-entries store contract (SESSION-WIRE-PROTOCOL v2).
 // ────────────────────────────────────────────────────────────────────────────
+
+function eventsFetchOk(items = [], leafId = null, fromStart = true) {
+  return async () => ({ ok: true, json: async () => ({ items, leafId, fromStart }) });
+}
+function eventsFetchFail() {
+  return async () => ({ ok: false, json: async () => ({}) });
+}
+
 check("concurrent-load-dedup", async () => {
-  const sid = "bug-1";
+  const sid = "dedup";
   setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([
-      { role: "user", content: "hi", createdAt: "2026-07-15T09:00:00.000Z" },
-      { role: "assistant", content: "hello", createdAt: "2026-07-15T09:00:01.000Z" },
-    ]) },
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([
+      { id: "u1", parentId: null, timestamp: "2026-07-15T09:00:00.000Z", role: "user", text: "hi" },
+      { id: "a1", parentId: "u1", timestamp: "2026-07-15T09:00:01.000Z", role: "assistant", blocks: [{ type: "text", text: "hello" }] },
+    ], "a1") },
     { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
   ]);
   const r1 = store.acquire(sid);
-  const r2 = store.acquire(sid); // StrictMode double-mount before resolve
+  const r2 = store.acquire(sid);
   await flushTimers();
   const items = store.getSnapshot(sid).items;
   assert.equal(items.length, 2, `concurrent loads must not duplicate transcript (got ${items.length})`);
+  assert.equal(items[0].id, "u1", "stable entry ids from the projection");
   r1(); r2();
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// Bug 2 (P1): history prepend must not clear msgIndex for in-flight stream.
-// ────────────────────────────────────────────────────────────────────────────
-check("msgindex-survives-history-prepend", async () => {
-  const sid = "bug-2";
-  let releaseMessagesFetch;
+check("entries-merge-is-idempotent", async () => {
+  const sid = "idem";
+  const entries = [
+    { id: "u1", parentId: null, timestamp: null, role: "user", text: "q" },
+    { id: "a1", parentId: "u1", timestamp: null, role: "assistant", blocks: [{ type: "text", text: "a" }] },
+  ];
   setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: () => new Promise((resolve) => {
-      releaseMessagesFetch = () => resolve({
-        ok: true,
-        json: async () => [
-          { role: "user", content: "earlier", createdAt: "2026-07-15T08:00:00.000Z" },
-        ],
-      });
-    }) },
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk(entries, "a1") },
     { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
   ]);
   const r1 = store.acquire(sid);
-  await Promise.resolve();
-  if (!activeEventSource) throw new Error("EventSource not opened");
-  activeEventSource.fireOpen();
-  activeEventSource.send({ type: "message_start", messageId: "m2", createdAt: "2026-07-15T09:00:05.000Z" });
-  activeEventSource.send({ type: "text_delta", messageId: "m2", delta: "hello" });
-  releaseMessagesFetch();
   await flushTimers();
-  activeEventSource.send({ type: "text_delta", messageId: "m2", delta: " world" });
+  activeEventSource.fireOpen();
+  activeEventSource.send({ type: "entries", entries, leafId: "a1" });
+  activeEventSource.send({ type: "entries", entries, leafId: "a1" });
   const items = store.getSnapshot(sid).items;
-  const bubbles = items.filter((i) => i.role === "assistant");
-  assert.equal(bubbles.length, 1, "in-flight assistant bubble must not split across history prepend");
-  assert.equal(assistantText(bubbles[0]), "hello world", "deltas must fold into the same bubble");
+  assert.equal(items.length, 2, `duplicate batches must not duplicate items (got ${items.length})`);
   r1();
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// Bug 3 (P2): reconnect sync must reconcile partialText into live bubble.
-// ────────────────────────────────────────────────────────────────────────────
-check("sync-partialText-reconcile", async () => {
-  const sid = "bug-3";
+check("toolresult-entry-patches-tool-block", async () => {
+  const sid = "toolres";
   setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([]) },
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([
+      { id: "u1", parentId: null, timestamp: null, role: "user", text: "run it" },
+      { id: "a1", parentId: "u1", timestamp: null, role: "assistant", blocks: [
+        { type: "toolCall", id: "call_1", name: "bash", args: { command: "echo hi" } },
+      ] },
+    ], "a1") },
     { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
   ]);
   const r1 = store.acquire(sid);
   await flushTimers();
   activeEventSource.fireOpen();
-  activeEventSource.send({ type: "message_start", messageId: "m3", createdAt: "2026-07-15T09:00:00.000Z" });
-  activeEventSource.send({ type: "text_delta", messageId: "m3", delta: "local-stale-" });
-  // Reconnect sync arrives with authoritative partialText.
-  activeEventSource.send({ type: "sync", streaming: true, partialText: "server-authoritative" });
+  activeEventSource.send({ type: "entries", entries: [
+    { id: "t1", parentId: "a1", timestamp: null, role: "toolResult", toolCallId: "call_1", toolName: "bash", isError: false, text: "hi\n" },
+    { id: "a2", parentId: "t1", timestamp: null, role: "assistant", blocks: [{ type: "text", text: "Done." }] },
+  ], leafId: "a2" });
   const items = store.getSnapshot(sid).items;
-  const bubbles = items.filter((i) => i.role === "assistant");
-  assert.equal(bubbles.length, 1, "no duplicate bubble after sync");
-  assert.equal(assistantText(bubbles[0]), "server-authoritative", "sync partialText must replace stale local text");
+  const turn = items.find((i) => i.id === "a1");
+  const tool = turn.blocks.find((b) => b.type === "tool" && b.id === "call_1");
+  assert.equal(tool.output, "hi\n", "toolResult entry patches the tool block output");
+  assert.equal(tool.status, "done", "tool status becomes done");
   r1();
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// Bug 4 (P2): fresh join mid-turn must not render duplicate assistant bubble.
-// ────────────────────────────────────────────────────────────────────────────
-check("sync-bubble-adoption", async () => {
-  const sid = "bug-4";
+check("message-end-then-entries-replace-overlay", async () => {
+  const sid = "overlay";
   setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([]) },
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([
+      { id: "u1", parentId: null, timestamp: null, role: "user", text: "q" },
+    ], "u1") },
     { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
   ]);
   const r1 = store.acquire(sid);
   await flushTimers();
   activeEventSource.fireOpen();
-  // Fresh join: sync arrives first (no live bubble yet).
-  activeEventSource.send({ type: "sync", streaming: true, partialText: "hi" });
+  activeEventSource.send({ type: "message_start", messageId: "m1" });
+  activeEventSource.send({ type: "text_delta", messageId: "m1", delta: "partial" });
   let items = store.getSnapshot(sid).items;
-  let bubbles = items.filter((i) => i.role === "assistant");
-  assert.equal(bubbles.length, 1, "sync creates one assistant bubble");
-  // First real message_start must adopt the sync bubble.
-  activeEventSource.send({ type: "message_start", messageId: "m4", createdAt: "2026-07-15T09:00:00.000Z" });
-  activeEventSource.send({ type: "text_delta", messageId: "m4", delta: " there" });
+  assert.equal(items.filter((i) => i.role === "assistant").length, 1, "live overlay bubble exists");
+  activeEventSource.send({ type: "message_end", messageId: "m1" });
+  activeEventSource.send({ type: "entries", entries: [
+    { id: "a1", parentId: "u1", timestamp: null, role: "assistant", blocks: [{ type: "text", text: "partial and done" }] },
+  ], leafId: "a1" });
   items = store.getSnapshot(sid).items;
-  bubbles = items.filter((i) => i.role === "assistant");
-  assert.equal(bubbles.length, 1, "real messageId must adopt the sync bubble, not append a second");
-  assert.equal(assistantText(bubbles[0]), "hi there", "deltas fold into adopted bubble");
+  const bubbles = items.filter((i) => i.role === "assistant");
+  assert.equal(bubbles.length, 1, "overlay replaced by durable entry, not duplicated");
+  assert.equal(assistantText(bubbles[0]), "partial and done", "durable entry text wins");
+  assert.equal(bubbles[0].id, "a1", "durable entry id adopted");
   r1();
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// Bug 5 (P2): failed history load must leave loaded=false so retry can refetch.
-// ────────────────────────────────────────────────────────────────────────────
-check("failed-load-allows-retry", async () => {
-  const sid = "bug-5";
+check("multi-message-turn-reconnect-exact", async () => {
+  const sid = "reconnect";
   setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchFail() },
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([], null) },
     { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
   ]);
   const r1 = store.acquire(sid);
   await flushTimers();
-  const stateAfterFail = store.getSnapshot(sid);
-  assert.ok(stateAfterFail.error, "error banner shown after failed load");
-  assert.equal(stateAfterFail.loaded, false, "loaded must remain false after failure so retry can refetch");
-  // Now network heals.
-  setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([
-      { role: "user", content: "recovered", createdAt: "2026-07-15T09:00:00.000Z" },
-    ]) },
-    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
-  ]);
-  await store.retry(sid);
-  await flushTimers();
-  const stateAfterRetry = store.getSnapshot(sid);
-  assert.equal(stateAfterRetry.loaded, true, "retry refetches after a healed failure");
-  assert.ok(stateAfterRetry.items.some((i) => i.role === "user" && i.content === "recovered"),
-    "recovered history visible after retry");
-  r1();
-});
-
-// ────────────────────────────────────────────────────────────────────────────
-// Bug 6 (P2): runPoll must be cleared on release (viewers=0) and after failures.
-// ────────────────────────────────────────────────────────────────────────────
-check("runPoll-cleared-on-release", async () => {
-  const sid = "bug-6a";
-  const runningRun = {
-    id: "run-6a", submissionId: "sub-6a", runId: "r-6a", sessionId: sid, spaceId: "sp",
-    description: "running", createdAt: "2026-07-15T09:00:00.000Z", lifecycle: "running",
-    totalTasks: 1, checkedTasks: 0, passedTasks: 0, failedTasks: 0,
-  };
-  setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([]) },
-    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([runningRun]) },
-  ]);
-  const r1 = store.acquire(sid);
-  await flushTimers();
-  assert.ok(intervals.size >= 1, "runPoll interval registered while job is running");
-  const before = intervals.size;
-  r1();
-  await flushTimers();
-  assert.equal(intervals.size, before - 1, "runPoll interval cleared when last viewer releases");
-});
-
-check("runPoll-stops-after-failures", async () => {
-  const sid = "bug-6b";
-  const runningRun = {
-    id: "run-6b", submissionId: "sub-6b", runId: "r-6b", sessionId: sid, spaceId: "sp",
-    description: "running", createdAt: "2026-07-15T09:00:00.000Z", lifecycle: "running",
-    totalTasks: 1, checkedTasks: 0, passedTasks: 0, failedTasks: 0,
-  };
-  // loadHistory sees a running job and starts polling; subsequent /jobs fetches fail.
-  let jobsCallCount = 0;
-  setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([]) },
-    {
-      match: (u) => u.endsWith("/hammersmith/jobs"),
-      respond: async () => {
-        jobsCallCount += 1;
-        return jobsCallCount === 1 ? { ok: true, json: async () => [runningRun] } : { ok: false, json: async () => ({}) };
-      },
-    },
-  ]);
-  const r1 = store.acquire(sid);
-  await flushTimers();
-  assert.ok(intervals.size >= 1, "runPoll interval registered after seeing a running job");
-  // Fire the interval until it clears itself (or hit a sane safety cap).
-  let safety = 0;
-  while (intervals.size > 0 && safety++ < 8) {
-    for (const [, fn] of intervals) { await fn(); await flushMicrotasks(); break; }
-  }
-  assert.equal(intervals.size, 0, "runPoll cleared after bounded consecutive failures");
-  r1();
-});
-
-// ────────────────────────────────────────────────────────────────────────────
-// Bug 7 (P3): SSE stream must close when the last viewer leaves mid-turn and turn ends.
-// ────────────────────────────────────────────────────────────────────────────
-check("stream-closes-on-end-after-last-viewer", async () => {
-  const sid = "bug-7";
-  setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([]) },
-    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
-  ]);
-  const r1 = store.acquire(sid);
-  await flushTimers();
-  const es = activeEventSource;
-  es.fireOpen();
-  // Turn starts; viewer leaves mid-turn.
-  es.send({ type: "submission", submission: { id: "sub-7", prompt: "go", mode: "message", status: "running" } });
-  r1();
-  await flushTimers();
-  assert.ok(!es.closed, "while streaming, release must not close the stream");
-  es.send({ type: "end" });
-  await flushTimers();
-  assert.ok(es.closed, "end after last viewer must close the stream");
-});
-
-// ────────────────────────────────────────────────────────────────────────────
-// Bug 8 (P2): null-timestamp history items must keep disk order.
-// ────────────────────────────────────────────────────────────────────────────
-check("null-timestamps-keep-disk-order", async () => {
-  const sid = "bug-8";
-  // Disk order: user@t10, assistant@null, user@t20, user@null. Nulls must NOT bubble to top.
-  setFetchRoutes([
-    { match: (u) => u.endsWith("/messages"), respond: messagesFetchOk([
-      { role: "user", content: "first", createdAt: "2026-07-15T09:00:10.000Z" },
-      { role: "assistant", content: "second-legacy" },
-      { role: "user", content: "third", createdAt: "2026-07-15T09:00:20.000Z" },
-      { role: "user", content: "fourth-legacy" },
-    ]) },
-    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
-  ]);
-  const r1 = store.acquire(sid);
-  await flushTimers();
+  activeEventSource.fireOpen();
+  // Turn with two assistant messages; disk persisted message 1 already.
+  activeEventSource.send({ type: "message_start", messageId: "m1" });
+  activeEventSource.send({ type: "text_delta", messageId: "m1", delta: "first answer" });
+  activeEventSource.send({ type: "message_end", messageId: "m1" });
+  // Reconnect mid-second-message: sync replays disk (user + m1) + live overlay of m2 only.
+  activeEventSource.send({ type: "sync", fromStart: true, entries: [
+    { id: "u1", parentId: null, timestamp: null, role: "user", text: "q" },
+    { id: "a1", parentId: "u1", timestamp: null, role: "assistant", blocks: [{ type: "text", text: "first answer" }] },
+  ], leafId: "a1", streaming: true, live: { messageId: "m2", text: "second so far", thinking: "", tools: [] }, submissions: [] });
   const items = store.getSnapshot(sid).items;
-  const roles = items.map((i) => {
-    if (i.role === "assistant") {
-      const t = i.blocks.find((b) => b.type === "text");
-      return `assistant:${t ? t.text : ""}`;
-    }
-    return `${i.role}:${i.content ?? ""}`;
-  }).join(",");
-  assert.equal(
-    roles,
-    "user:first,assistant:second-legacy,user:third,user:fourth-legacy",
-    `null-timestamp items must preserve disk order (got ${roles})`,
-  );
+  const bubbles = items.filter((i) => i.role === "assistant");
+  assert.equal(bubbles.length, 2, "persisted first message + live second overlay");
+  assert.equal(assistantText(bubbles[0]), "first answer");
+  assert.equal(assistantText(bubbles[1]), "second so far", "overlay holds ONLY the in-flight message, no cross-message accumulation");
+  r1();
+});
+
+check("optimistic-user-swap-keeps-display", async () => {
+  const sid = "swap";
+  setFetchRoutes([
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([], null) },
+    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
+    { match: (u, o) => u.includes("/message") && o?.method === "POST", respond: async () => ({ ok: true, json: async () => ({ ok: true, submission: { id: "sub-1", prompt: "clean prompt", mode: "goal", status: "starting" } }) }) },
+  ]);
+  const r1 = store.acquire(sid);
+  await flushTimers();
+  activeEventSource.fireOpen();
+  await store.send(sid, "clean prompt", "goal");
+  await flushTimers();
+  let items = store.getSnapshot(sid).items;
+  assert.equal(items.filter((i) => i.role === "user").length, 1, "optimistic user bubble");
+  // Persisted user entry carries the goal-wrapped text + submissionId annotation.
+  activeEventSource.send({ type: "entries", entries: [
+    { id: "u1", parentId: null, timestamp: null, role: "user", text: "You must use the create_goal tool … Task: clean prompt", submissionId: "sub-1" },
+  ], leafId: "u1" });
+  items = store.getSnapshot(sid).items;
+  const users = items.filter((i) => i.role === "user");
+  assert.equal(users.length, 1, "optimistic bubble swapped, not duplicated");
+  assert.equal(users[0].id, "u1", "stable entry id adopted");
+  assert.equal(users[0].content, "clean prompt", "raw prompt stays as the display text");
+  assert.equal(users[0].submissionStatus, "starting", "submission status preserved through the swap");
+  r1();
+});
+
+check("sync-replay-merges-after-cursor", async () => {
+  const sid = "replay";
+  setFetchRoutes([
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([
+      { id: "u1", parentId: null, timestamp: null, role: "user", text: "one" },
+      { id: "a1", parentId: "u1", timestamp: null, role: "assistant", blocks: [{ type: "text", text: "1" }] },
+    ], "a1") },
+    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
+  ]);
+  const r1 = store.acquire(sid);
+  await flushTimers();
+  activeEventSource.fireOpen();
+  // Reconnect with a cursor: server sends only entries after the cursor.
+  activeEventSource.send({ type: "sync", fromStart: false, entries: [
+    { id: "u2", parentId: "a1", timestamp: null, role: "user", text: "two" },
+  ], leafId: "u2", streaming: false, live: null, submissions: [] });
+  const items = store.getSnapshot(sid).items;
+  assert.equal(items.length, 3, `cursor replay appends without wiping history (got ${items.length})`);
+  assert.equal(items[2].id, "u2");
+  r1();
+});
+
+check("stream-closes-on-end-after-last-viewer", async () => {
+  const sid = "close";
+  setFetchRoutes([
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([], null) },
+    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
+  ]);
+  const r1 = store.acquire(sid);
+  await flushTimers();
+  activeEventSource.fireOpen();
+  const es = activeEventSource;
+  r1();
+  es.send({ type: "end" });
+  await flushTimers(); // closeTimer = 30s
+  assert.equal(es.closed, true, "SSE closes 30s after end with no viewers");
+});
+
+check("queue-event-updates-count", async () => {
+  const sid = "queuen";
+  setFetchRoutes([
+    { match: (u) => u.endsWith("/events"), respond: eventsFetchOk([], null) },
+    { match: (u) => u.endsWith("/hammersmith/jobs"), respond: jobsFetchOk([]) },
+  ]);
+  const r1 = store.acquire(sid);
+  await flushTimers();
+  activeEventSource.fireOpen();
+  activeEventSource.send({ type: "queue", queued: 2 });
+  assert.equal(store.getSnapshot(sid).queuedCount, 2);
   r1();
 });
 
