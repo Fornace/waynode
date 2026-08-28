@@ -61,20 +61,14 @@ Browser A ──GET /messages ◄──────────┘ lib/sessions.
              (lossy flat projection, re-read on every load)
 ```
 
-Key files:
-
-| Concern | File | Notes |
-|---|---|---|
-| SSE stream + send/queue endpoints | `routes/sessions.js` | fire-and-forget POST; events over `/stream`; sync snapshot on subscribe |
-| Agent process ownership | `lib/agent-manager.mjs` | server-side Map; idle reaper 30 min; survives client disconnect |
-| pi RPC wrapper | `lib/agent-rpc-handle.mjs` | long-lived `pi --mode rpc`; own follow-up queue + submission ledger |
-| Sandbox (hosted) wrapper | `lib/sandboxed-agent-handle.mjs` | one-shot pi per turn in microVM; parallel implementation of the same surface |
-| Event translation | `lib/agent-rpc-events.mjs` | pi events → waynode SSE contract; keeps `liveText`/`liveTools` |
-| Disk history | `lib/sessions.mjs` `getMessagesFromDisk` | flat user/assistant text list |
-| Web client store | `frontend/src/lib/sessionStore.ts` | EventSource, sync merge, history merge, reducer |
-| Web transport/projections | `frontend/src/lib/sessionTransport.ts`, `sessionSubmissions.ts`, `sessionBlocks.ts` | |
-| Native client (3rd impl) | `native-app/WaynodeCore/...` SSEClient/Chat/SessionStore | same contract re-implemented in Swift |
-| Deploy | `.github/deploy/deploy-production.sh` | `docker stop --time 30` + `compose up -d --force-recreate` |
+Key files: routes/sessions.js (SSE + send/queue), lib/agent-manager.mjs
+(process ownership, 30-min idle reaper), lib/agent-rpc-handle.mjs (pi RPC
+wrapper with own queue + ledger), lib/sandboxed-agent-handle.mjs (hosted
+one-shot-per-turn twin), lib/agent-rpc-events.mjs (event translation),
+lib/sessions.mjs getMessagesFromDisk (lossy disk history),
+frontend/src/lib/sessionStore.ts + sessionTransport/sessionSubmissions/
+sessionBlocks (web store), native-app/WaynodeCore (third client in Swift),
+.github/deploy/deploy-production.sh (docker stop -t 30 + force-recreate).
 
 What already works well (keep): server-owned agents detached from HTTP
 clients; idempotent submissionIds; pi session files inside the space worktree;
@@ -214,13 +208,10 @@ Architecture (docs/ai-chat/sessions.md, how-it-works.md, client-protocol.md):
 
 ### 4.2 Cloudflare Agents SDK
 Docs (developers.cloudflare.com/agents, updated Jun-Aug 2026): one Durable
-Object per agent = durable identity + state in transactional storage +
-WebSocket hibernation (connections die, agent sleeps at zero cost, wakes on
-message). New experimental Session API (tree-structured messages, context
-blocks, compaction) is explicitly "inspired by Pi". Relevant to us as the
-pattern: identity/state live in durable storage; processes/connections are
-replaceable views. Not adoptable as runtime (our engine is a pi subprocess
-with a git worktree and PTY needs), except potentially for hosted extras.
+Object per agent = durable identity + state + WebSocket hibernation. New
+experimental Session API is explicitly "inspired by Pi". Pattern adopted
+(identity/state in durable storage, processes replaceable); runtime not
+(engine is a pi subprocess with a git worktree and PTY needs).
 
 ### 4.3 Vercel AI SDK resumable streams
 Canonical community pattern (github.com/zirkelc/ai-resumable-stream; Upstash
@@ -231,11 +222,9 @@ stream. Confirms the shape: chunk log + cursor + cross-request control, i.e.
 what S2 gives trigger.dev and what pi's JSONL gives us.
 
 ### 4.4 Happy (Claude Code mobile/web client)
-github.com/slopus/happy: agent runs as a local daemon next to the user's
-Claude Code; an E2E-encrypted relay syncs every client (iOS/Android/web/
-desktop); "switch devices instantly". The SOLID feeling comes from: one
-durable owner of the session (the daemon), all clients are views with
-replay, notifications when the agent needs you.
+github.com/slopus/happy: local daemon owns the session; an E2E-encrypted
+relay syncs every client (iOS/Android/web/desktop). The SOLID feeling: one
+durable owner, all clients are replaying views, notifications on need.
 
 ### 4.5 pi itself (the engine we already run)
 Installed 0.84.3 = npm latest. Docs (session-format.md, rpc.md):
@@ -296,59 +285,38 @@ update items by pi entry/message id. The web `contentKey` dedup heuristic
 and the `history-*` transient ids disappear.
 
 ### 6.2 Event protocol with replay (waynode SSE v2)
-- `GET /api/sessions/:id/stream?since=<entryId>`:
-  - no live agent needed: serve projection entries after `since` from disk,
-    then live events if an agent is running; else close with a settled
-    marker (trigger's `X-Session-Settled` idea, avoids hanging polls).
-  - live events stay as today (deltas, tool events) but every persisted
-    boundary emits the entry id, so clients advance their cursor on
-    message_end/tool_end, not only on end.
-- Sync snapshot is replaced by: full projection (or entries-after-cursor) +
-  `live` block = current in-flight message partial keyed by messageId +
-  pi queue state (`queue_update` mirror) + submission snapshot.
-- Fix server-side partial accumulation: reset per `message_start` (or drop
-  the accumulation and let clients append deltas; keep a per-message partial
-  only for sync).
+- `GET /api/sessions/:id/stream?since=<entryId>`: serve projection entries
+  after `since` from disk, then live events if an agent is running. Live
+  events stay as today but persisted boundaries broadcast the entry, so
+  clients advance their cursor on message_end, not only on turn end.
+- Sync snapshot becomes: full projection (or entries-after-cursor) + `live`
+  block = in-flight message partial keyed by messageId + pi queue state
+  (`queue_update` mirror) + submission snapshot. Partials reset per
+  `message_start`.
 - Reading a session never spawns pi (D7): stream serves disk truth; agent
   boots only on send/queue/terminal.
 
 ### 6.3 pi owns the queue and the turn lifecycle
-- Delete `_followUpWaiters`; `/queue` sends pi `follow_up` directly and
-  relies on `queue_update` + subsequent `agent_start`s to drive the ledger.
-- Settle submissions on `agent_settled` (and `agent_end` only updates
-  streaming display state). Handle `willRetry` / auto_retry / compaction
-  events as status, not completion.
-- SubmissionLedger persists to SQLite (submissions table) so state survives
-  restarts and is visible cross-device; prune by age.
+Delete `_followUpWaiters`; `/queue` sends pi `follow_up` and `agent_start`s
+promote FIFO records. Settle on `agent_settled` (agent_end/willRetry/auto-
+retry/compaction are status, not completion). SubmissionLedger persists to
+SQLite so state survives restarts and is visible cross-device.
 
 ### 6.4 Recovery continuation (the trust fix)
-On `getAgent` spawn (and on server boot for all sessions with running
-state):
-1. Read projection tail. If the active branch ends with an unanswered user
-   message (user entry with no subsequent assistant/toolResult entries) AND
-   the persisted session state says a turn was in flight, resume:
-   automatically send that prompt to pi (trigger's "smart default": the
-   model sees its own partial output if any, then continues).
-2. If a partial assistant message exists on disk (pi persisted text but the
-   turn never settled), include it as context exactly as trigger's
-   recovery boot splice does; pi's `--continue` gives us this for free
-   since partials are in the JSONL.
-3. Surface it in UI: "Turn resumed after server restart" system item, and
-   the goal banner keeps tracking.
-This makes deploys survivable by design. Pair with deploy-time drain:
-SIGTERM handler stops accepting turns, waits up to N minutes for streaming
-agents to settle, then lets the container die knowing recovery continuation
-resumes the rest.
+On server boot (and handle spawn), read the projection tail: if the active
+branch ends with an unanswered user message AND a submission row says a turn
+was in flight, automatically continue it (pi's `--continue` already has the
+partial output in context; a continuation instruction finishes the job —
+trigger's recovery-boot splice). Surface "Turn resumed after server restart"
+in the UI. Pair with deploy-time drain: SIGTERM stops accepting turns, waits
+up to N minutes for streaming agents, then dies knowing recovery resumes.
 
 ### 6.5 Unify the two handles
-Extract one `AgentSurface` interface (subscribe/streaming/submissions/
-send/queue/abort/setModel/shutdown) with two adapters:
-- `RpcAdapter` (long-lived pi RPC) and `SandboxAdapter` (per-turn run) share
-  ledger, projection, rename, metering modules. The sandbox adapter gains
-  real fidelity by parsing the turn's JSONL entries after (or tailing
-  during) the run instead of the whole-text fallback.
-- Longer-term option: in-process `AgentSession` SDK instead of subprocess
-  for the self-host path (fewer moving parts, same protocol).
+Both handles satisfy one surface (subscribe/streaming/submissions/send/
+queue/abort/setModel/shutdown) sharing ledger, projection, rename, metering.
+The sandbox adapter gains real fidelity by broadcasting the turn's JSONL
+entries after each run instead of the whole-text fallback. Longer-term:
+in-process `AgentSession` SDK instead of a subprocess.
 
 ### 6.6 One contract, three renderers
 Write `docs/SESSION-WIRE-PROTOCOL.md` (events + projection schema + cursor
@@ -389,25 +357,20 @@ Phase 4 (recovery continuation + drain): boot-time interrupted-turn
 detection and auto-resume, deploy SIGTERM drain, "resumed" UI affordance
 (kills D4; the unattended-trust fix).
 
-Phase 5 (unify handles + sandbox fidelity): shared AgentSurface adapters;
-sandbox path emits real tool events from the session JSONL (kills D8, D9).
+Phase 5 (unify handles + sandbox fidelity): shared adapters; sandbox path
+emits real tool events from the session JSONL (kills D8, D9).
 
 Phase 6 (optional polish): in-process AgentSession; push notifications on
-settle; cross-tab BroadcastChannel so N tabs share one EventSource.
-
-Each phase ships independently behind the existing e2e suites; no
-big-bang rewrite. Total: roughly 2-3 focused weeks; Phases 1-2 alone change
-the felt reliability most.
+settle; cross-tab BroadcastChannel. Each phase ships behind the existing e2e
+suites; no big-bang rewrite. Phases 1-2 alone change the felt reliability most.
 
 ## 8. What we deliberately do not adopt
 
-- Running the chat loop on self-hosted trigger.dev: our engine needs a pi
-  subprocess per space worktree, PTY terminals, KVM microsandboxes, and
-  repo-level git credentials; porting that into their run containers buys
-  durability we can get from pi's own log at a fraction of the operational
-  surface. Hammersmith (batch swarms) can revisit trigger.dev separately.
-- Cloudflare Agents runtime for chat: engine mismatch (Workers JS vs
-  subprocess+worktree). Pattern adopted, runtime not.
+Self-hosted trigger.dev for the chat loop: the engine needs a pi subprocess
+per space worktree, PTY terminals, KVM microsandboxes, and repo-level git
+credentials; pi's own log gives the same durability at a fraction of the
+operational surface (Hammersmith can revisit it separately). Cloudflare
+Agents runtime: same engine mismatch. Patterns adopted, runtimes not.
 
 ## 9. Receipts
 

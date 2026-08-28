@@ -34,11 +34,20 @@ try {
   assert.match(commands.find((command) => command.type === "follow_up").message, /create_goal/);
   assert.equal(handle.getSubmission("goal-id").mode, "goal");
 
-  handle._onAgentEnd();
+  // agent_end alone never settles: pi may retry, compact, or deliver queued
+  // follow-ups after it. Only agent_settled completes the turn.
+  normalizeAgentEvent(handle, { type: "agent_end", messages: [] });
+  assert.equal(handle.getSubmission("first-id").status, "starting");
+  normalizeAgentEvent(handle, { type: "agent_settled" });
   assert.equal((await first).status, "completed");
-  assert.equal(handle.getSubmission("goal-id").status, "starting");
+  // pi had the follow-up queued, so the handle stays busy and the next
+  // agent_start promotes the queued record FIFO.
+  assert.equal(handle.streaming, true);
+  assert.equal(handle.getSubmission("goal-id").status, "queued");
   normalizeAgentEvent(handle, { type: "agent_start" });
-  handle._onAgentEnd();
+  assert.equal(handle.getSubmission("goal-id").status, "running");
+  normalizeAgentEvent(handle, { type: "agent_end", messages: [] });
+  normalizeAgentEvent(handle, { type: "agent_settled" });
   assert.equal((await goal).status, "completed");
   assert.equal((await duplicate).status, "completed");
 
@@ -47,7 +56,7 @@ try {
   const cancelled = aborting.sendPrompt("stop me", "message", "cancel-id");
   await Promise.resolve();
   await aborting.abort();
-  aborting._onAgentEnd();
+  normalizeAgentEvent(aborting, { type: "agent_settled" });
   assert.equal((await cancelled).status, "cancelled");
 
   const failedCommands = [];

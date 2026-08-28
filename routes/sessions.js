@@ -8,7 +8,6 @@ import {
   updateSession,
   deleteSession,
   archiveSession,
-  getMessagesFromDisk,
   touchSession,
 } from "../lib/sessions.mjs";
 import { SUBMISSION_MODES } from "../lib/agent-submissions.mjs";
@@ -30,6 +29,11 @@ import { configuredModelCatalog, resolvePiModel } from "../lib/pi-model.mjs";
 import db from "../lib/db.mjs";
 import { hasRunningHammersmithJob } from "../lib/hammersmith-store.mjs";
 import { subscribeHammersmithJobs } from "../lib/hammersmith-events.mjs";
+import { projectAfter, projectSession } from "../lib/pi-session-projection.mjs";
+import { subscribeSession } from "../lib/session-bus.mjs";
+import { buildSyncEvent, sseSetup, streamCursor, withLegacyFields, writeSSE } from "../lib/session-sse.mjs";
+
+export { cleanupSseOnResponseClose } from "../lib/session-sse.mjs";
 
 const router = Router();
 function sseAuth(req, res, next) {
@@ -41,7 +45,6 @@ function sseAuth(req, res, next) {
   }
   requireAuth(req, res, next);
 }
-
 router.get("/api/spaces/:spaceId/sessions", requireAuth, requireSpaceAccess, (req, res) => {
   const includeArchived = req.query.includeArchived === "true" || req.query.includeArchived === "1";
   res.json(listSessions(req.params.spaceId, { includeArchived }));
@@ -216,25 +219,21 @@ router.post("/api/sessions/:sessionId/archive", requireAuth, (req, res) => {
 
 router.get("/api/sessions/:sessionId/messages", requireAuth, (req, res) => {
   const session = ownSession(req, res);
-  if (session) res.json(getMessagesFromDisk(session));
+  if (!session) return;
+  const { items } = projectSession(session.pi_session_dir);
+  res.json(items.map(withLegacyFields));
 });
 
-function sseSetup(res) {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  if (typeof res.flushHeaders === "function") res.flushHeaders();
-}
-function writeSSE(res, ev) {
-  if (res.destroyed || res.writableEnded) return;
-  try {
-    res.write(`data: ${JSON.stringify(ev)}\n\n`);
-    if (typeof res.flush === "function") res.flush();
-  } catch {}
-}
-export const cleanupSseOnResponseClose = (res, cleanups) => res.once("close", () => cleanups.forEach((cleanup) => cleanup()));
-
+/** Durable session items with an optional cursor (see SESSION-WIRE-PROTOCOL). */
+router.get("/api/sessions/:sessionId/events", sseAuth, (req, res) => {
+  const session = ownSession(req, res);
+  if (!session) return;
+  const since = typeof req.query.since === "string" && req.query.since ? req.query.since : null;
+  const projected = since
+    ? projectAfter(session.pi_session_dir, since)
+    : { ...projectSession(session.pi_session_dir), fromStart: true };
+  res.json({ items: projected.items, leafId: projected.leafId, fromStart: projected.fromStart });
+});
 router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
@@ -252,22 +251,24 @@ router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
   // leaves clients visually stuck on “Connecting…” while pi starts normally.
   writeSSE(res, { type: "connecting" });
 
-  let handle;
-  try {
-    handle = await getAgent(session);
-  } catch (err) {
-    writeSSE(res, { type: "error", message: err.message });
-    return res.end();
-  }
+  // Reading a session never boots an agent: replay durable entries from the
+  // pi session JSONL and only attach to an ALREADY-RUNNING handle. A later
+  // POST /message spawns the agent and its events flow through the session
+  // bus, so this stream stays useful without holding a process hostage.
+  const handle = getAgentIfActive(session.id);
+  const since = streamCursor(req);
+  const { event: sync, leafId } = buildSyncEvent(session, handle, since);
+  writeSSE(res, sync, leafId ?? undefined);
 
-  // Subscribe; subscribe() immediately emits a `sync` snapshot.
-  const unsub = handle.subscribe((ev) => writeSSE(res, ev));
+  const unsubBus = subscribeSession(session.id, (ev) => writeSSE(res, ev, ev.type === "entries" ? ev.leafId : undefined));
   const unsubHammersmith = subscribeHammersmithJobs(session.id, (ev) => writeSSE(res, ev));
 
   const ping = setInterval(() => writeSSE(res, { type: "ping" }), 15000);
-  cleanupSseOnResponseClose(res, [
-    () => clearInterval(ping), unsub, unsubHammersmith, // detach client; agent keeps running
-  ]);
+  res.once("close", () => {
+    clearInterval(ping);
+    unsubBus();
+    unsubHammersmith();
+  });
 });
 // ── Send a message (fire-and-forget; events flow over /stream) ──
 
