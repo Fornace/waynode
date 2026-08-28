@@ -159,6 +159,15 @@ SandboxedAgentHandle emits one synthetic message per turn with plain
 no tool events, and the final text replaces the stream. Same UI, less truth
 than the RPC path.
 
+### D10. Deployment reality makes D9 the only prod experience
+Verified on prod 2026-08-29: `WAYNODE_DEPLOYMENT=hosted`, `/dev/kvm`
+present, `WAYNODE_SANDBOX_STREAM` unset (config default: off). Every
+production chat turn runs the one-shot SandboxedAgentHandle with whole-turn
+text and zero incremental events. So on prod today: cross-device mid-turn
+view is a spinner until the turn completes, and tool activity is invisible
+forever (D1 drops it from history, D9 never streams it). The rich RPC path
+only exists on self-hosted deployments.
+
 ---
 
 ## 4. External research (reviewed 2026-08-28/29)
@@ -414,3 +423,8 @@ the felt reliability most.
   agent_settled, queue_update, follow_up/steer, AgentSession in-process).
 - Waynode sources as cited in section 3; deploy script lines 199/308
   (docker stop -t 30, up -d --force-recreate).
+- Prod deployment verified 2026-08-29 via SSH (95.216.37.30): container
+  `waynode` healthy, revision 209d8f6, WAYNODE_DEPLOYMENT=hosted, /dev/kvm
+  present, no DEV_AUTH_TOKEN in prod env (repo AGENTS.md prod-E2E recipe is
+  stale; e2e/README.md correctly says prod uses real OAuth only), zero pi
+  processes idle.

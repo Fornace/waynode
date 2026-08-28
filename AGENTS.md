@@ -72,6 +72,12 @@ DEV=$(ssh root@95.216.37.30 'docker exec $(docker ps -q --filter name=waynode) p
 BROWSER_TOKEN="fnc_…" DEV_TOKEN="$DEV" node run-rest.mjs   # ONLY=auth,chat for a subset
 ```
 
+Note (verified 2026-08-29): production no longer sets `DEV_AUTH_TOKEN`, so
+the `DEV_TOKEN` path above only works against a staging or local isolated
+deployment (see `scripts/run-rest-e2e-nonprod.sh`). For production, follow
+e2e/README.md: require `/api/health/ready` 200, then drive a real
+GitHub/GitLab OAuth browser session for the smoke flows.
+
 Covers 6 hosted flows: auth, open-session, chat-send, model-switch,
 hosted-terminal-disabled, and chat-after-terminal-gate. Self-host terminal
 mechanics are covered by the focused sandbox terminal/security regressions.
