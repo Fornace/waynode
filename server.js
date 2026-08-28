@@ -15,7 +15,7 @@ import { SQLiteSessionStore } from "./lib/sqlite-session-store.mjs";
 import { publicReadinessReport, readinessReport, versionReport } from "./lib/health.mjs";
 import { attachTerminalWebSocket } from "./routes/terminal.js";
 import { activeStreamingCount } from "./lib/agent-manager.mjs";
-import { resumeInterruptedSessions } from "./lib/session-recovery.mjs";
+import { prepareInterruptedSessions, resumeInterruptedSessions } from "./lib/session-recovery.mjs";
 import { beginDrain } from "./lib/shutdown-state.mjs";
 
 import authRoutes from "./routes/auth.js";
@@ -198,6 +198,10 @@ if (config.isProd) {
 }
 
 attachTerminalWebSocket(server, sessionMiddleware);
+
+// Freeze stale in-flight rows BEFORE accepting new work. The delayed recovery
+// scan below can then never mistake a fresh turn for one from the old process.
+prepareInterruptedSessions();
 
 app.use((err, req, res, next) => {
   console.error("[error]", err.message, err.stack);

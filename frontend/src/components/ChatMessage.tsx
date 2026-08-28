@@ -138,7 +138,7 @@ function ReasoningDisclosure({ text, streaming }: { text: string; streaming: boo
 function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "tool" }>; onRecover?: (markdown: string) => void }) {
   const [wrapped, setWrapped] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [open, setOpen] = useState(block.status === "error");
+  const [open, setOpen] = useState(block.status !== "done");
   const [now, setNow] = useState(Date.now());
   const output = block.output || "";
   const label = TOOL_LABELS[block.name] || "Tool activity";
@@ -147,7 +147,7 @@ function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "t
   try { args = JSON.stringify(block.args, null, 2); } catch { args = String(block.args ?? ""); }
 
   useEffect(() => {
-    if (block.status === "error") setOpen(true);
+    setOpen(block.status !== "done");
   }, [block.status]);
 
   useEffect(() => {
@@ -166,7 +166,7 @@ function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "t
   };
 
   return (
-    <details className={`trace-disclosure tool-${block.status}`} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <details data-tool-call-id={block.id} className={`trace-disclosure tool-${block.status}`} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>
         <StatusIcon status={block.status} />
         <span>{statusVerb(block.status)} {label.toLowerCase()}</span>
@@ -175,7 +175,11 @@ function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "t
         <DisclosureChevron />
       </summary>
       <div className="tool-details">
-        <details className="tool-raw"><summary>Technical details</summary><pre>{block.name}{args ? `\n${args}` : ""}</pre></details>
+        {block.status === "running" && <div className="tool-live-detail">
+          <span className="tool-live-line" aria-hidden="true" />
+          <code>{context || commandPreview(block) || label}</code>
+        </div>}
+        <details className="tool-raw" open={block.status === "running"}><summary>Technical details</summary><pre>{block.name}{args ? `\n${args}` : ""}</pre></details>
         {output && <div className={`tool-output-wrap ${wrapped ? "is-wrapped" : ""}`}>
           <div className="tool-output-actions">
             <span>Output</span>
@@ -301,6 +305,12 @@ function toolContext(block: Extract<Block, { type: "tool" }>) {
   if (typeof args?.path === "string") return args.path;
   if (typeof args?.file === "string") return args.file;
   return "";
+}
+
+function commandPreview(block: Extract<Block, { type: "tool" }>) {
+  const command = block.args?.command;
+  if (typeof command !== "string") return "";
+  return command.length > 96 ? `${command.slice(0, 93)}…` : command;
 }
 
 function statusVerb(status: ToolStatus) {

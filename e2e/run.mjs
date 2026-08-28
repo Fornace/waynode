@@ -7,7 +7,7 @@
 import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "crypto";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -101,7 +101,12 @@ function gitIn(cwd, args) {
 }
 
 try {
-  browser = await chromium.launch({ headless: !HEADED, timeout: NAV_TIMEOUT });
+  const systemChrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  browser = await chromium.launch({
+    headless: !HEADED,
+    timeout: NAV_TIMEOUT,
+    ...(existsSync(systemChrome) ? { executablePath: systemChrome } : {}),
+  });
   context = await browser.newContext({
     baseURL: BASE,
     viewport: { width: 1280, height: 900 },
@@ -177,6 +182,48 @@ try {
     }
     await screenshot("03-local-chat");
     console.log("   assistant streamed, persisted, rehydrated, and timestamped");
+  });
+
+  await flow("session-resilience-ui", async () => {
+    if (!isolatedSessionId) throw new Error("open-session did not create a session");
+    const nonce = `LIVE_UI_${randomUUID()}`;
+    const prompt = `Use the bash tool to run: sleep 15; echo ${nonce}. Then reply with exactly: ${nonce}_DONE`;
+    await page.locator(".composer-input").fill(prompt, { timeout: UI_TIMEOUT });
+    await page.locator(".send-btn").click({ timeout: UI_TIMEOUT });
+    await page.locator(".run-progress").waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    await page.locator(".trace-disclosure.tool-running").last().waitFor({ state: "visible", timeout: TURN_TIMEOUT });
+    const liveCopy = await page.locator(".run-progress").innerText();
+    if (!liveCopy.includes("Work continues on the server")) throw new Error("run progress did not explain background continuation");
+    const chromeState = await page.locator(".session-run-state").innerText();
+    if (chromeState === "Starting…") throw new Error("session header stayed on Starting after the tool began");
+    const tools = await page.locator(".trace-disclosure[class*='tool-']").evaluateAll((nodes) => nodes.map((node) => ({
+      id: node.getAttribute("data-tool-call-id"), cls: node.className, text: node.querySelector("summary")?.textContent?.trim(),
+    })));
+    console.log(`   live tool disclosures: ${JSON.stringify(tools)}`);
+    const liveToolIds = tools.filter((tool) => tool.cls.includes("tool-running")).map((tool) => tool.id);
+    if (new Set(liveToolIds).size !== liveToolIds.length) throw new Error("same live tool rendered more than once");
+    await screenshot("05-local-live-desktop");
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Reload mid-tool in a mobile viewport: the app initializes with its
+    // navigation closed and the same durable session/live overlay reappears.
+    await page.reload({ waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    await page.locator(".composer-input").waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    const sidebarState = await page.locator(".sidebar").evaluate((node) => ({
+      visible: !!(node.offsetWidth || node.offsetHeight || node.getClientRects().length),
+      transform: getComputedStyle(node).transform,
+      rect: node.getBoundingClientRect().toJSON(),
+      width: innerWidth,
+      layout: node.parentElement?.className,
+    }));
+    console.log(`   mobile sidebar state: ${JSON.stringify(sidebarState)}`);
+    if (sidebarState.rect.right > 0) throw new Error("mobile navigation covered the chat after reload");
+    await page.locator(".run-progress").waitFor({ state: "visible", timeout: UI_TIMEOUT });
+    await screenshot("06-local-live-mobile");
+    await page.waitForFunction((expected) => [...document.querySelectorAll(".msg-assistant .msg-text")]
+      .some((node) => node.textContent?.trim() === `${expected}_DONE`), nonce, { timeout: TURN_TIMEOUT });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await screenshot("07-local-live-reloaded");
+    console.log("   live tool status stayed clear across desktop, mobile, and mid-turn reload");
   });
 
   await flow("model-switch", async () => {

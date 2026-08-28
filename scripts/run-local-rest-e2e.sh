@@ -46,6 +46,8 @@ export WAYNODE_DEPLOYMENT=self-hosted
 export WAYNODE_REVISION=isolated-browser-e2e
 
 mkdir -p "$DATA_DIR"
+echo "[browser-e2e] building the current frontend"
+npm --prefix "$ROOT/frontend" run build >/dev/null
 echo "[browser-e2e] starting isolated server on local port $LOCAL_PORT"
 node "$ROOT/server.js" >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!

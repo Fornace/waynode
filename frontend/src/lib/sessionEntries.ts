@@ -164,6 +164,26 @@ export function liveOverlayItem(live: LiveOverlay | null | undefined, sentAt: st
  * id; user entries annotated with a submissionId adopt (and preserve) the
  * optimistic bubble's display text and status.
  */
+export function updateToolItems(items: ChatItem[], id: string, output: string, status: "running" | "done" | "error"): ChatItem[] {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item.role !== "assistant" || !item.blocks.some((b) => b.type === "tool" && b.id === id)) continue;
+    const copy = items.slice();
+    copy[index] = {
+      ...item,
+      blocks: item.blocks.map((block) => block.type === "tool" && block.id === id
+        ? { ...block, output, status, endedAt: status === "running" ? undefined : Date.now() }
+        : block),
+    };
+    return copy;
+  }
+  return items;
+}
+
+export function hasTool(items: ChatItem[], id: string): boolean {
+  return items.some((item) => item.role === "assistant" && item.blocks.some((b) => b.type === "tool" && b.id === id));
+}
+
 export function toolStatusText(toolName: string, args: any): string {
   const label = toolName === "bash" || toolName === "shell" || toolName === "ctx_shell" ? "Running command"
     : toolName === "read" || toolName === "ctx_read" ? "Reading file"

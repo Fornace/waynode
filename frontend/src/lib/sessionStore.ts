@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { ChatItem, ComposerMode, HammersmithRun, Submission, SubmissionStatus } from "../types";
-import { appendText, appendThinking, appendTool, setToolOutput } from "./sessionBlocks";
+import { appendText, appendThinking, appendTool } from "./sessionBlocks";
 import { abortSession, loadEvents, loadHammersmithRuns, openSessionStream, resumeSession as requestResume, SubmissionError, submitDraft } from "./sessionTransport";
 import {
   newDraft, optimisticSubmission, reconcileSubmission,
@@ -8,8 +8,8 @@ import {
   type SubmissionDraft, type SubmissionView,
 } from "./sessionSubmissions";
 import {
-  addLiveItem, dropLiveItem, liveIndex, liveOverlayItem, mergeEntries,
-  toolStatusText, updateLiveBlocks, type LiveOverlay, type WireEntry,
+  addLiveItem, dropLiveItem, hasTool, liveIndex, liveOverlayItem, mergeEntries,
+  toolStatusText, updateLiveBlocks, updateToolItems, type LiveOverlay, type WireEntry,
 } from "./sessionEntries";
 let _idSeq = 0;
 const uid = () => `c${Date.now()}-${_idSeq++}`;
@@ -174,12 +174,16 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
     case "text_delta": applyDelta(e, ev, (b) => appendText(b, ev.delta || "")); emit(e); return;
     case "thinking_delta": applyDelta(e, ev, (b) => appendThinking(b, ev.delta || "")); emit(e); return;
     case "tool_start":
-      applyDelta(e, ev, (b) => appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args }));
+      if (!hasTool(e.state.items, ev.toolCallId)) {
+        applyDelta(e, ev, (b) => appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args }));
+      }
       e.state.status = toolStatusText(ev.toolName, ev.args);
       emit(e); return;
-    case "tool_delta": applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", "running")); emit(e); return;
+    case "tool_delta":
+      e.state.items = updateToolItems(e.state.items, ev.toolCallId, ev.text || "", "running");
+      emit(e); return;
     case "tool_end":
-      applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done"));
+      e.state.items = updateToolItems(e.state.items, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done");
       e.state.status = ev.isError ? "Tool failed. Deciding how to recover…" : "Checking the result…";
       emit(e); return;
     case "message_end": e.liveEnded = true; return;

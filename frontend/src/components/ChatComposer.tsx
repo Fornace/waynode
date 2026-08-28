@@ -104,7 +104,7 @@ export function ChatComposer(props: ChatComposerProps) {
             {isTouchDevice() && !streaming && <button className="newline-btn" onClick={onInsertNewline} aria-label="Insert new line" title="Insert new line"><NewlineIcon /></button>}
             {streaming ? <>
               <button className="queue-btn" onClick={onQueue} disabled={!input.trim()} aria-label="Queue follow-up">Queue</button>
-              <button className="send-btn send-stop" onClick={onAbort} aria-label="Stop agent" title="Stop agent"><StopIcon /></button>
+              <button className="send-btn send-stop" onClick={onAbort} aria-label="Stop agent" title="Stop agent"><span>Stop</span><StopIcon /></button>
             </> : (
               <button className="send-btn" onClick={() => onSend(mode)} disabled={!input.trim() || (mode === "hammersmith" && hammersmithDisabled)} aria-label={selected.action} title={selected.action}>
                 <span>{selected.action}</span><SendIcon />

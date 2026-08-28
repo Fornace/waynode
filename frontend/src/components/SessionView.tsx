@@ -175,7 +175,7 @@ function getRunState(chat: ReturnType<typeof store.useSessionChat>) {
   if (chat.connection === "connecting") return { label: "Connecting…", tone: "quiet" };
   if (chat.activeStatus === "sending") return { label: "Sending…", tone: "quiet" };
   if (chat.activeStatus === "starting") return { label: "Starting…", tone: "active" };
-  if (chat.activeStatus === "running" || chat.streaming) return { label: chat.status || "Agent working", tone: "active" };
+  if (chat.activeStatus === "running" || chat.streaming) return { label: "Active", tone: "active" };
   if (chat.queuedCount > 0) return { label: "Queued", tone: "attention" };
   return { label: "Ready", tone: "quiet" };
 }

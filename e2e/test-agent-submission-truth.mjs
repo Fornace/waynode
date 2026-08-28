@@ -37,7 +37,7 @@ try {
   // agent_end alone never settles: pi may retry, compact, or deliver queued
   // follow-ups after it. Only agent_settled completes the turn.
   normalizeAgentEvent(handle, { type: "agent_end", messages: [] });
-  assert.equal(handle.getSubmission("first-id").status, "starting");
+  assert.equal(handle.getSubmission("first-id").status, "running");
   normalizeAgentEvent(handle, { type: "agent_settled" });
   assert.equal((await first).status, "completed");
   // pi had the follow-up queued, so the handle stays busy and the next
