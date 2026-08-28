@@ -14,6 +14,9 @@ import { bootstrapSelfHostedProviderCredential } from "./lib/pi-provider-bootstr
 import { SQLiteSessionStore } from "./lib/sqlite-session-store.mjs";
 import { publicReadinessReport, readinessReport, versionReport } from "./lib/health.mjs";
 import { attachTerminalWebSocket } from "./routes/terminal.js";
+import { activeStreamingCount } from "./lib/agent-manager.mjs";
+import { resumeInterruptedSessions } from "./lib/session-recovery.mjs";
+import { beginDrain } from "./lib/shutdown-state.mjs";
 
 import authRoutes from "./routes/auth.js";
 import spacesRoutes from "./routes/spaces.js";
@@ -206,3 +209,36 @@ server.listen(config.port, () => {
   console.log(`  Repos: ${config.reposDir}`);
   console.log(`  DB:    ${config.dbPath}`);
 });
+
+// Recovery continuation: any turn a restart left unfinished resumes on its
+// own, so unattended (goal) work survives deploys and crashes.
+setTimeout(() => {
+  resumeInterruptedSessions()
+    .then(({ resumed, failed }) => {
+      if (resumed || failed) console.log(`[recovery] resumed=${resumed} failed=${failed}`);
+    })
+    .catch((error) => console.error("[recovery] boot scan failed:", error.message));
+}, 3_000);
+
+// Graceful deploy drain: stop accepting turns, give streaming agents the
+// drain window to settle, then exit. Whatever is still running is resumed by
+// the next boot's recovery scan.
+async function drainAndExit(signal) {
+  console.log(`[shutdown] ${signal} received: draining (limit ${config.drainMs}ms)`);
+  beginDrain();
+  const deadline = Date.now() + config.drainMs;
+  await new Promise((resolve) => {
+    const check = () => {
+      const busy = activeStreamingCount();
+      if (busy === 0 || Date.now() >= deadline) return resolve();
+      console.log(`[shutdown] waiting for ${busy} agent turn(s) to settle`);
+      setTimeout(check, 2_000);
+    };
+    check();
+  });
+  console.log("[shutdown] closing");
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5_000).unref();
+}
+process.on("SIGTERM", () => void drainAndExit("SIGTERM"));
+process.on("SIGINT", () => void drainAndExit("SIGINT"));

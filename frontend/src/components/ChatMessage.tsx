@@ -276,6 +276,7 @@ function normalizeSystemEvent(content: string) {
     { token: "✗ ", tone: "error" },
     { token: "📝 ", tone: "neutral" },
     { token: "🔀 ", tone: "attention" },
+    { token: "🔄 ", tone: "attention" },
     { token: "✓ ", tone: "success" },
   ];
   const match = prefixes.find(({ token }) => content.startsWith(token));

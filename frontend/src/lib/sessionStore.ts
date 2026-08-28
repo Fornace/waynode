@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { ChatItem, ComposerMode, HammersmithRun, Submission, SubmissionStatus } from "../types";
 import { appendText, appendThinking, appendTool, setToolOutput } from "./sessionBlocks";
-import { abortSession, loadEvents, loadHammersmithRuns, openSessionStream, SubmissionError, submitDraft } from "./sessionTransport";
+import { abortSession, loadEvents, loadHammersmithRuns, openSessionStream, resumeSession as requestResume, SubmissionError, submitDraft } from "./sessionTransport";
 import {
   newDraft, optimisticSubmission, reconcileSubmission,
   hammersmithFreshness, submissionFromHammersmithRun,
@@ -18,8 +18,8 @@ interface SessionState {
   items: ChatItem[]; streaming: boolean; error: string | null; status: string | null;
   loaded: boolean; connection: "connecting" | "connected" | "reconnecting" | "disconnected";
   queuedCount: number; activeStatus: SubmissionStatus | null; failedDraft: SubmissionDraft | null;
-}
-interface SessionEntry {
+  interruptedCount: number;
+}interface SessionEntry {
   state: SessionState; listeners: Set<() => void>; es: EventSource | null; viewers: number;
   closeTimer: ReturnType<typeof setTimeout> | null;
   connectionFailures: number; runPoll: ReturnType<typeof setInterval> | null;
@@ -29,6 +29,7 @@ interface SessionEntry {
 const EMPTY: SessionState = {
   items: [], streaming: false, error: null, status: null, loaded: false,
   connection: "connecting", queuedCount: 0, activeStatus: null, failedDraft: null,
+  interruptedCount: 0,
 };
 const entries = new Map<string, SessionEntry>();
 const renameListeners = new Set<(sessionId: string, title: string) => void>();
@@ -150,6 +151,10 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
       e.connectionFailures = 0;
       e.state.connection = "connected";
       e.state.streaming = !!ev.streaming;
+      e.state.interruptedCount = (ev.interrupted || []).length;
+      if (e.state.interruptedCount > 0 && !ev.streaming) {
+        e.state.status = "Ready to resume";
+      }
       if (ev.fromStart === false) applyEntries(e, ev.entries || []);
       else { e.state.items = []; applyEntries(e, ev.entries || []); }
       if (ev.live) {
@@ -211,6 +216,8 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
     case "resumed":
       e.state.items = [...e.state.items, { id: uid(), role: "system", content: `🔄 ${ev.message || "Turn resumed after a server restart."}`, sentAt: new Date().toISOString() }];
       e.state.streaming = true;
+      e.state.interruptedCount = 0;
+      e.state.status = "Resuming interrupted turn…";
       emit(e); return;
     case "error":
       e.state.streaming = false;
@@ -361,6 +368,25 @@ export async function abort(sessionId: string): Promise<void> {
   if (!result.cancelled && result.reason) {
     e.state.error = result.reason;
     emit(e);
+  }
+}
+export async function resumeInterrupted(sessionId: string): Promise<boolean> {
+  const e = getEntry(sessionId);
+  e.state.status = "Resuming interrupted turn…";
+  e.state.error = null;
+  emit(e);
+  try {
+    const result = await requestResume(sessionId);
+    if (!result.ok) throw new Error("Resume was not accepted");
+    e.state.streaming = true;
+    e.state.interruptedCount = 0;
+    emit(e);
+    return true;
+  } catch (error) {
+    e.state.status = null;
+    e.state.error = error instanceof Error ? error.message : "Resume failed";
+    emit(e);
+    return false;
   }
 }
 export function injectSystem(sessionId: string, content: string) { const e = getEntry(sessionId); e.state.items = [...e.state.items, { id: uid(), role: "system", content, sentAt: new Date().toISOString() }]; emit(e); }

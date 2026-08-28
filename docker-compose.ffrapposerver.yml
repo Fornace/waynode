@@ -19,7 +19,7 @@ services:
     container_name: waynode
     restart: unless-stopped
     init: true
-    stop_grace_period: 30s
+    stop_grace_period: 2m
     ports:
       # nginx terminates TLS on this same host. Never publish the app's plain
       # HTTP origin on every interface.

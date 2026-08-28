@@ -72,3 +72,12 @@ export async function abortSession(sessionId: string) {
   if (!response.ok) throw new Error("Abort failed");
   return response.json() as Promise<{ ok: boolean; cancelled: boolean; reason?: string }>;
 }
+
+export async function resumeSession(sessionId: string) {
+  const response = await fetch(`/api/sessions/${sessionId}/resume`, {
+    method: "POST", credentials: "include", headers: jsonHeaders(),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || "Resume failed");
+  return body as { ok: boolean; submissionId: string };
+}

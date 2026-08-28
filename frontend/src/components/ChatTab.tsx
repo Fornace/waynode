@@ -180,6 +180,10 @@ export function ChatTab({ session }: ChatTabProps) {
     if (await store.retry(session.id)) { setInput(""); drafts.clear(session.id); }
   };
 
+  const handleResume = async () => {
+    await store.resumeInterrupted(session.id);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Escape") { e.preventDefault(); inputRef.current?.blur(); return; }
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -301,6 +305,15 @@ export function ChatTab({ session }: ChatTabProps) {
             <span>Your transcript and draft are safe.</span>
           </div>
           <button type="button" onClick={handleRetry}>Retry</button>
+        </div>
+      )}
+      {state.interruptedCount > 0 && !runActive && (
+        <div className="chat-recovery recovery-interrupted" role="status">
+          <div>
+            <strong>Work paused during a server restart.</strong>
+            <span>The conversation is intact. Continue from exactly where it stopped.</span>
+          </div>
+          <button type="button" onClick={handleResume}>Resume work</button>
         </div>
       )}
       {state.queuedCount > 0 && (

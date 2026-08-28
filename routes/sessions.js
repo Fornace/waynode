@@ -14,6 +14,8 @@ import { SUBMISSION_MODES } from "../lib/agent-submissions.mjs";
 import { isPiAvailable } from "../lib/pi-runner.mjs";
 import { readGoalStatus } from "../lib/pi-runner.mjs";
 import { getAgent, getAgentIfActive, stopAgent } from "../lib/agent-manager.mjs";
+import { isDraining } from "../lib/shutdown-state.mjs";
+import { createSessionRecoveryRouter } from "../lib/session-recovery-routes.mjs";
 import { config } from "../lib/config.mjs";
 import { getSpace } from "../lib/spaces.mjs";
 import { getOrgSetting } from "../lib/orgs.mjs";
@@ -88,9 +90,7 @@ function ownSession(req, res) {
   return session;
 }
 
-// Self-hosted deployments never enforce Waynode Cloud plans. In hosted mode,
-// gate a new model turn before the agent starts so expired trials and dunning
-// accounts cannot keep consuming provider spend.
+/** Hosted plan gate: block new turns for expired/dunning orgs. */
 function canUseHostedWorkspace(session, res) {
   if (!billingEnabled) return true;
   const space = getSpace(session.space_id);
@@ -131,9 +131,7 @@ function reconcileHostedTurn(admission) {
 
 function requestSubmission(req) {
   const supplied = req.body?.submissionId;
-  const id = typeof supplied === "string" && supplied.length > 0 && supplied.length <= 128
-    ? supplied
-    : randomUUID();
+  const id = typeof supplied === "string" && supplied.length > 0 && supplied.length <= 128 ? supplied : randomUUID();
   const mode = req.body?.mode ?? "message";
   if (!SUBMISSION_MODES.includes(mode)) {
     const error = new Error("Unknown or unavailable submission mode");
@@ -282,8 +280,8 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
   if (!prompt) return res.status(400).json({ error: "prompt required" });
   if (mode === "hammersmith") return res.status(400).json({ error: "Hammersmith mode requires the delegation endpoint" });
   if (hasRunningHammersmithJob(session.space_id)) return res.status(409).json({ error: "A Hammersmith job is modifying this Space" });
-
   if (!isPiAvailable()) return res.status(503).json({ error: "pi is not installed" });
+  if (isDraining()) return res.status(503).json({ error: "Server is restarting for a deploy. Interrupted turns resume automatically in a moment." });
   const duplicate = existingSubmission(getAgentIfActive(session.id), submissionId);
   if (duplicate) return res.json({ ok: true, submission: duplicate, duplicate: true });
   const admission = reserveHostedTurn(session, res);
@@ -327,6 +325,7 @@ router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   if (!prompt) return res.status(400).json({ error: "prompt required" });
   if (mode === "hammersmith") return res.status(400).json({ error: "Hammersmith jobs cannot be queued behind chat" });
   if (hasRunningHammersmithJob(session.space_id)) return res.status(409).json({ error: "A Hammersmith job is modifying this Space" });
+  if (isDraining()) return res.status(503).json({ error: "Server is restarting for a deploy. Interrupted turns resume automatically in a moment." });
   const activeHandle = getAgentIfActive(session.id);
   const duplicate = existingSubmission(activeHandle, submissionId);
   if (duplicate) return res.json({ ok: true, submission: duplicate, duplicate: true });
@@ -374,18 +373,7 @@ router.post("/api/sessions/:sessionId/abort", requireAuth, async (req, res) => {
   res.json({ ok: true, ...result });
 });
 
-// ── Live state (is something running?) ──
-
-router.get("/api/sessions/:sessionId/state", requireAuth, (req, res) => {
-  const session = ownSession(req, res);
-  if (!session) return;
-  const handle = getAgentIfActive(session.id);
-  res.json({
-    active: !!(handle && handle.streaming),
-    done: !(handle && handle.streaming),
-    submissions: handle?.getSubmissionSnapshot?.() || [],
-  });
-});
+router.use(createSessionRecoveryRouter({ requireAuth, ownSession }));
 
 // ── Goal status (pi-codex-goal plugin) ──
 
