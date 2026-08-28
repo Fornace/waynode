@@ -59,7 +59,8 @@ export function layoutAssistantEntry(entry: Extract<WireEntry, { role: "assistan
 }
 
 export function layoutNoteEntry(entry: Extract<WireEntry, { role: "note" }>): ChatItem {
-  const label = entry.kind === "compaction" ? "📝 Context compacted. Earlier work was summarized to keep the session fast." : `📝 ${entry.text}`;
+  const label = entry.kind === "compaction" ? "📝 Context compacted. Earlier work was summarized to keep the session fast."
+    : entry.kind === "recovery" ? `🔄 ${entry.text}` : `📝 ${entry.text}`;
   return { id: entry.id, role: "system", content: label, sentAt: entry.timestamp };
 }
 

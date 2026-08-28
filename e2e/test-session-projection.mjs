@@ -100,6 +100,18 @@ try {
     role: "bashExecution", command: "ls", exitCode: 0, cancelled: false, text: "a b",
   });
 
+  // ── Internal recovery instructions render as a humane durable event ──
+  const dir4 = join(root, "sess4");
+  mkdirSync(dir4, { recursive: true });
+  writeFileSync(join(dir4, "d.jsonl"), [
+    { type: "message", id: "r1", parentId: null, timestamp: "2026-08-28T13:00:00.000Z", message: { role: "user", content: "<!-- waynode:recovery --> internal continuation" } },
+  ].map(JSON.stringify).join("\n") + "\n");
+  const p4 = projectSession(dir4);
+  assert.deepEqual(p4.items[0], {
+    id: "r1", parentId: null, timestamp: "2026-08-28T13:00:00.000Z",
+    role: "note", kind: "recovery", text: "Turn resumed automatically after a server restart.",
+  });
+
   // ── Empty dir ──
   const empty = projectSession(join(root, "nope"));
   assert.deepEqual(empty, { items: [], leafId: null });
