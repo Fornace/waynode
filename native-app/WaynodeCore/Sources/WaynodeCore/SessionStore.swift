@@ -328,7 +328,11 @@ extension ChatReducer.HistoryItem {
             text: msg.text,
             thinking: msg.thinking,
             key: msg.key,
-            sentAt: msg.timestamp.flatMap { ISO8601DateFormatter().date(from: $0) }
+            sentAt: msg.timestamp.flatMap { ISO8601DateFormatter().date(from: $0) },
+            blocks: msg.blocks,
+            toolCallId: msg.toolCallId,
+            toolName: msg.toolName,
+            isError: msg.isError
         )
     }
 }

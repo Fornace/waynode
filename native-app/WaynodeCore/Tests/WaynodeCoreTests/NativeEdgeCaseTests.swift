@@ -52,6 +52,30 @@ struct NativeEdgeCaseTests {
         #expect(r.items.count == 1)
     }
 
+    @Test("Full-fidelity history preserves tool call and result")
+    @MainActor
+    func fullFidelityHistoryTools() async throws {
+        let transport = NativeEdgeTransport()
+        let history = try JSONDecoder.api.decode([APIClient.HistoryMessage].self, from: Data(#"""
+        [{"role":"user","id":"u1","content":"run it"},
+         {"role":"assistant","id":"a1","blocks":[{"type":"thinking","text":"checking"},{"type":"tool","id":"call_1","name":"bash","args":"{\\"command\\":\\"pwd\\"}","output":"","status":"running"}]},
+         {"role":"toolResult","id":"t1","toolCallId":"call_1","toolName":"bash","isError":false,"text":"/workspace\\n"},
+         {"role":"assistant","id":"a2","blocks":[{"type":"text","text":"Done."}]}]
+        """#.utf8))
+        await transport.setHistory(history)
+        let store = SessionStore(sessionId: "s", spaceId: "sp", api: transport)
+        await store.loadHistory()
+        #expect(store.reducer.items.map(\.id) == ["u1", "a1", "a2"])
+        guard case .assistant(let assistant) = store.reducer.items[1],
+              case .tool(let tool) = assistant.blocks.last else {
+            Issue.record("Expected durable tool block")
+            return
+        }
+        #expect(tool.name == "bash")
+        #expect(tool.output == "/workspace\n")
+        #expect(tool.status == .done)
+    }
+
     // MARK: Bug 2 — History load silently skipped when an optimistic
     // submission lands first. loadHistory gated on reducer.items.isEmpty, so a
     // send that beat GET /messages skipped the whole transcript while still

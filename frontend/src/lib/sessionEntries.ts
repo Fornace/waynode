@@ -101,6 +101,40 @@ export function applyToolResult(items: ChatItem[], result: Extract<WireEntry, { 
 }
 
 /** Build the live overlay item from a sync snapshot's live block. */
+export function liveIndex(items: ChatItem[]): number {
+  return items.findIndex((item) => item.role === "assistant" && !item.done && item.live === true);
+}
+
+export function dropLiveItem(items: ChatItem[]): ChatItem[] {
+  const index = liveIndex(items);
+  if (index < 0) return items;
+  const copy = items.slice();
+  copy.splice(index, 1);
+  return copy;
+}
+
+export function addLiveItem(items: ChatItem[], messageId: string | null, sentAt: string | null): ChatItem[] {
+  if (liveIndex(items) >= 0) return items;
+  return [...items, {
+    id: `live-${messageId ?? crypto.randomUUID()}`,
+    role: "assistant" as const,
+    blocks: [],
+    done: false,
+    sentAt,
+    live: true,
+  }];
+}
+
+export function updateLiveBlocks(items: ChatItem[], fn: (blocks: Block[]) => Block[]): ChatItem[] {
+  const index = liveIndex(items);
+  if (index < 0) return items;
+  const item = items[index];
+  if (item.role !== "assistant") return items;
+  const copy = items.slice();
+  copy[index] = { ...item, blocks: fn(item.blocks) };
+  return copy;
+}
+
 export function liveOverlayItem(live: LiveOverlay | null | undefined, sentAt: string | null): ChatItem | null {
   if (!live) return null;
   const blocks: Block[] = [];
@@ -130,6 +164,16 @@ export function liveOverlayItem(live: LiveOverlay | null | undefined, sentAt: st
  * id; user entries annotated with a submissionId adopt (and preserve) the
  * optimistic bubble's display text and status.
  */
+export function toolStatusText(toolName: string, args: any): string {
+  const label = toolName === "bash" || toolName === "shell" || toolName === "ctx_shell" ? "Running command"
+    : toolName === "read" || toolName === "ctx_read" ? "Reading file"
+      : toolName === "edit" || toolName === "ctx_edit" ? "Editing file"
+        : toolName === "write" ? "Writing file"
+          : toolName?.includes("search") || toolName?.includes("grep") ? "Searching the codebase" : "Using tool";
+  const target = typeof args?.path === "string" ? args.path : typeof args?.file === "string" ? args.file : "";
+  return target ? `${label}: ${target}` : `${label}…`;
+}
+
 export function mergeEntries(items: ChatItem[], entries: WireEntry[]): { items: ChatItem[]; changed: boolean } {
   let next = items;
   let changed = false;

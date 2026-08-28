@@ -6,11 +6,10 @@ import { api } from "../api/client";
 import * as store from "../lib/sessionStore";
 import * as drafts from "../lib/sessionDrafts";
 import { ComposerModePersistence } from "../lib/composerModePersistence";
-
+import { RunProgress } from "./RunProgress";
 interface ChatTabProps {
   session: Session;
 }
-
 export function ChatTab({ session }: ChatTabProps) {
   const state = store.useSessionChat(session.id);
   const [input, setInput] = useState(() => drafts.get(session.id) || "");
@@ -33,12 +32,10 @@ export function ChatTab({ session }: ChatTabProps) {
   const submitInFlight = useRef(false);
   const restoredDraftId = useRef<string | null>(null);
   const userPickedMode = useRef(false);
-
   // ── Acquire the session stream on mount; release on unmount. ──
   // The stream lives in the module-scoped store, so navigating away does NOT
   // kill an in-flight turn — it keeps running in the background.
   useEffect(() => store.acquire(session.id), [session.id]);
-
   const refreshHammersmithCapability = useCallback(async () => {
     try {
       const capability = (await api.hammersmith.settings()).capability;
@@ -53,9 +50,7 @@ export function ChatTab({ session }: ChatTabProps) {
       setCapabilityError(true);
     }
   }, [composerMode, session.id]);
-
   useEffect(() => { void refreshHammersmithCapability(); }, [refreshHammersmithCapability]);
-
   // Insert a newline at the caret (mobile affordance): on touch devices the
   // soft keyboard has no Shift, so there's no way to get a newline without a
   // dedicated button. Enter stays bound to send; this ↵ button adds the line.
@@ -74,7 +69,6 @@ export function ChatTab({ session }: ChatTabProps) {
       el.style.height = Math.min(el.scrollHeight, 200) + "px";
     });
   };
-
   // ── Auto-scroll ──
   // Stick to bottom while new messages arrive, but if the user scrolled up to
   // read, don't yank them down. useLayoutEffect runs before paint so there's no
@@ -91,13 +85,11 @@ export function ChatTab({ session }: ChatTabProps) {
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
-
   useLayoutEffect(() => {
     if (stickToBottom.current && bottomRef.current) {
       bottomRef.current.scrollIntoView({ block: "end" });
     }
   }, [state.items]);
-
   // ── Goal status (pi-codex-goal plugin) ──
   const refreshGoal = useCallback(async () => {
     try {
@@ -108,11 +100,9 @@ export function ChatTab({ session }: ChatTabProps) {
       setGoalError("Goal status could not be refreshed. The last known status may be stale; the session and run are unchanged.");
     }
   }, [session.id]);
-
   useEffect(() => {
     refreshGoal();
   }, [refreshGoal, state.streaming]);
-
   useEffect(() => {
     const failed = state.failedDraft;
     if (!failed) { restoredDraftId.current = null; return; }
@@ -292,6 +282,12 @@ export function ChatTab({ session }: ChatTabProps) {
         </div>
       )}
 
+      <RunProgress
+        active={runActive}
+        status={state.status}
+        queued={state.queuedCount}
+        connection={state.connection}
+      />
       {state.connection === "reconnecting" && (
         <div className="run-state-banner" role="status" aria-live="polite">
           <span className="run-state-line" aria-hidden="true" />

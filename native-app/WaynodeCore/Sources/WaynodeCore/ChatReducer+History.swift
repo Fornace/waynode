@@ -18,22 +18,20 @@ extension ChatReducer {
                 // submitted — so replayed rows are plain messages.
                 items.append(.user(.init(id: h.id, content: h.content ?? "", sentAt: h.sentAt)))
             case "assistant":
-                // Server sends assistant text as `content` (NOT `text`), and
-                // optional reasoning as `thinking`. This mirrors the web
-                // client (sessionStore.ts loadHistory) exactly:
-                //   if (m.thinking) blocks.push({ type: "thinking", text: m.thinking });
-                //   blocks.push({ type: "text", text: m.content || "" });
-                var blocks: [Block] = []
-                if let th = h.thinking, !th.isEmpty { blocks.append(.thinking(.init(text: th))) }
-                if let txt = h.content, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
-                // Only add an assistant item if there's actual content.
-                // Skip pure tool-call turns (no text/thinking) — they were
-                // already filtered server-side, but guard defensively.
+                var blocks = Self.historyBlocks(h)
+                if blocks.isEmpty {
+                    if let th = h.thinking, !th.isEmpty { blocks.append(.thinking(.init(text: th))) }
+                    if let txt = h.content, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
+                }
                 if !blocks.isEmpty {
                     items.append(.assistant(.init(id: h.id, blocks: blocks, done: true, sentAt: h.sentAt)))
                 }
-            case "system":
-                items.append(.system(.init(id: h.id, content: h.content ?? "", key: h.key, sentAt: h.sentAt)))
+            case "toolResult":
+                // Full-fidelity replay: attach durable output to the earlier
+                // assistant tool block (same toolCallId as pi's JSONL).
+                if let callId = h.toolCallId { applyHistoryToolResult(callId: callId, output: h.text ?? h.content ?? "", isError: h.isError ?? false) }
+            case "system", "note":
+                items.append(.system(.init(id: h.id, content: h.content ?? h.text ?? "", key: h.key, sentAt: h.sentAt)))
             default:
                 break
             }
@@ -80,6 +78,39 @@ extension ChatReducer {
         }
     }
 
+    private static func historyBlocks(_ item: HistoryItem) -> [Block] {
+        (item.blocks ?? []).compactMap { wire in
+            switch wire.type {
+            case "text": return wire.text.map { .text(.init(text: $0)) }
+            case "thinking": return wire.text.map { .thinking(.init(text: $0)) }
+            case "tool": return .tool(.init(
+                id: wire.id ?? UUID().uuidString,
+                name: wire.name ?? "Tool",
+                args: wire.args ?? "",
+                output: wire.output ?? "",
+                status: .init(rawValue: wire.status ?? "running") ?? .running
+            ))
+            default: return nil
+            }
+        }
+    }
+
+    private mutating func applyHistoryToolResult(callId: String, output: String, isError: Bool) {
+        for index in items.indices.reversed() {
+            guard case .assistant(var assistant) = items[index] else { continue }
+            guard let blockIndex = assistant.blocks.firstIndex(where: {
+                if case .tool(let tool) = $0 { return tool.id == callId }
+                return false
+            }) else { continue }
+            guard case .tool(var tool) = assistant.blocks[blockIndex] else { return }
+            tool.output = output
+            tool.status = isError ? .error : .done
+            assistant.blocks[blockIndex] = .tool(tool)
+            items[index] = .assistant(assistant)
+            return
+        }
+    }
+
     public struct HistoryItem: Sendable {
         public var role: String
         public var id: String
@@ -88,9 +119,20 @@ extension ChatReducer {
         public var thinking: String?
         public var key: String?
         public var sentAt: Date?
-        public init(role: String, id: String, content: String? = nil, text: String? = nil, thinking: String? = nil, key: String? = nil, sentAt: Date? = nil) {
+        public var blocks: [SyncSnapshot.WireBlock]?
+        public var toolCallId: String?
+        public var toolName: String?
+        public var isError: Bool?
+        public init(
+            role: String, id: String, content: String? = nil, text: String? = nil,
+            thinking: String? = nil, key: String? = nil, sentAt: Date? = nil,
+            blocks: [SyncSnapshot.WireBlock]? = nil, toolCallId: String? = nil,
+            toolName: String? = nil, isError: Bool? = nil
+        ) {
             self.role = role; self.id = id; self.content = content
             self.text = text; self.thinking = thinking; self.key = key; self.sentAt = sentAt
+            self.blocks = blocks; self.toolCallId = toolCallId
+            self.toolName = toolName; self.isError = isError
         }
     }
 }

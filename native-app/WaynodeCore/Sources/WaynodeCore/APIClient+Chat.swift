@@ -28,6 +28,10 @@ extension APIClient: SessionTransport {
         public var thinking: String?
         public var key: String?
         public var timestamp: String?
+        public var blocks: [SyncSnapshot.WireBlock]?
+        public var toolCallId: String?
+        public var toolName: String?
+        public var isError: Bool?
     }
 
     public func getMessages(_ sessionId: String) async throws -> [HistoryMessage] {

@@ -212,14 +212,14 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
                 kind = .unknown
             }
         case "sync":
-            // Server wire format: { type: "sync", streaming: Bool, partialText: String, tools: [...] }
-            // We build a SyncSnapshot from the flat fields. partialText becomes an assistant item.
-            var items: [SyncSnapshot.WireItem] = []
+            // v2 sync carries durable transcript in `items`, plus the in-flight
+            // assistant in legacy partialText. This gives native the same
+            // full-fidelity reload/cross-device view as web without parsing
+            // the web-only `entries` union.
+            var items = try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .items) ?? []
             if let partial = try c.decodeIfPresent(String.self, forKey: .partialText), !partial.isEmpty {
                 items.append(SyncSnapshot.WireItem(role: "assistant", content: nil, id: nil, mode: nil, text: partial, thinking: nil, blocks: nil))
             }
-            // tools are currently never populated server-side (liveTools is always []),
-            // but decode defensively if present.
             if let tools = try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .tools) {
                 items.append(contentsOf: tools)
             }
@@ -238,7 +238,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case type, messageId = "messageId", delta, toolName = "toolName"
         case toolCallId = "toolCallId", toolInput = "toolInput"
         case message, text, snapshot, title
-        case streaming, partialText, tools, submission, submissions
+        case streaming, partialText, tools, submission, submissions, items
         case args
         case isError = "isError"
     }

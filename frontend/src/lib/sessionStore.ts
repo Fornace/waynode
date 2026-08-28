@@ -7,13 +7,13 @@ import {
   hammersmithFreshness, submissionFromHammersmithRun,
   type SubmissionDraft, type SubmissionView,
 } from "./sessionSubmissions";
-import { liveOverlayItem, mergeEntries, type LiveOverlay, type WireEntry } from "./sessionEntries";
-
+import {
+  addLiveItem, dropLiveItem, liveIndex, liveOverlayItem, mergeEntries,
+  toolStatusText, updateLiveBlocks, type LiveOverlay, type WireEntry,
+} from "./sessionEntries";
 let _idSeq = 0;
 const uid = () => `c${Date.now()}-${_idSeq++}`;
 const eventSentAt = (event: any) => event.createdAt ?? event.created_at ?? event.timestamp ?? new Date().toISOString();
-const LIVE_PREFIX = "live-";
-
 interface SessionState {
   items: ChatItem[]; streaming: boolean; error: string | null; status: string | null;
   loaded: boolean; connection: "connecting" | "connected" | "reconnecting" | "disconnected";
@@ -49,56 +49,24 @@ function emit(e: SessionEntry) {
   e.state = { ...e.state };
   for (const l of e.listeners) l();
 }
-function findLiveIndex(e: SessionEntry): number {
-  return e.state.items.findIndex((item) => item.role === "assistant" && !item.done && item.id.startsWith(LIVE_PREFIX));
-}
-function ensureLive(e: SessionEntry, messageId: string | null, sentAt: string | null): number {
-  const existing = findLiveIndex(e);
-  if (existing >= 0) return existing;
-  const items = e.state.items.slice();
-  items.push({ id: `${LIVE_PREFIX}${messageId ?? uid()}`, role: "assistant", blocks: [], done: false, sentAt, live: true });
-  e.state.items = items;
-  return e.state.items.length - 1;
-}
-function updateLive(e: SessionEntry, fn: (item: Extract<ChatItem, { role: "assistant" }>) => Extract<ChatItem, { role: "assistant" }>) {
-  const idx = findLiveIndex(e);
-  if (idx < 0) return;
-  const items = e.state.items.slice();
-  items[idx] = fn(items[idx] as Extract<ChatItem, { role: "assistant" }>);
-  e.state.items = items;
-}
-function dropLive(e: SessionEntry) {
-  const idx = findLiveIndex(e);
-  if (idx < 0) return;
-  const items = e.state.items.slice();
-  items.splice(idx, 1);
-  e.state.items = items;
-}
-/** Durable entries: merge by id; an ended live overlay is superseded. */
 function applyEntries(e: SessionEntry, list: WireEntry[]) {
-  const hadLive = findLiveIndex(e) >= 0;
+  const hadLive = liveIndex(e.state.items) >= 0;
   const { items, changed } = mergeEntries(e.state.items, list);
   e.state.items = items;
   if (hadLive && e.liveEnded && list.some((entry) => entry.role === "assistant" || entry.role === "toolResult")) {
-    dropLive(e);
+    e.state.items = dropLiveItem(e.state.items);
     e.liveEnded = false;
-  } else if (changed && findLiveIndex(e) >= 0) {
-    // Keep the live bubble last: persisted items land before it.
-    const idx = findLiveIndex(e);
+  } else if (changed) {
+    const idx = liveIndex(e.state.items);
     if (idx >= 0 && idx !== e.state.items.length - 1) {
-      const items2 = e.state.items.slice();
-      const [live] = items2.splice(idx, 1);
-      items2.push(live);
-      e.state.items = items2;
+      const items2 = e.state.items.slice(), live = items2.splice(idx, 1)[0];
+      items2.push(live); e.state.items = items2;
     }
   }
 }
 function applyDelta(e: SessionEntry, ev: any, fn: (blocks: import("../types").Block[]) => import("../types").Block[]) {
-  const idx = ensureLive(e, ev.messageId ?? null, eventSentAt(ev));
-  const items = e.state.items.slice();
-  const item = items[idx] as Extract<ChatItem, { role: "assistant" }>;
-  items[idx] = { ...item, blocks: fn(item.blocks) };
-  e.state.items = items;
+  e.state.items = addLiveItem(e.state.items, ev.messageId ?? null, eventSentAt(ev));
+  e.state.items = updateLiveBlocks(e.state.items, fn);
 }
 function submissionView(e: SessionEntry): SubmissionView {
   return {
@@ -160,7 +128,7 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
       if (ev.live) {
         const overlay = liveOverlayItem(ev.live as LiveOverlay, new Date().toISOString());
         if (overlay) { e.state.items = [...e.state.items, overlay]; e.liveEnded = false; }
-      } else if (!ev.streaming) dropLive(e);
+      } else if (!ev.streaming) e.state.items = dropLiveItem(e.state.items);
       for (const submission of ev.submissions || []) applySubmission(e, submission);
       const known = new Set((ev.submissions || []).map((s: Submission) => s.id));
       for (const item of e.state.items) {
@@ -180,7 +148,9 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
     case "start":
       e.state.streaming = true;
       e.state.error = null;
+      e.state.status = "Agent started";
       emit(e); return;
+    case "turn_start": e.state.status = "Thinking through the next step…"; emit(e); return;
     case "submission":
       applySubmission(e, ev.submission);
       if (["starting", "running"].includes(ev.submission.status)) e.state.streaming = true;
@@ -195,16 +165,23 @@ function applyEvent(sessionId: string, e: SessionEntry, ev: any) {
       }
       emit(e); return;
     case "message_start": {
-      dropLive(e);
+      e.state.items = dropLiveItem(e.state.items);
       e.liveEnded = false;
-      ensureLive(e, ev.messageId ?? null, eventSentAt(ev));
+      e.state.items = addLiveItem(e.state.items, ev.messageId ?? null, eventSentAt(ev));
+      e.state.status = "Writing response…";
       emit(e); return;
     }
     case "text_delta": applyDelta(e, ev, (b) => appendText(b, ev.delta || "")); emit(e); return;
     case "thinking_delta": applyDelta(e, ev, (b) => appendThinking(b, ev.delta || "")); emit(e); return;
-    case "tool_start": applyDelta(e, ev, (b) => appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args })); emit(e); return;
+    case "tool_start":
+      applyDelta(e, ev, (b) => appendTool(b, { id: ev.toolCallId, name: ev.toolName, args: ev.args }));
+      e.state.status = toolStatusText(ev.toolName, ev.args);
+      emit(e); return;
     case "tool_delta": applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", "running")); emit(e); return;
-    case "tool_end": applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done")); emit(e); return;
+    case "tool_end":
+      applyDelta(e, ev, (b) => setToolOutput(b, ev.toolCallId, ev.text || "", ev.isError ? "error" : "done"));
+      e.state.status = ev.isError ? "Tool failed. Deciding how to recover…" : "Checking the result…";
+      emit(e); return;
     case "message_end": e.liveEnded = true; return;
     case "status": e.state.status = ev.text || null; emit(e); return;
     case "end":
@@ -282,8 +259,6 @@ async function loadHistory(sessionId: string) {
         loadEvents(sessionId),
         loadHammersmithRuns(sessionId).catch(() => [] as HammersmithRun[]),
       ]);
-      // A full reload starts from the durable projection; any live overlay
-      // from an in-flight turn is re-established by the sync event.
       e.state.items = [];
       applyEntries(e, eventBatch.items);
       applyRuns(e, runs, "live");
