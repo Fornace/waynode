@@ -61,6 +61,8 @@ assert.match(
 );
 
 assert.match(deploy, /Unreconciled production source changes found/);
+assert.match(deploy, /Interrupted source-only deployment detected/, "source-only cancellation is reconciled");
+assert.match(deploy, /trap 'rollback 130' HUP INT TERM/, "SSH cancellation must invoke rollback");
 assert.match(deploy, /waynode-backup\.sh" restore-offline/);
 assert.match(deploy, /api\/health\/version/);
 assert.match(deploy, /\$public_url\/api\/health\/ready/);

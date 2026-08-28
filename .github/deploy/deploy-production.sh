@@ -188,8 +188,8 @@ previous_sandbox_archive="$transaction_dir/sandbox-image.tar"
 new_sandbox_archive="$transaction_dir/new-sandbox-image.tar"
 
 rollback() {
-  local status=$? rollback_failed=0
-  trap - ERR
+  local status=${1:-$?} rollback_failed=0
+  trap - ERR HUP INT TERM
   set +e
   say "Deployment failed; restoring the matching predeploy recovery set."
   if [[ $backup_timer_changed == 1 ]]; then
@@ -235,7 +235,8 @@ rollback() {
   cleanup_stage
   exit "$status"
 }
-trap rollback ERR
+trap 'rollback $?' ERR
+trap 'rollback 130' HUP INT TERM
 
 [[ -n "$previous_image_id" ]] || die "The previous server image could not be resolved."
 [[ -n "$previous_image_name" ]] || die "The previous server image name could not be resolved."
@@ -254,7 +255,11 @@ archive_live_source
 if [[ -f "$LIVE_DIR/.waynode-revision" && -f "$LIVE_DIR/.waynode-source.sha256" ]]; then
   recorded_revision=$(<"$LIVE_DIR/.waynode-revision")
   recorded_digest=$(<"$LIVE_DIR/.waynode-source.sha256")
-  [[ "$recorded_revision" == "$previous_revision" ]] || die "Live source/image revision mismatch."
+  if [[ "$recorded_revision" != "$previous_revision" ]]; then
+    [[ "$ALLOW_LEGACY_SOURCE" == 1 ]] \
+      || die "Live source/image revision mismatch."
+    say "Interrupted source-only deployment detected; reconciling from the healthy running image."
+  fi
   if [[ "$recorded_digest" != "$previous_source_digest" ]]; then
     [[ "$ALLOW_LEGACY_SOURCE" == 1 ]] \
       || die "Unreconciled production source changes found."
