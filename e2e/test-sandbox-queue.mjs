@@ -1,6 +1,6 @@
 /** Hosted sandbox follow-up FIFO and completion-contract regression. */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -41,9 +41,18 @@ try {
   const second = deferred();
   const calls = [];
   const events = [];
+  const intervalCallbacks = [];
+  const oldSetInterval = globalThis.setInterval;
+  const oldClearInterval = globalThis.clearInterval;
+  globalThis.setInterval = (callback) => { intervalCallbacks.push(callback); return { unref() {} }; };
+  globalThis.clearInterval = () => {};
   const handle = testHandle(async ({ prompt, mode, onChunk }) => {
     calls.push({ prompt, mode });
-    if (prompt === "first") await first.promise;
+    if (prompt === "first") {
+      writeFileSync(join(root, "turn.jsonl"), `${JSON.stringify({ type: "message", id: "u1", parentId: null, timestamp: new Date().toISOString(), message: { role: "user", content: "first" } })}\n${JSON.stringify({ type: "message", id: "a1", parentId: "u1", timestamp: new Date().toISOString(), message: { role: "assistant", content: [{ type: "toolCall", id: "call_1", name: "bash", arguments: { command: "sleep 1" } }] } })}\n`);
+      await intervalCallbacks.at(-1)?.();
+      await first.promise;
+    }
     if (prompt === "second") await second.promise;
     onChunk(`${prompt}-done`);
     return { status: 0, stdout: `${prompt}-done`, stderr: "" };
@@ -52,6 +61,8 @@ try {
 
   const initialCompletion = handle.sendPrompt("first", "message", "first-id");
   await until(() => calls.length === 1);
+  await until(() => events.includes("entries"));
+  assert.ok(events.includes("entries"), "hosted entry poll exposes tool calls before the turn finishes");
   let queuedCompleted = false;
   const queuedCompletion = handle.queueFollowUp("second", "goal", "second-id").then(() => { queuedCompleted = true; });
   const duplicateCompletion = handle.queueFollowUp("second", "goal", "second-id");
@@ -71,6 +82,8 @@ try {
   assert.equal(events.filter((type) => type === "start").length, 3);
   assert.equal(events.filter((type) => type === "end").length, 3);
   assert.equal(handle.streaming, false);
+  globalThis.setInterval = oldSetInterval;
+  globalThis.clearInterval = oldClearInterval;
 
   const blocked = deferred();
   const bounded = testHandle(async () => {

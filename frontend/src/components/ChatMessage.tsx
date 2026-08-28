@@ -177,7 +177,7 @@ function ToolDisclosure({ block, onRecover }: { block: Extract<Block, { type: "t
       <div className="tool-details">
         {block.status === "running" && <div className="tool-live-detail">
           <span className="tool-live-line" aria-hidden="true" />
-          <code>{context || commandPreview(block) || label}</code>
+          <div><strong>{output ? "Receiving command output" : "Waiting for command output"}</strong><code>{context || commandPreview(block) || label}</code></div>
         </div>}
         <details className="tool-raw" open={block.status === "running"}><summary>Technical details</summary><pre>{block.name}{args ? `\n${args}` : ""}</pre></details>
         {output && <div className={`tool-output-wrap ${wrapped ? "is-wrapped" : ""}`}>
