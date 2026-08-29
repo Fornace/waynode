@@ -1,9 +1,20 @@
 /** Regression: the runtime agent dir is seeded from the reviewed manifest. */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { seedPiComponents } from "../lib/pi-component-seed.mjs";
+import { pathToFileURL } from "node:url";
+
+// Load a copy of the seeder with a stubbed config module so this test runs
+// in CI without a .env (config.mjs throws at import time without secrets).
+const stubRoot = mkdtempSync(join(tmpdir(), "waynode-pi-seed-stub-"));
+process.on("exit", () => rmSync(stubRoot, { recursive: true, force: true }));
+mkdirSync(join(stubRoot, "lib"), { recursive: true });
+writeFileSync(join(stubRoot, "lib", "pi-config.mjs"),
+  'export function piAgentDir() { return "/tmp/agent"; }\n');
+writeFileSync(join(stubRoot, "lib", "pi-component-seed.mjs"),
+  readFileSync(new URL("../lib/pi-component-seed.mjs", import.meta.url), "utf8"));
+const { seedPiComponents } = await import(pathToFileURL(join(stubRoot, "lib", "pi-component-seed.mjs")));
 
 const root = mkdtempSync(join(tmpdir(), "waynode-pi-seed-"));
 
