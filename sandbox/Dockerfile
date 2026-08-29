@@ -46,20 +46,12 @@ RUN git config --global user.name "Waynode" && \
     git config --global init.defaultBranch main && \
     git config --global --add safe.directory '*'
 
-# pi CLI + the two extensions waynode relies on.
-RUN npm install -g @earendil-works/pi-coding-agent@0.80.7
-RUN pi install npm:pi-codex-goal@0.1.36 --approve
-RUN pi install npm:pi-lean-ctx@3.9.9 --approve
-
-# lean-ctx standalone binary (for pi-lean-ctx extension).
-ARG LEAN_CTX_VERSION=v3.9.9
-ARG LEAN_CTX_SHA256=5e33a5f6214fcffccac38d955c56d7467adfde4455c22dbb16dd37ce05460ba4
-RUN curl -fsSL -o /tmp/lean-ctx.tar.gz \
-      https://github.com/yvgude/lean-ctx/releases/download/${LEAN_CTX_VERSION}/lean-ctx-x86_64-unknown-linux-musl.tar.gz && \
-    echo "${LEAN_CTX_SHA256}  /tmp/lean-ctx.tar.gz" | sha256sum -c - && \
-    tar xzf /tmp/lean-ctx.tar.gz -C /tmp && \
-    mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx && \
-    lean-ctx --version
+# pi CLI, its two packages, and the matching standalone lean-ctx binary use
+# the same reviewed manifest as the server image.
+COPY config/pi-components.json /tmp/pi-components.json
+COPY scripts/install-pi-components.sh /tmp/install-pi-components.sh
+RUN bash /tmp/install-pi-components.sh /tmp/pi-components.json && \
+    rm -f /tmp/install-pi-components.sh /tmp/pi-components.json
 
 # Fornace LLM provider. Endpoint is the WIREGUARD tunnel address on
 # 49.12.9.255 (10.200.0.1:4000) — reachable from the microVM only because the

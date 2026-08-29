@@ -10,6 +10,7 @@ import { configuredModelCatalog, providerCredentialKey, resolvePiModel } from ".
 import { passport } from "./lib/auth.mjs";
 import { ensureGitAskpass } from "./lib/git-creds.mjs";
 import { ensurePiProviderConfig } from "./lib/pi-config.mjs";
+import { seedPiComponents } from "./lib/pi-component-seed.mjs";
 import { bootstrapSelfHostedProviderCredential } from "./lib/pi-provider-bootstrap.mjs";
 import { SQLiteSessionStore } from "./lib/sqlite-session-store.mjs";
 import { publicReadinessReport, readinessReport, versionReport } from "./lib/health.mjs";
@@ -45,6 +46,16 @@ ensureGitAskpass();
 // Write pi's fornace LLM provider config from runtime env (LLM_API_KEY),
 // never baked into the Docker image — see lib/pi-config.mjs.
 ensurePiProviderConfig();
+// Seed DATA_DIR/pi-agent with the reviewed Pi components so self-host RPC
+// sessions load the same pinned packages the image bakes for microVMs.
+try {
+  const result = seedPiComponents();
+  if (result.changed.length) {
+    console.log(`[pi-components] seeded ${result.changed.join(", ")}`);
+  }
+} catch (error) {
+  console.error("[pi-components] seeding failed:", error.message);
+}
 
 // A self-host installer may supply PI_PROVIDER_API_KEY for the first boot.
 // Persist it encrypted, then remove it before any agent process can inherit it.

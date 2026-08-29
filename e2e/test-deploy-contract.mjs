@@ -6,6 +6,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const workflow = read(".github/workflows/deploy.yml");
 const serverDockerfile = read("Dockerfile");
 const sandboxDockerfile = read("sandbox/Dockerfile");
+const componentManifest = JSON.parse(read("config/pi-components.json"));
 const deploy = read(".github/deploy/deploy-production.sh");
 const backup = read("scripts/waynode-backup.sh");
 const server = read("server.js");
@@ -38,15 +39,25 @@ for (const [name, dockerfile] of [
 ]) {
   assert.match(dockerfile, /node:26\.0\.0-slim@sha256:[0-9a-f]{64}/, `${name} base is immutable`);
   assert.match(dockerfile, /org\.opencontainers\.image\.revision=\$WAYNODE_REVISION/);
-  assert.match(dockerfile, /@earendil-works\/pi-coding-agent@0\.80\.7/);
-  assert.match(dockerfile, /pi-codex-goal@0\.1\.36/);
-  assert.match(dockerfile, /pi-lean-ctx@3\.9\.9/);
+  const sharedPins = name === "server"
+    ? /COPY config\/pi-components\.json \/root\/\.pi\/agent\/pi-components\.json/
+    : /COPY config\/pi-components\.json \/tmp\/pi-components\.json/;
+  assert.match(dockerfile, sharedPins);
+  assert.match(dockerfile, /COPY scripts\/install-pi-components\.sh \/tmp\/install-pi-components\.sh/);
+  assert.match(dockerfile, /bash \/tmp\/install-pi-components\.sh .*pi-components\.json/);
   assert.match(dockerfile, /hammersmith-0\.1\.0\+86a8308d\.tar\.gz/);
   assert.match(dockerfile, /1a8f44f26bf9d7cce0b7191c74fbfe8f2c3a96f7c01c0826c3ffba34964242c1/);
   assert.match(dockerfile, /hammersmith --version/);
   assert.match(dockerfile, /--no-build-isolation \/tmp\/hammersmith\.tar\.gz/);
   assert.doesNotMatch(dockerfile, /pip install(?:[^\n]*\s)hammersmith(?:\s|$)/);
   assert.doesNotMatch(dockerfile, /@latest|npm ci \|\||install failed|\|\| true/);
+}
+
+assert.equal(componentManifest.schemaVersion, 1);
+assert.match(componentManifest.pi.version, /^\d+\.\d+\.\d+$/);
+assert.equal(new Set(componentManifest.packages.map((entry) => entry.name)).size, componentManifest.packages.length);
+for (const required of ["pi-codex-goal", "pi-lean-ctx"]) {
+  assert.ok(componentManifest.packages.some((entry) => entry.name === required), `${required} stays pinned`);
 }
 
 assert.doesNotMatch(

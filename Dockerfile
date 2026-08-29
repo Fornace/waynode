@@ -46,16 +46,14 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       > /etc/apt/sources.list.d/github-cli.list && \
     apt-get update && apt-get install -y gh && rm -rf /var/lib/apt/lists/*
 
-# Install lean-ctx CLI (standalone binary for pi-lean-ctx extension)
-ARG LEAN_CTX_VERSION=v3.9.9
-ARG LEAN_CTX_SHA256=5e33a5f6214fcffccac38d955c56d7467adfde4455c22dbb16dd37ce05460ba4
-RUN curl -fsSL -o /tmp/lean-ctx.tar.gz \
-      https://github.com/yvgude/lean-ctx/releases/download/${LEAN_CTX_VERSION}/lean-ctx-x86_64-unknown-linux-musl.tar.gz && \
-    echo "${LEAN_CTX_SHA256}  /tmp/lean-ctx.tar.gz" | sha256sum -c - && \
-    tar xzf /tmp/lean-ctx.tar.gz -C /tmp && \
-      mv /tmp/lean-ctx /usr/local/bin/lean-ctx && chmod +x /usr/local/bin/lean-ctx && \
-    lean-ctx --version
-
+# Install pi, its packages, and the matching standalone lean-ctx binary from
+# one reviewed manifest. The updater changes this file; image builds stay
+# immutable and server/sandbox versions cannot drift. The manifest is kept
+# inside the agent dir so the server runtime can seed its DATA_DIR from it.
+COPY config/pi-components.json /root/.pi/agent/pi-components.json
+COPY scripts/install-pi-components.sh /tmp/install-pi-components.sh
+RUN bash /tmp/install-pi-components.sh /root/.pi/agent/pi-components.json && \
+    rm -f /tmp/install-pi-components.sh
 WORKDIR /app
 
 # Git identity safety net. Real attribution comes per-commit (-c flags from
@@ -89,11 +87,6 @@ COPY content/ ./content/
 
 # Copy built frontend
 COPY --from=builder /build/frontend/dist ./frontend/dist
-
-# Install pi CLI
-RUN npm install -g @earendil-works/pi-coding-agent@0.80.7
-RUN pi install npm:pi-codex-goal@0.1.36 --approve
-RUN pi install npm:pi-lean-ctx@3.9.9 --approve
 
 # pi's fornace-llm provider config (including the API key) is written at
 # CONTAINER STARTUP by lib/pi-config.mjs, from the LLM_BASE_URL / LLM_API_KEY

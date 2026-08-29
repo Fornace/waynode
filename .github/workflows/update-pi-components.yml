@@ -1,0 +1,119 @@
+name: Update Pi Components
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: waynode-pi-components
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install application dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+
+      - name: Run supported Pi update paths
+        id: update
+        run: node scripts/update-pi-components.mjs
+
+      - name: Validate updated application
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          npm test
+          npm run build:frontend
+
+      - name: Verify isolated component installation
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
+          export npm_config_prefix="$root/npm"
+          export PATH="$npm_config_prefix/bin:$PATH"
+          export PI_CODING_AGENT_DIR="$root/agent"
+          export LEAN_CTX_INSTALL_DIR="$root/bin"
+          bash scripts/install-pi-components.sh config/pi-components.json
+
+      - name: Build and inspect both runtime images
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          docker build --build-arg "WAYNODE_REVISION=${GITHUB_SHA}" -t waynode-pi-update .
+          docker build --file sandbox/Dockerfile --build-arg "WAYNODE_REVISION=${GITHUB_SHA}" \
+            --tag waynode-sandbox-pi-update .
+          for image in waynode-pi-update waynode-sandbox-pi-update; do
+            docker run --rm --entrypoint sh \
+              --volume "$PWD/config/pi-components.json:/tmp/pi-components.json:ro" \
+              --volume "$PWD/scripts/smoke-pi-components.mjs:/tmp/smoke-pi-components.mjs:ro" \
+              "$image" -lc \
+              'pi --version && lean-ctx --version && node /tmp/smoke-pi-components.mjs /tmp/pi-components.json'
+          done
+          docker run --rm --entrypoint node \
+            --volume "$PWD/scripts/check-sandbox-image.mjs:/tmp/check-sandbox-image.mjs:ro" \
+            waynode-sandbox-pi-update \
+            /tmp/check-sandbox-image.mjs /root/.pi/agent/models.json
+
+      - name: Verify every recorded release asset digest
+        if: steps.update.outputs.changed == 'true'
+        env:
+            MANIFEST_FILE: config/pi-components.json
+        run: |
+          while IFS=' ' read -r tag name digest; do
+            curl -fsSL -o /tmp/lean-ctx-asset "https://github.com/yvgude/lean-ctx/releases/download/${tag}/${name}"
+            printf '%s  %s\n' "$digest" /tmp/lean-ctx-asset | sha256sum -c -
+            rm -f /tmp/lean-ctx-asset
+          done < <(node -e "
+            const manifest = require('./' + process.env.MANIFEST_FILE);
+            for (const arch of Object.keys(manifest.leanCtx.assets)) {
+              const asset = manifest.leanCtx.assets[arch];
+              console.log(manifest.leanCtx.releaseTag + ' ' + asset.name + ' ' + asset.sha256);
+            }
+          ")
+
+      - name: Commit update branch
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PI_UPDATE_TOKEN }}
+        run: |
+          branch=automation/pi-components
+          git config user.name "waynode-pi-updater[bot]"
+          git config user.email "waynode-pi-updater[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add config/pi-components.json
+          git commit -m "chore(pi): update runtime components"
+          git push --force origin "HEAD:$branch"
+
+      - name: Create and merge tested update
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PI_UPDATE_TOKEN }}
+          PI_VERSION: ${{ steps.update.outputs.pi_version }}
+          GOAL_VERSION: ${{ steps.update.outputs.goal_version }}
+          LEAN_VERSION: ${{ steps.update.outputs.lean_version }}
+        run: |
+          branch=automation/pi-components
+          pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            gh pr create --base main --head "$branch" \
+              --title "chore(pi): update runtime components" \
+              --body "Automated, fully tested update: pi ${PI_VERSION}, pi-codex-goal ${GOAL_VERSION}, pi-lean-ctx and lean-ctx ${LEAN_VERSION}."
+            pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number')
+          fi
+          gh pr merge "$pr" --squash --delete-branch

@@ -117,7 +117,11 @@ gh secret set DEPLOY_SSH_KEY < ~/.ssh/waynode_deploy_key
 The Dockerfile is a multi-stage build: it compiles the frontend
 (`npm run build`) then installs pi + the `pi-codex-goal` / `pi-lean-ctx`
 plugins and configures the fornace LLM provider, so `frontend/dist` does not
-need to be committed.
+need to be committed. Pi and both packages are exact, shared pins in
+`config/pi-components.json`. A daily tested updater runs the supported
+`pi update` and `pi update --extensions` paths, then merges a verified pin
+update through the normal main deployment workflow. See
+[Pi component updates](docs/PI-COMPONENT-UPDATES.md).
 
 Before treating a deployment as successful, confirm the container on
 `DEPLOY_HOST` was actually replaced (not merely that the public domain answers
