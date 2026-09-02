@@ -38,6 +38,8 @@ esac
   || die "The staged release is incomplete."
 for command in docker rsync sha256sum tar curl node systemctl; do need "$command"; done
 
+bash "$STAGED_SOURCE_DIR/.github/deploy/reconcile-tls.sh"
+
 transaction_dir="$BACKUP_ROOT/$DEPLOY_SHA-$DEPLOY_ID"
 [[ ! -e "$transaction_dir" ]] || die "Deployment transaction already exists: $transaction_dir"
 install -d -m 700 "$transaction_dir"

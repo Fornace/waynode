@@ -90,6 +90,28 @@ source, exact environment, data, server image, and sandbox image. An incomplete
 rollback leaves Waynode stopped for operator recovery instead of starting a
 mixed-version service. See [Backup and recovery](BACKUP-RECOVERY.md).
 
+## TLS ownership and renewal
+
+The Waynode host (`95.216.37.30`) is the sole owner of the
+`waynode.fornace.net` certificate. The deploy workflow verifies the public
+HTTP-01 webroot, maintains the Certbot lineage
+`waynode.fornace.net-managed`, performs a staging renewal, switches the pinned
+Nginx configuration only after certificate validation, and proves the public
+endpoint serves that exact certificate. Do not issue or renew this name from
+the Mantice host (`49.12.9.255`), where DNS no longer terminates.
+
+The host's standard `certbot.timer` renews the persisted webroot lineage and
+uses its saved deploy hook to reload Nginx. Production TLS changes therefore
+ship only through the merge-triggered deploy; never edit the Nginx site or run
+an ad-hoc issuance command. Verify ownership with:
+
+```bash
+certbot certificates
+systemctl is-enabled certbot.timer
+openssl x509 -in /etc/letsencrypt/live/waynode.fornace.net-managed/fullchain.pem \
+  -noout -subject -issuer -dates
+```
+
 Install and prove the backup schedule in [Backup and recovery](BACKUP-RECOVERY.md)
 before accepting customer work. A pre-deploy backup is not a substitute for
 encrypted off-host retention and a scheduled restore drill.

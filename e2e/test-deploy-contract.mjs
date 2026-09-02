@@ -8,6 +8,8 @@ const serverDockerfile = read("Dockerfile");
 const sandboxDockerfile = read("sandbox/Dockerfile");
 const componentManifest = JSON.parse(read("config/pi-components.json"));
 const deploy = read(".github/deploy/deploy-production.sh");
+const tls = read(".github/deploy/reconcile-tls.sh");
+const nginx = read(".github/deploy/waynode.nginx.conf");
 const backup = read("scripts/waynode-backup.sh");
 const server = read("server.js");
 const compose = read("docker-compose.ffrapposerver.yml");
@@ -24,6 +26,19 @@ assert.match(deploy, /WAYNODE_CI_DEPLOY[^\n]*!= "1"/, "deploy script must gate o
 assert.match(deploy, /manual invocation is not supported/i);
 assert.match(workflow, /WAYNODE_CI_DEPLOY=1/, "workflow must set the CI-only flag");
 assert.match(workflow, /\.github\/deploy\/deploy-production\.sh/, "workflow must call the CI-owned script");
+assert.match(deploy, /\.github\/deploy\/reconcile-tls\.sh/, "deploy must reconcile TLS from verified source");
+
+assert.match(tls, /WAYNODE_CI_DEPLOY[^\n]*== 1/, "TLS changes must stay CI-only");
+assert.match(tls, /waynode\.fornace\.net-managed/);
+assert.match(tls, /--webroot-path "\$webroot"/);
+assert.match(tls, /--cert-name "\$cert_name"/);
+assert.match(tls, /certbot renew --cert-name "\$cert_name" --dry-run/);
+assert.match(tls, /Public ACME webroot preflight/);
+assert.match(tls, /public_fingerprint == "\$local_fingerprint"/);
+assert.match(tls, /rollback/);
+assert.match(tls, /--connect-timeout 5 --max-time 15/);
+assert.match(nginx, /live\/waynode\.fornace\.net-managed\/fullchain\.pem/);
+assert.match(nginx, /live\/waynode\.fornace\.net-managed\/privkey\.pem/);
 
 assert.match(workflow, /find scripts \.github\/deploy -type f -name '\*\.sh' -exec bash -n/);
 assert.match(workflow, /docker compose -f docker-compose\.yml config --quiet/);
