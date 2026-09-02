@@ -35,6 +35,7 @@ assert.match(tls, /--cert-name "\$cert_name"/);
 assert.match(tls, /certbot renew --cert-name "\$cert_name" --dry-run/);
 assert.match(tls, /Public ACME webroot preflight/);
 assert.match(tls, /public_fingerprint == "\$local_fingerprint"/);
+assert.match(tls, /for _attempt in \{1\.\.20\}/, "Nginx certificate handoff must be bounded and retried");
 assert.match(tls, /rollback/);
 assert.match(tls, /--connect-timeout 5 --max-time 15/);
 assert.match(nginx, /live\/waynode\.fornace\.net-managed\/fullchain\.pem/);

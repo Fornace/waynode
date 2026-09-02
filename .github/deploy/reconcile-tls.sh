@@ -27,7 +27,7 @@ legacy_nginx_sha=f87ad57084c7a570b00f06a13eb3fd179d52b6221acca7cbc218a56fba62891
 say() { printf '%s\n' "$*"; }
 die() { printf 'Error: %s\n' "$*" >&2; false; }
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required."; }
-for command in certbot curl install nginx openssl sha256sum systemctl timeout; do need "$command"; done
+for command in certbot curl install nginx openssl sha256sum sleep systemctl timeout; do need "$command"; done
 
 [[ -f $nginx_source ]] || die "Pinned Nginx artifact is missing."
 [[ $(sha256sum "$nginx_source" | awk '{print $1}') == "$expected_nginx_sha" ]] \
@@ -116,8 +116,14 @@ nginx -t
 systemctl reload nginx.service
 
 local_fingerprint=$(openssl x509 -in "$cert_root/fullchain.pem" -noout -fingerprint -sha256)
-public_fingerprint=$(timeout 15 openssl s_client -connect "$domain:443" \
-  -servername "$domain" </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256)
+public_fingerprint=
+for _attempt in {1..20}; do
+  public_fingerprint=$(timeout 5 openssl s_client -connect "$domain:443" \
+    -servername "$domain" </dev/null 2>/dev/null | \
+    openssl x509 -noout -fingerprint -sha256 2>/dev/null || true)
+  [[ $public_fingerprint != "$local_fingerprint" ]] || break
+  sleep 1
+done
 [[ $public_fingerprint == "$local_fingerprint" ]] \
   || die "Public endpoint is not serving the managed certificate."
 curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
