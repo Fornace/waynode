@@ -48,13 +48,12 @@ ensureGitAskpass();
 ensurePiProviderConfig();
 // Seed DATA_DIR/pi-agent with the reviewed Pi components so self-host RPC
 // sessions load the same pinned packages the image bakes for microVMs.
-try {
-  const result = seedPiComponents();
-  if (result.changed.length) {
-    console.log(`[pi-components] seeded ${result.changed.join(", ")}`);
-  }
-} catch (error) {
-  console.error("[pi-components] seeding failed:", error.message);
+// Production images require the manifest; local/source-only installs may omit it.
+const piSeed = seedPiComponents();
+if (piSeed.status === "skipped") {
+  console.log(`[pi-components] skipped: ${piSeed.reason}`);
+} else if (piSeed.changed.length) {
+  console.log(`[pi-components] seeded ${piSeed.changed.join(", ")}`);
 }
 
 // A self-host installer may supply PI_PROVIDER_API_KEY for the first boot.

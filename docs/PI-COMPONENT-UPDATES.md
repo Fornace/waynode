@@ -82,7 +82,11 @@ The server runtime keeps its own agent directory on the data volume
 (`DATA_DIR/pi-agent`). At startup, `lib/pi-component-seed.mjs` copies each
 manifest package from the image's baked agent directory into that runtime
 directory and verifies the result, repairing stale or partially written
-volumes on every boot. Hosted microVMs use the baked directory directly.
+volumes on every boot. Production images set `PI_COMPONENTS_REQUIRED=1`, so an
+absent, malformed, empty, or image-inconsistent manifest stops startup. Local
+source-only and CI runs may omit the manifest; startup then reports the
+explicit `manifest absent` skip result without trying to seed. Hosted microVMs
+use the baked directory directly.
 
 ## Compatibility receipt
 

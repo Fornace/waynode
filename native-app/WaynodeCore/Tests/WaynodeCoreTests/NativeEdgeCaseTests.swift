@@ -58,8 +58,8 @@ struct NativeEdgeCaseTests {
         let transport = NativeEdgeTransport()
         let history = try JSONDecoder.api.decode([APIClient.HistoryMessage].self, from: Data(#"""
         [{"role":"user","id":"u1","content":"run it"},
-         {"role":"assistant","id":"a1","blocks":[{"type":"thinking","text":"checking"},{"type":"tool","id":"call_1","name":"bash","args":"{\\"command\\":\\"pwd\\"}","output":"","status":"running"}]},
-         {"role":"toolResult","id":"t1","toolCallId":"call_1","toolName":"bash","isError":false,"text":"/workspace\\n"},
+         {"role":"assistant","id":"a1","blocks":[{"type":"thinking","text":"checking"},{"type":"tool","id":"call_1","name":"bash","args":"{\"command\":\"pwd\"}","output":"","status":"running"}]},
+         {"role":"toolResult","id":"t1","toolCallId":"call_1","toolName":"bash","isError":false,"text":"/workspace\n"},
          {"role":"assistant","id":"a2","blocks":[{"type":"text","text":"Done."}]}]
         """#.utf8))
         await transport.setHistory(history)
