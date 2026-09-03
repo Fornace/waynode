@@ -2,5 +2,7 @@
   "name": "waynode-e2e",
   "private": true,
   "type": "module",
-  "dependencies": { "playwright": "1.61.1" }
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
 }

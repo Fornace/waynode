@@ -52,28 +52,28 @@
     "test": "npm run check:file-lengths && npm run test:auth && npm run test:oauth-tokens && npm run test:deploy-contract && npm run test:account-deletion && npm run test:billing && npm run test:billing-reservations && npm run test:billing-hammersmith && npm run test:org-llm-key && npm run test:app-store && npm run test:content && npm run test:public-trust && npm run test:terminal && npm run test:terminal-capability && npm run test:sandbox-terminal && npm run test:sandbox-queue && npm run test:agent-submissions && npm run test:sandbox-security && npm run test:hosted-git-credentials && npm run test:git-discard && npm run test:clone-policy && npm run test:space-authorization && npm run test:trial-eligibility && npm run test:provider && npm run test:repository-creation && npm run test:session-store && npm run test:session-history && npm run test:session-sse && npm run test:hammersmith && npm run test:session-lifecycle && npm run test:session-recovery && npm run test:stream-reconnect && npm run test:billing-edges && npm run test:design-language && npm run test:onboarding-states && npm run test:a11y-contract && npm run test:composer-behaviors && npm run typecheck"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.11",
-    "ai": "^7.0.20",
+    "@ai-sdk/openai": "4.0.57",
+    "ai": "7.0.91",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
     "dotenv": "17.4.2",
     "express": "5.2.1",
-    "express-rate-limit": "8.5.2",
+    "express-rate-limit": "8.7.0",
     "express-session": "1.19.0",
-    "helmet": "8.2.0",
-    "marked": "^18.0.6",
-    "microsandbox": "^0.6.6",
-    "multer": "^2.2.0",
+    "helmet": "8.3.0",
+    "marked": "18.0.11",
+    "microsandbox": "0.6.16",
+    "multer": "2.3.0",
     "node-pty": "1.1.0",
     "passport": "0.7.0",
     "passport-github2": "0.1.12",
     "passport-gitlab2": "5.0.0",
-    "stripe": "^22.3.1",
-    "uuid": "14.0.1",
-    "ws": "8.21.0"
+    "stripe": "22.6.1",
+    "uuid": "14.0.2",
+    "ws": "8.21.3"
   },
   "devDependencies": {
-    "concurrently": "10.0.3",
+    "concurrently": "10.0.5",
     "cross-env": "10.1.0"
   }
 }
