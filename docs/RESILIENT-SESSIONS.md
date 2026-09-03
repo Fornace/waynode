@@ -152,7 +152,7 @@ SQLite so state survives restarts and is visible cross-device.
 On server boot (and handle spawn), read the projection tail: if the active
 branch ends with an unanswered user message AND a submission row says a turn
 was in flight, automatically continue it (pi's `--continue` already has the
-partial output in context; a continuation instruction finishes the job —
+partial output in context; a continuation instruction finishes the job,
 trigger's recovery-boot splice). Surface "Turn resumed after server restart"
 in the UI. Pair with deploy-time drain: SIGTERM stops accepting turns, waits
 up to N minutes for streaming agents, then dies knowing recovery resumes.
