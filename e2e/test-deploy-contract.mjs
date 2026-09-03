@@ -45,6 +45,13 @@ assert.match(workflow, /find scripts \.github\/deploy -type f -name '\*\.sh' -ex
 assert.match(workflow, /docker compose -f docker-compose\.yml config --quiet/);
 assert.match(workflow, /docker compose -f docker-compose\.ffrapposerver\.yml config --quiet/);
 assert.match(workflow, /git archive --format=tar\.gz/);
+assert.match(workflow, /docker build --build-arg "WAYNODE_REVISION=\$\{GITHUB_SHA\}" -t waynode-ci/,
+  "every main deployment must build the server image before touching production");
+assert.match(workflow, /docker build --file sandbox\/Dockerfile[\s\S]*--tag waynode-sandbox-ci/,
+  "every main deployment must build the sandbox image before touching production");
+assert.match(workflow, /for image in waynode-ci waynode-sandbox-ci/);
+assert.match(workflow, /smoke-pi-components\.mjs \/tmp\/pi-components\.json/);
+assert.match(workflow, /waynode-sandbox-ci[\s\S]*check-sandbox-image\.mjs \/root\/\.pi\/agent\/models\.json/);
 assert.match(workflow, /Reconcile, deploy, and publicly verify transaction/);
 assert.match(workflow, /permissions:\s+contents: read/);
 assert.doesNotMatch(workflow, /actions\/checkout@v\d/);

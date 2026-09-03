@@ -14,6 +14,9 @@ Source of truth: pi session JSONL (`<space>/.waynode/sessions/<sessionId>`).
    supersedes it; clients never display both.
 5. Browser disconnect never controls agent lifetime. A server restart marks
    active submission rows interrupted and automatically resumes them.
+6. Pi `agent_settled` is the authoritative turn-completion event. Earlier
+   `agent_end` events can still be followed by retries, compaction recovery,
+   or queued follow-ups.
 7. An assistant tool call is never blindly replayed after execution stops.
    Waynode restores a durably journaled final result, or appends an error
    result that says execution and side effects are uncertain, before Pi can
@@ -117,7 +120,10 @@ or `running` rows become `interrupted`, then recovery continuation dispatches
 the oldest turn with its original submission id. Before Pi starts, Waynode
 repairs every unmatched tool call on the active JSONL branch. A finalized
 result captured by the reviewed `waynode-tool-journal` extension is restored
-with the original `toolCallId`; a call without such a result receives an
+with the original `toolCallId`; the sidecar uses Pi's stable session id rather
+than a substrate-specific absolute path, so `/workspace/...` in a microVM and
+the corresponding host path resolve to the same identity. A call without such
+a result receives an
 `isError: true` result explaining that execution and side effects are
 uncertain. Pi then sees each previous tool call as resolved and cannot execute
 it merely because the server restarted. Remaining submission rows go back

@@ -42,8 +42,22 @@ jobs:
           npm test
           npm run build:frontend
 
-      - name: Verify sandbox image credential boundary
-        run: node scripts/check-sandbox-image.mjs
+      - name: Build and inspect both runtime images
+        run: |
+          docker build --build-arg "WAYNODE_REVISION=${GITHUB_SHA}" -t waynode-ci .
+          docker build --file sandbox/Dockerfile --build-arg "WAYNODE_REVISION=${GITHUB_SHA}" \
+            --tag waynode-sandbox-ci .
+          for image in waynode-ci waynode-sandbox-ci; do
+            docker run --rm --entrypoint sh \
+              --volume "$PWD/config/pi-components.json:/tmp/pi-components.json:ro" \
+              --volume "$PWD/scripts/smoke-pi-components.mjs:/tmp/smoke-pi-components.mjs:ro" \
+              "$image" -lc \
+              'pi --version && lean-ctx --version && node /tmp/smoke-pi-components.mjs /tmp/pi-components.json'
+          done
+          docker run --rm --entrypoint node \
+            --volume "$PWD/scripts/check-sandbox-image.mjs:/tmp/check-sandbox-image.mjs:ro" \
+            waynode-sandbox-ci \
+            /tmp/check-sandbox-image.mjs /root/.pi/agent/models.json
 
       - name: Package exact source revision
         run: git archive --format=tar.gz --output="${RUNNER_TEMP}/waynode-source.tar.gz" "${GITHUB_SHA}"

@@ -1,6 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { closeSync, fsyncSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { randomUUID } from "node:crypto";
+import {
+  closeSync, fsyncSync, openSync, readFileSync, readdirSync, renameSync,
+  unlinkSync, writeFileSync,
+} from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 interface JournalResult {
   toolCallId: string;
@@ -14,8 +18,8 @@ interface JournalResult {
 }
 
 interface Journal {
-  version: 1;
-  sessionFile: string;
+  version: 2;
+  sessionId: string;
   results: Record<string, JournalResult>;
 }
 
@@ -23,27 +27,73 @@ function journalPath(sessionFile: string): string {
   return `${sessionFile}.waynode-tools.json`;
 }
 
-function loadJournal(sessionFile: string): Journal {
-  const path = journalPath(sessionFile);
+function validResults(value: unknown): value is Record<string, JournalResult> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function loadJournal(sessionFile: string, sessionId: string): Journal {
   try {
-    const value = JSON.parse(readFileSync(path, "utf8"));
-    if (value?.version === 1 && value.sessionFile === sessionFile && value.results) return value;
+    const value = JSON.parse(readFileSync(journalPath(sessionFile), "utf8"));
+    if (value?.version === 2 && value.sessionId === sessionId && validResults(value.results)) {
+      return value;
+    }
+    // v1 stored an absolute path. Accept an adjacent legacy sidecar by stable
+    // filename so an upgrade can recover a guest /workspace path on the host.
+    if (value?.version === 1 && basename(value.sessionFile || "") === basename(sessionFile)
+        && validResults(value.results)) {
+      return { version: 2, sessionId, results: value.results };
+    }
   } catch {}
-  return { version: 1, sessionFile, results: {} };
+  return { version: 2, sessionId, results: {} };
+}
+
+function syncDirectory(path: string): void {
+  const fd = openSync(dirname(path), "r");
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function removeDurably(path: string): void {
+  try {
+    unlinkSync(path);
+    syncDirectory(path);
+  } catch (error: any) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+}
+
+function cleanupTemporaryWrites(path: string): void {
+  const prefix = `${basename(path)}.`;
+  let removed = false;
+  try {
+    for (const name of readdirSync(dirname(path))) {
+      if (!name.startsWith(prefix) || !name.endsWith(".tmp")) continue;
+      try { unlinkSync(join(dirname(path), name)); removed = true; } catch (error: any) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+    }
+  } catch (error: any) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  if (removed) syncDirectory(path);
 }
 
 function durableWrite(path: string, value: unknown): void {
-  const temporary = `${path}.${process.pid}.tmp`;
-  const fd = openSync(temporary, "w", 0o600);
+  // Unique names prevent parallel tool completions from sharing one temp file.
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  let fd: number | undefined;
   try {
+    fd = openSync(temporary, "wx", 0o600);
     writeFileSync(fd, `${JSON.stringify(value)}\n`, "utf8");
     fsyncSync(fd);
-  } finally {
     closeSync(fd);
+    fd = undefined;
+    renameSync(temporary, path);
+    syncDirectory(path);
+  } catch (error) {
+    if (fd !== undefined) try { closeSync(fd); } catch {}
+    try { unlinkSync(temporary); } catch {}
+    throw error;
   }
-  renameSync(temporary, path);
-  const dir = openSync(dirname(path), "r");
-  try { fsyncSync(dir); } finally { closeSync(dir); }
 }
 
 function sessionToolResults(sessionFile: string): Set<string> {
@@ -60,12 +110,6 @@ function sessionToolResults(sessionFile: string): Set<string> {
   return ids;
 }
 
-function removeJournal(path: string): void {
-  try { unlinkSync(path); } catch (error: any) {
-    if (error?.code !== "ENOENT") throw error;
-  }
-}
-
 function compact(sessionFile: string, journal: Journal): Journal {
   const persisted = sessionToolResults(sessionFile);
   let changed = false;
@@ -75,7 +119,7 @@ function compact(sessionFile: string, journal: Journal): Journal {
     changed = true;
   }
   if (changed) {
-    if (Object.keys(journal.results).length === 0) removeJournal(journalPath(sessionFile));
+    if (Object.keys(journal.results).length === 0) removeDurably(journalPath(sessionFile));
     else durableWrite(journalPath(sessionFile), journal);
   }
   return journal;
@@ -94,7 +138,10 @@ export default function waynodeToolJournal(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event, ctx) => {
     sessionFile = ctx.sessionManager.getSessionFile();
-    journal = sessionFile ? compact(sessionFile, loadJournal(sessionFile)) : undefined;
+    const sessionId = ctx.sessionManager.getSessionId();
+    if (!sessionFile || !sessionId) { journal = undefined; return; }
+    cleanupTemporaryWrites(journalPath(sessionFile));
+    journal = compact(sessionFile, loadJournal(sessionFile, sessionId));
   });
 
   pi.on("tool_execution_end", (event) => {
@@ -113,14 +160,8 @@ export default function waynodeToolJournal(pi: ExtensionAPI): void {
     durableWrite(journalPath(sessionFile), journal);
   });
 
-  pi.on("message_end", (event) => {
-    if (!sessionFile || !journal || event.message.role !== "toolResult") return;
-    if (!journal.results[event.message.toolCallId]) return;
-    delete journal.results[event.message.toolCallId];
-    if (Object.keys(journal.results).length === 0) removeJournal(journalPath(sessionFile));
-    else durableWrite(journalPath(sessionFile), journal);
-  });
-
+  // message_end runs before SessionManager.appendMessage(). Cleanup here
+  // would reopen the exact crash window this journal exists to close.
   pi.on("agent_settled", () => {
     if (sessionFile && journal) compact(sessionFile, journal);
   });
