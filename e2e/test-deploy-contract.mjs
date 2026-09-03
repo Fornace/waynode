@@ -107,6 +107,17 @@ assert.match(deploy, /The previous sandbox image could not be resolved/);
 assert.match(deploy, /capture_backup_timer_state/);
 assert.match(deploy, /capture_backup_timer_state\s+backup_timer_changed=1\s+quiesce_backup_timer/);
 assert.match(deploy, /restore_backup_timer_state \|\| rollback_failed=1/);
+assert.match(deploy, /launch_revision "\$previous_revision" \|\| rollback_failed=1/,
+  "rollback must launch and verify the restored image with its exact prior revision");
+assert.match(deploy, /if \[\[ -n "\$previous_revision" \]\]; then\s+launch_revision "\$previous_revision" \|\| rollback_failed=1\s+else\s+unset WAYNODE_REVISION/,
+  "only an unversioned legacy rollback may use the Compose fallback");
+assert.match(deploy, /prepare_deploy_storage\s+install -d -m 700 "\$transaction_dir"\s+capture_backup_timer_state/,
+  "host storage must be checked before recovery-set creation, backup, and image builds");
+assert.match(deploy, /docker builder prune -af --min-free-space "\$DEPLOY_MIN_FREE_BYTES"/);
+assert.match(deploy, /Deployment requires \$DEPLOY_MIN_FREE_BYTES free bytes/);
+assert.match(deploy, /waynode-rollback:\*\|waynode-sandbox:rollback-\*/);
+assert.doesNotMatch(deploy, /docker image prune -af/,
+  "deployment cleanup must preserve unused but active microsandbox image tags");
 assert.match(deploy, /prune_successful_recovery_sets/);
 assert.match(deploy, /-name SUCCEEDED/);
 assert.match(deploy, /--connect-timeout 5 --max-time 15/);

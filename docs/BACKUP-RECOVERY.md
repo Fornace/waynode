@@ -75,6 +75,14 @@ label and only after the complete legacy source has been archived. Later
 deployments fail closed when revision manifests are absent or the source was
 changed out of band.
 
+Every deployment also performs a storage preflight before source backup or image
+builds. It removes only stale deployment rollback tags and dangling images,
+keeps the active server image and `waynode-sandbox:latest`, and prunes unused
+BuildKit cache only when the filesystem has less than 32 GiB free. The deploy
+fails before mutation when the threshold still cannot be met. Do not replace
+this with `docker image prune -a`: microsandbox imports its own image copy, so
+Docker can classify the operationally active local sandbox tag as unused.
+
 The transaction remains rollback-capable until both local and public HTTPS
 readiness report the exact requested Git revision. If the replacement could
 have opened the database, rollback restores the matching old source, exact

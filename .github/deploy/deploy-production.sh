@@ -22,6 +22,7 @@ BACKUP_ROOT=${BACKUP_ROOT:-/var/backups/waynode/deployments}
 COMPOSE_NAME=${COMPOSE_NAME:-docker-compose.ffrapposerver.yml}
 ALLOW_LEGACY_SOURCE=${ALLOW_LEGACY_SOURCE:-0}
 DEPLOYMENT_RETENTION_DAYS=${DEPLOYMENT_RETENTION_DAYS:-30}
+DEPLOY_MIN_FREE_BYTES=${DEPLOY_MIN_FREE_BYTES:-34359738368}
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'Error: %s\n' "$*" >&2; false; }
@@ -33,16 +34,18 @@ case "$DEPLOY_ID" in *[!a-zA-Z0-9._-]*|'') die "DEPLOY_ID contains unsupported c
 case "$DEPLOYMENT_RETENTION_DAYS" in
   *[!0-9]*|'') die "DEPLOYMENT_RETENTION_DAYS must be a non-negative integer." ;;
 esac
+case "$DEPLOY_MIN_FREE_BYTES" in
+  *[!0-9]*|'') die "DEPLOY_MIN_FREE_BYTES must be a non-negative integer." ;;
+esac
 [[ -d "$LIVE_DIR" && -f "$LIVE_DIR/.env" ]] || die "Live Waynode source and .env are required."
 [[ -d "$STAGED_SOURCE_DIR" && -f "$STAGED_SOURCE_DIR/$COMPOSE_NAME" ]] \
   || die "The staged release is incomplete."
-for command in docker rsync sha256sum tar curl node systemctl; do need "$command"; done
+for command in docker rsync sha256sum tar curl node systemctl df; do need "$command"; done
 
 bash "$STAGED_SOURCE_DIR/.github/deploy/reconcile-tls.sh"
 
 transaction_dir="$BACKUP_ROOT/$DEPLOY_SHA-$DEPLOY_ID"
 [[ ! -e "$transaction_dir" ]] || die "Deployment transaction already exists: $transaction_dir"
-install -d -m 700 "$transaction_dir"
 
 compose() {
   docker compose --project-directory "$LIVE_DIR" -f "$LIVE_DIR/$COMPOSE_NAME" "$@"
@@ -86,11 +89,11 @@ revision_from_image() {
 }
 
 verify_revision_url() {
-  local url=$1
-  EXPECTED_REVISION="$DEPLOY_SHA" curl --fail --silent --show-error \
+  local url=$1 expected_revision=$2
+  EXPECTED_REVISION="$expected_revision" curl --fail --silent --show-error \
     --connect-timeout 5 --max-time 15 \
     --retry 12 --retry-delay 2 --retry-all-errors "$url" | \
-    EXPECTED_REVISION="$DEPLOY_SHA" node -e '
+    EXPECTED_REVISION="$expected_revision" node -e '
       let body = "";
       process.stdin.on("data", chunk => body += chunk);
       process.stdin.on("end", () => {
@@ -100,6 +103,42 @@ verify_revision_url() {
         } catch { process.exit(3); }
       });
     '
+}
+
+launch_revision() {
+  local revision=$1 running_revision
+  export WAYNODE_REVISION="$revision"
+  compose up -d --wait --wait-timeout 120 --force-recreate
+  running_revision=$(docker inspect waynode \
+    --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')
+  [[ "$running_revision" == "$revision" ]] || {
+    say "Running container has the wrong revision label."
+    return 1
+  }
+  verify_revision_url "http://127.0.0.1:3000/api/health/version" "$revision"
+}
+
+available_bytes() {
+  df --block-size=1 --output=avail "$LIVE_DIR" | tail -n 1 | tr -d ' '
+}
+
+prepare_deploy_storage() {
+  local reference free_bytes
+  while IFS= read -r reference; do
+    case "$reference" in
+      waynode-rollback:*|waynode-sandbox:rollback-*)
+        docker image rm "$reference" >/dev/null ;;
+    esac
+  done < <(docker image ls --format '{{.Repository}}:{{.Tag}}' | sort -u)
+  docker image prune -f >/dev/null
+  free_bytes=$(available_bytes)
+  if (( free_bytes < DEPLOY_MIN_FREE_BYTES )); then
+    say "Docker storage is low; pruning unused build cache before deployment."
+    docker builder prune -af --min-free-space "$DEPLOY_MIN_FREE_BYTES" >/dev/null
+    free_bytes=$(available_bytes)
+  fi
+  (( free_bytes >= DEPLOY_MIN_FREE_BYTES )) \
+    || die "Deployment requires $DEPLOY_MIN_FREE_BYTES free bytes; only $free_bytes available."
 }
 
 capture_backup_timer_state() {
@@ -183,8 +222,6 @@ backup_timer_changed=0
 previous_image_id=$(docker inspect --format '{{.Image}}' waynode 2>/dev/null || true)
 previous_image_name=$(compose config --images | head -n 1)
 previous_sandbox_id=$(docker image inspect --format '{{.Id}}' waynode-sandbox:latest 2>/dev/null || true)
-previous_revision=$(revision_from_image "$previous_image_id")
-previous_source_digest=$(source_digest "$LIVE_DIR")
 data_archive="$transaction_dir/waynode-predeploy.data.tar.gz"
 previous_sandbox_archive="$transaction_dir/sandbox-image.tar"
 new_sandbox_archive="$transaction_dir/new-sandbox-image.tar"
@@ -218,11 +255,15 @@ rollback() {
           --tag waynode-sandbox:latest --quiet || rollback_failed=1
     fi
     if [[ $rollback_failed == 0 ]]; then
-      unset WAYNODE_REVISION
-      compose up -d --force-recreate || rollback_failed=1
-      curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-all-errors \
-        --connect-timeout 5 --max-time 15 \
-        http://127.0.0.1:3000/api/auth/me >/dev/null || rollback_failed=1
+      if [[ -n "$previous_revision" ]]; then
+        launch_revision "$previous_revision" || rollback_failed=1
+      else
+        unset WAYNODE_REVISION
+        compose up -d --wait --wait-timeout 120 --force-recreate || rollback_failed=1
+        curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-all-errors \
+          --connect-timeout 5 --max-time 15 \
+          http://127.0.0.1:3000/api/auth/me >/dev/null || rollback_failed=1
+      fi
     fi
   fi
   if [[ $backup_timer_changed == 1 ]]; then
@@ -243,6 +284,10 @@ trap 'rollback 130' HUP INT TERM
 [[ -n "$previous_image_id" ]] || die "The previous server image could not be resolved."
 [[ -n "$previous_image_name" ]] || die "The previous server image name could not be resolved."
 [[ -n "$previous_sandbox_id" ]] || die "The previous sandbox image could not be resolved."
+previous_revision=$(revision_from_image "$previous_image_id")
+previous_source_digest=$(source_digest "$LIVE_DIR")
+prepare_deploy_storage
+install -d -m 700 "$transaction_dir"
 
 capture_backup_timer_state
 backup_timer_changed=1
@@ -312,10 +357,7 @@ docker run --rm --network none \
     --tag waynode-sandbox:latest --quiet
 
 replacement_started=1
-compose up -d --wait --wait-timeout 120 --force-recreate
-[[ "$(docker inspect waynode --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" == "$DEPLOY_SHA" ]] \
-  || die "Running container has the wrong revision label."
-verify_revision_url "http://127.0.0.1:3000/api/health/version"
+launch_revision "$DEPLOY_SHA"
 curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
   http://127.0.0.1:3000/api/health/ready >/dev/null
 if docker exec waynode printenv DEV_AUTH_TOKEN >/dev/null 2>&1; then
@@ -327,7 +369,7 @@ WAYNODE_ROOT_DIR="$LIVE_DIR" COMPOSE_FILE="$LIVE_DIR/$COMPOSE_NAME" \
 public_url=$(awk 'index($0, "APP_URL=") == 1 { print substr($0, 9); exit }' "$LIVE_DIR/.env")
 public_url=${public_url%/}
 [[ "$public_url" == https://* ]] || die "Production APP_URL must use HTTPS."
-verify_revision_url "$public_url/api/health/version"
+verify_revision_url "$public_url/api/health/version" "$DEPLOY_SHA"
 curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-all-errors \
   --connect-timeout 5 --max-time 15 \
   "$public_url/api/health/ready" >/dev/null
