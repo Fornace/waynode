@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import express from "express";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,7 +9,8 @@ process.env.DATA_DIR = root;
 process.env.SESSION_SECRET = "admission-test";
 process.env.ENCRYPTION_KEY = "0".repeat(64);
 process.env.DEV_AUTH_TOKEN = "admission-token";
-process.env.PI_BINARY = process.execPath;
+symlinkSync(process.execPath, join(root, "pi"));
+process.env.PATH = `${root}:${process.env.PATH || ""}`;
 
 const { default: db } = await import("../lib/db.mjs");
 const { createSession } = await import("../lib/sessions.mjs");
