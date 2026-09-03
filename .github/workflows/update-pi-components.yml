@@ -95,8 +95,9 @@ jobs:
           branch=automation/pi-components
           git config user.name "waynode-pi-updater[bot]"
           git config user.email "waynode-pi-updater[bot]@users.noreply.github.com"
+          gh auth setup-git
           git checkout -B "$branch"
-          git add config/pi-components.json
+          git add config/pi-components.json docs/PI-COMPONENT-UPDATES.md
           git commit -m "chore(pi): update runtime components"
           git push --force origin "HEAD:$branch"
 

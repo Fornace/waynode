@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = resolve(repoRoot, "config/pi-components.json");
+const docsPath = resolve(repoRoot, "docs/PI-COMPONENT-UPDATES.md");
 const current = JSON.parse(readFileSync(manifestPath, "utf8"));
 const root = mkdtempSync(join(tmpdir(), "waynode-pi-update-"));
 const prefix = join(root, "npm-global");
@@ -65,6 +66,28 @@ async function leanRelease(version) {
       aarch64: readAsset("lean-ctx-aarch64-unknown-linux-musl.tar.gz"),
     },
   };
+}
+
+function syncDocumentation(next) {
+  let docs = readFileSync(docsPath, "utf8");
+  const currentGoal = current.packages.find((item) => item.name === "pi-codex-goal").version;
+  const currentLean = current.packages.find((item) => item.name === "pi-lean-ctx").version;
+  const nextGoal = next.packages.find((item) => item.name === "pi-codex-goal").version;
+  const nextLean = next.packages.find((item) => item.name === "pi-lean-ctx").version;
+  const replace = (before, after) => {
+    if (before === after) return;
+    if (!docs.includes(before)) throw new Error(`Documentation marker missing: ${before}`);
+    docs = docs.replace(before, after);
+  };
+  replace(`Reviewed: ${current.reviewedAt}`, `Reviewed: ${next.reviewedAt}`);
+  replace(`- \`${current.pi.package}\` ${current.pi.version}`, `- \`${next.pi.package}\` ${next.pi.version}`);
+  replace(`- \`pi-codex-goal\` ${currentGoal}`, `- \`pi-codex-goal\` ${nextGoal}`);
+  replace(`- \`pi-lean-ctx\` ${currentLean}`, `- \`pi-lean-ctx\` ${nextLean}`);
+  replace(`- standalone \`lean-ctx\` ${current.leanCtx.version}`, `- standalone \`lean-ctx\` ${next.leanCtx.version}`);
+  replace(`Sources reviewed on ${current.reviewedAt}:`, `Sources reviewed on ${next.reviewedAt}:`);
+  replace(`- lean-ctx ${current.leanCtx.version} release assets:`, `- lean-ctx ${next.leanCtx.version} release assets:`);
+  replace(`releases/tag/${current.leanCtx.releaseTag}>`, `releases/tag/${next.leanCtx.releaseTag}>`);
+  writeFileSync(docsPath, docs);
 }
 
 function writeOutput(changed, next) {
@@ -131,7 +154,10 @@ try {
     packages: next.packages,
     leanCtx: next.leanCtx,
   };
-  if (changed) writeFileSync(manifestPath, `${JSON.stringify(ordered, null, 2)}\n`);
+  if (changed) {
+    writeFileSync(manifestPath, `${JSON.stringify(ordered, null, 2)}\n`);
+    syncDocumentation(ordered);
+  }
   writeOutput(changed, ordered);
   console.log(changed
     ? `Updated pi component pins: pi ${piVersion}, ${packages.map((item) => `${item.name} ${item.version}`).join(", ")}`

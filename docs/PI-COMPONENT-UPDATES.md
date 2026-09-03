@@ -1,6 +1,6 @@
 # Pi component updates
 
-Reviewed: 2026-08-29
+Reviewed: 2026-09-03
 
 Waynode keeps pi and its runtime packages current through a daily, tested,
 reproducible update workflow. Production images never install floating versions.
@@ -11,8 +11,8 @@ The source of truth is `config/pi-components.json`:
 
 - `@earendil-works/pi-coding-agent` 0.84.4
 - `pi-codex-goal` 0.2.0
-- `pi-lean-ctx` 3.9.20
-- standalone `lean-ctx` 3.9.20 for Linux x86_64 and aarch64
+- `pi-lean-ctx` 3.10.0
+- standalone `lean-ctx` 3.10.0 for Linux x86_64 and aarch64
 
 The manifest records npm SRI values and the official GitHub release SHA-256
 values. Both `Dockerfile` and `sandbox/Dockerfile` consume the same manifest
@@ -90,7 +90,7 @@ use the baked directory directly.
 
 ## Compatibility receipt
 
-Sources reviewed on 2026-08-29:
+Sources reviewed on 2026-09-03:
 
 - Pi packages and update commands:
   <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md>
@@ -98,8 +98,8 @@ Sources reviewed on 2026-08-29:
   <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/CHANGELOG.md>
 - pi-codex-goal 0.2.0 release source:
   <https://github.com/fitchmultz/pi-codex-goal/releases/tag/v0.2.0>
-- lean-ctx 3.9.20 release assets:
-  <https://github.com/yvgude/lean-ctx/releases/tag/v3.9.20>
+- lean-ctx 3.10.0 release assets:
+  <https://github.com/yvgude/lean-ctx/releases/tag/v3.10.0>
 - GitHub workflow token behavior:
   <https://docs.github.com/actions/using-workflows/triggering-a-workflow>
 
