@@ -20,7 +20,7 @@
     "test:org-llm-key": "node e2e/test-org-llm-key.mjs",
     "test:app-store": "node e2e/test-app-store.mjs",
     "test:content": "node e2e/test-content.mjs",
-    "test:public-trust": "node e2e/test-public-trust.mjs",
+    "test:public-trust": "node e2e/test-public-trust.mjs && node e2e/test-hosted-readiness.mjs",
     "test:terminal": "node e2e/test-terminal-billing.mjs",
     "test:terminal-capability": "node e2e/test-terminal-capability.mjs",
     "test:sandbox-terminal": "node e2e/test-sandbox-terminal.mjs",

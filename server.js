@@ -90,8 +90,8 @@ app.use(helmet({
 // hosted execution prerequisites and returns 503 until they are usable.
 app.get("/api/health/live", (req, res) => res.json({ live: true }));
 app.get("/api/health/version", (req, res) => res.json(versionReport()));
-app.get("/api/health/ready", (req, res) => {
-  const report = readinessReport();
+app.get("/api/health/ready", async (req, res) => {
+  const report = await readinessReport();
   res.status(report.ready ? 200 : 503).json(publicReadinessReport(report));
 });
 

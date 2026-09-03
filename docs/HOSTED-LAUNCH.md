@@ -82,7 +82,12 @@ fails readiness if the replacement container still exposes one.
 The host-specific Compose file binds application HTTP to `127.0.0.1`; nginx on
 the same host is the only public origin. Both Docker and the deployment check
 `/api/health/ready`, which includes SQLite/data access and hosted KVM, OAuth,
-sandbox-credential, and billing prerequisites.
+sandbox-credential, billing, and private sandbox LLM gateway prerequisites.
+Hosted readiness sends an unauthenticated `GET /readyz` to the root of the
+configured `LLM_BASE_URL`, requires HTTP 200 JSON with `status: "ok"`, times out
+after 1.5 seconds, coalesces concurrent checks, and caches each result for five
+seconds. Credential presence alone never makes a dead private route ready.
+Self-hosted readiness has no managed-gateway dependency.
 
 Deployment remains inside its rollback transaction until the public HTTPS
 version and readiness endpoints pass. A failure restores the matching old
