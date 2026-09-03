@@ -39,7 +39,7 @@
     "test:session-sse": "node e2e/test-session-sse.mjs",
     "test:hammersmith": "node e2e/test-hammersmith.mjs",
     "test:session-lifecycle": "node e2e/test-session-lifecycle.mjs",
-    "test:session-recovery": "node e2e/test-session-recovery.mjs",
+    "test:session-recovery": "node e2e/test-session-recovery.mjs && node e2e/test-tool-call-recovery.mjs",
     "test:session-resilience-live": "node e2e/test-session-resilience-live.mjs",
     "test:stream-reconnect": "node e2e/test-session-stream-reconnect.mjs",
     "test:billing-edges": "node e2e/test-billing-edges.mjs",

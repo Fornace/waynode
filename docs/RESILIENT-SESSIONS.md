@@ -257,7 +257,13 @@ SOLID bar (from trigger.dev/CF/Happy behavior):
 3. Server restart/deploy → work pauses and resumes (or cleanly reports),
    never silently vanishes.
 4. Idle hours → nothing runs, nothing lost; next message is instant.
-5. One wire contract, rendered identically everywhere.
+5. **One wire contract, rendered identically everywhere.**
+6. **Crash-safe tool boundary.** A process death between an external tool's
+   side effect and Pi's normal `toolResult` append can never cause automatic
+   re-execution or false success. Waynode fsyncs finalized results in a
+   reviewed Pi extension. Recovery appends that exact result when present,
+   otherwise a Pi-native error result says execution and side effects are
+   uncertain. Only then may continuation begin.
 
 | Bar | Today |
 |---|---|
@@ -332,6 +338,26 @@ future CLI) consumes the same replay stream.
   already avoids battery burn; verify page-visibility resume behavior.
 - Optional later: Web Push when a goal turn settles while no viewer is
   connected (session_events table gives the hook).
+
+### 6.8 Tool-call recovery boundary
+
+Pi persists an assistant tool call before execution and its `toolResult`
+after `tool_execution_end`. A SIGKILL inside that interval otherwise leaves
+an unmatched call which Pi may execute again on `--continue`. The
+`waynode-tool-journal` extension writes each finalized result to an
+fsync-backed, per-JSONL sidecar before Pi's host listener proceeds. Normal
+`toolResult` persistence consumes the sidecar record. On cold handle creation
+and boot continuation, the host scans the active branch before starting Pi:
+
+- a matching sidecar record becomes the exact Pi-native `toolResult`;
+- a missing record becomes an `isError: true` result that says execution and
+  side effects are uncertain;
+- stable `toolCallId` matching and active-branch traversal make repair
+  idempotent and avoid touching abandoned branches.
+
+This enforces at-most-once automatic tool execution across server and
+microVM crashes. A user or agent can choose a later explicit retry only after
+inspecting current state.
 
 ---
 

@@ -14,8 +14,10 @@ Source of truth: pi session JSONL (`<space>/.waynode/sessions/<sessionId>`).
    supersedes it; clients never display both.
 5. Browser disconnect never controls agent lifetime. A server restart marks
    active submission rows interrupted and automatically resumes them.
-6. `agent_settled`, not `agent_end`, settles a pi turn. `agent_end` can be
-   followed by retry, compaction, or queued continuations.
+7. An assistant tool call is never blindly replayed after execution stops.
+   Waynode restores a durably journaled final result, or appends an error
+   result that says execution and side effects are uncertain, before Pi can
+   continue the session.
 
 ## Opening the stream
 
@@ -112,18 +114,25 @@ sending (client only)
 
 Submission rows live in SQLite. On process boot, stale `queued`, `starting`,
 or `running` rows become `interrupted`, then recovery continuation dispatches
-the oldest turn with its original submission id. Remaining rows go back into
-pi's follow-up queue. A manual `POST /api/sessions/:id/resume` is available if
-a boot-time start failed.
+the oldest turn with its original submission id. Before Pi starts, Waynode
+repairs every unmatched tool call on the active JSONL branch. A finalized
+result captured by the reviewed `waynode-tool-journal` extension is restored
+with the original `toolCallId`; a call without such a result receives an
+`isError: true` result explaining that execution and side effects are
+uncertain. Pi then sees each previous tool call as resolved and cannot execute
+it merely because the server restarted. Remaining submission rows go back
+into Pi's follow-up queue. A manual `POST /api/sessions/:id/resume` is
+available if a boot-time start failed.
 
 ## Restart and deploy behavior
 
 SIGTERM sets drain mode: new turns receive 503 with a restart explanation;
 running turns get 90 seconds to settle (`WAYNODE_DRAIN_MS`). Docker grants a
-2-minute stop grace. Anything still in flight becomes recoverable at the next
-boot. pi `--continue` supplies the original user message and any durable
-partial output; the recovery prompt tells the model to continue without
-repeating visible work.
+2-minute stop grace. Anything still in flight becomes recoverable at the next boot. Pi
+`--continue` supplies the original user message and any durable partial
+output. Unmatched tool calls are resolved first under the no-blind-replay rule
+above, then the internal recovery prompt tells the model to continue without
+repeating visible work. The original user prompt remains the submission truth.
 
 ## Client merge rules
 

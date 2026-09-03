@@ -29,6 +29,9 @@ function packageDir(target, name, version) {
 try {
   const baked = join(root, "baked");
   const agent = join(root, "agent");
+  const sourceExtensions = join(baked, "extensions");
+  mkdirSync(sourceExtensions, { recursive: true });
+  writeFileSync(join(sourceExtensions, "waynode-tool-journal.ts"), "export default () => {};\n");
   packageDir(baked, "pi-codex-goal", "0.2.0");
   packageDir(baked, "pi-lean-ctx", "3.9.20");
   const manifestPath = join(baked, "pi-components.json");
@@ -41,7 +44,12 @@ try {
 
   const first = seedPiComponents({ agentDir: agent, bakedDir: baked, manifestPath });
   assert.equal(first.status, "seeded");
-  assert.deepEqual(first.changed.sort(), ["pi-codex-goal@0.2.0", "pi-lean-ctx@3.9.20"]);
+  assert.deepEqual(first.changed.sort(), ["pi-codex-goal@0.2.0", "pi-lean-ctx@3.9.20", "waynode-extensions"]);
+  assert.equal(
+    readFileSync(join(agent, "extensions", "waynode-tool-journal.ts"), "utf8"),
+    "export default () => {};\n",
+    "the Waynode recovery extension is seeded with package resources",
+  );
 
   const second = seedPiComponents({ agentDir: agent, bakedDir: baked, manifestPath });
   assert.deepEqual(second.changed, [], "seeding is idempotent");

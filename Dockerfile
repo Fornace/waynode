@@ -51,6 +51,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 # immutable and server/sandbox versions cannot drift. The manifest is kept
 # inside the agent dir so the server runtime can seed its DATA_DIR from it.
 COPY config/pi-components.json /root/.pi/agent/pi-components.json
+COPY pi-extensions/ /root/.pi/agent/extensions/
 COPY scripts/install-pi-components.sh /tmp/install-pi-components.sh
 RUN bash /tmp/install-pi-components.sh /root/.pi/agent/pi-components.json && \
     rm -f /tmp/install-pi-components.sh

@@ -10,11 +10,14 @@ const expectedGoal = manifest.packages.find((entry) => entry.name === "pi-codex-
 const expectedLean = manifest.packages.find((entry) => entry.name === "pi-lean-ctx")?.version;
 if (!expectedGoal || !expectedLean) throw new Error("Required packages are missing from the component manifest");
 const packageRoot = join(agentDir, "npm", "node_modules");
+const waynodeJournal = join(agentDir, "extensions", "waynode-tool-journal.ts");
+readFileSync(waynodeJournal, "utf8");
 const extensions = [
+  waynodeJournal,
   join(packageRoot, "pi-codex-goal", "src", "index.ts"),
   join(packageRoot, "pi-lean-ctx", "extensions", "index.ts"),
 ];
-for (const extension of extensions) {
+for (const extension of extensions.filter((path) => path.includes("node_modules"))) {
   const expected = extension.includes("pi-codex-goal") ? expectedGoal : expectedLean;
   const installed = JSON.parse(readFileSync(join(extension, "..", "..", "package.json"), "utf8")).version;
   if (installed !== expected) throw new Error(`Expected ${extension} version ${expected}, found ${installed}`);

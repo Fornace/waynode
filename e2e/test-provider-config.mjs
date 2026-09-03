@@ -41,6 +41,10 @@ try {
   const goalExtension = join(goalExtensionDir, "index.ts");
   mkdirSync(goalExtensionDir, { recursive: true });
   writeFileSync(goalExtension, "// test extension\n");
+  const recoveryExtensionDir = join(operatorAgentDir, "extensions");
+  const recoveryExtension = join(recoveryExtensionDir, "waynode-tool-journal.ts");
+  mkdirSync(recoveryExtensionDir, { recursive: true });
+  writeFileSync(recoveryExtension, "// recovery extension\n");
   writeFileSync(join(operatorAgentDir, "auth.json"), '{"operator":"auth"}\n');
   writeFileSync(join(operatorAgentDir, "settings.json"), '{"operator":"settings"}\n');
   writeFileSync(join(operatorAgentDir, "models.json"), '{"operator":"models"}\n');
@@ -49,15 +53,20 @@ try {
   for (const flag of resourceIsolationFlags) {
     assert.ok(resourceArgs.includes(flag), `embedded pi isolates ambient resources with ${flag}`);
   }
-  assert.equal(resourceArgs.filter((arg) => arg === "--extension").length, 1, "embedded pi restores exactly one extension");
-  assert.equal(resourceArgs[resourceArgs.indexOf("--extension") + 1], goalExtension, "only the goal extension is explicitly restored");
+  assert.equal(resourceArgs.filter((arg) => arg === "--extension").length, 2, "embedded pi restores exactly two reviewed extensions");
+  assert.deepEqual(
+    resourceArgs.filter((arg, index) => resourceArgs[index - 1] === "--extension"),
+    [recoveryExtension, goalExtension],
+    "only the recovery journal and goal extension are explicitly restored",
+  );
   const rpcArgs = getAgentRpcArgs({ id: "rpc-session", provider: "openai", model: "gpt-4.1", pi_session_dir: root });
   for (const flag of resourceIsolationFlags) {
     assert.ok(rpcArgs.includes(flag), `long-lived RPC chat isolates ambient resources with ${flag}`);
   }
   assert.equal(rpcArgs.includes("--no-tools"), false, "ordinary RPC messages retain normal and goal tools");
   assert.equal(rpcArgs[rpcArgs.indexOf("--session-id") + 1], "rpc-session", "new RPC sessions use the stable Waynode ID");
-  assert.equal(rpcArgs[rpcArgs.indexOf("--extension") + 1], goalExtension, "long-lived RPC chat preserves goal tools");
+  assert.ok(rpcArgs.includes(recoveryExtension), "long-lived RPC chat enables tool-result journaling");
+  assert.ok(rpcArgs.includes(goalExtension), "long-lived RPC chat preserves goal tools");
   const rpcHandle = new AgentHandle({ id: "rpc-session", space_id: "rpc-space", title: "RPC" });
   let firstTurnCommand = null;
   rpcHandle._send = async (command) => { firstTurnCommand = command; };
@@ -121,7 +130,8 @@ try {
   assert.ok(args.includes("--no-approve"), "headless agents never wait for project trust input");
   assert.ok(args.includes("--no-extensions"), "one-shot chat also isolates ambient extensions");
   assert.equal(args.includes("--no-tools"), false, "one-shot ordinary messages retain normal and goal tools");
-  assert.equal(args[args.indexOf("--extension") + 1], goalExtension, "one-shot chat preserves goal tools");
+  assert.ok(args.includes(recoveryExtension), "one-shot chat enables tool-result journaling");
+  assert.ok(args.includes(goalExtension), "one-shot chat preserves goal tools");
   assert.equal(args[args.indexOf("--session-id") + 1], "waynode-session", "new sessions receive a stable pi session ID");
   const goalArgs = getPiArgs({
     session: { id: "goal-session", provider: "openai", model: "gpt-4.1", pi_session_dir: root },

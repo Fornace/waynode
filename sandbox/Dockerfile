@@ -49,6 +49,7 @@ RUN git config --global user.name "Waynode" && \
 # pi CLI, its two packages, and the matching standalone lean-ctx binary use
 # the same reviewed manifest as the server image.
 COPY config/pi-components.json /tmp/pi-components.json
+COPY pi-extensions/ /root/.pi/agent/extensions/
 COPY scripts/install-pi-components.sh /tmp/install-pi-components.sh
 RUN bash /tmp/install-pi-components.sh /tmp/pi-components.json && \
     rm -f /tmp/install-pi-components.sh /tmp/pi-components.json

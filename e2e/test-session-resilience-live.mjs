@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -20,10 +20,21 @@ if (!process.env.LLM_API_KEY) {
 const root = mkdtempSync(join(tmpdir(), "waynode-live-resilience-"));
 const data = join(root, "data");
 const repo = join(root, "repo");
+const markerFile = join(repo, "tool-side-effect.txt");
 const port = 48100 + Math.floor(Math.random() * 500);
 const base = `http://127.0.0.1:${port}`;
 const token = "resilience-dev-token";
 let server = null;
+let passed = false;
+let liveSessionDir = null;
+
+function snapshotSession(label) {
+  if (!liveSessionDir || !existsSync(liveSessionDir)) return;
+  const destination = join(root, "artifacts", label);
+  mkdirSync(join(root, "artifacts"), { recursive: true });
+  cpSync(liveSessionDir, destination, { recursive: true });
+  console.log(`  captured ${label}: ${destination}`);
+}
 
 function startServer() {
   server = spawn(process.execPath, ["server.js"], {
@@ -104,6 +115,7 @@ try {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ title: "Live resilience", model: "fornace-fast", provider: "fornace" }),
   });
+  liveSessionDir = session.pi_session_dir;
 
   const a = new StreamReader(session.id); const b = new StreamReader(session.id);
   await a.open(); await b.open();
@@ -114,7 +126,7 @@ try {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
       submissionId, mode: "message",
-      prompt: "Use the bash tool to run: sleep 12; echo LIVE-RESILIENCE-MARKER. After it finishes, reply with exactly LIVE-RESILIENCE-DONE.",
+      prompt: "Use the bash tool to run exactly this command: sleep 4; printf 'LIVE-TOOL-ONCE\\n' >> tool-side-effect.txt; sleep 20; echo LIVE-RESILIENCE-MARKER. After it finishes, reply with exactly LIVE-RESILIENCE-DONE.",
     }),
   });
   await Promise.all([
@@ -122,10 +134,17 @@ try {
     b.waitFor((e) => e.type === "tool_start" && e.toolName === "bash"),
   ]);
   console.log("  two devices saw the same live tool call");
+  const effectDeadline = Date.now() + 30_000;
+  while (!existsSync(markerFile) && Date.now() < effectDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.equal(existsSync(markerFile), true, "tool side effect happened before the crash");
   a.close();
   assert.equal(b.events.some((e) => e.type === "tool_start"), true, "client B remains live after A closes");
+  snapshotSession("pre-kill");
 
   server.kill("SIGKILL"); await new Promise((resolve) => server.once("exit", resolve));
+  snapshotSession("post-kill-pre-recovery");
   console.log("  server crashed mid-tool; restarting with the same durable data");
   startServer(); await waitLive();
   const c = new StreamReader(session.id); await c.open();
@@ -138,9 +157,14 @@ try {
   const texts = persisted.items.flatMap((entry) => entry.blocks || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
   assert.match(texts, /LIVE-RESILIENCE-DONE/, "new device reload gets the durable final answer");
   assert.ok(persisted.items.some((entry) => entry.role === "toolResult"), "tool result survives reload");
+  assert.equal(readFileSync(markerFile, "utf8"), "LIVE-TOOL-ONCE\n",
+    "recovery never executes an interrupted side effect twice");
+  snapshotSession("post-settlement");
   c.close(); b.close();
+  passed = true;
   console.log("live session resilience: PASS (two clients + close + crash + recovery + reload)");
 } finally {
   try { server?.kill("SIGKILL"); } catch {}
-  rmSync(root, { recursive: true, force: true });
+  if (passed) rmSync(root, { recursive: true, force: true });
+  else console.error(`live session resilience artifacts retained at ${root}`);
 }
