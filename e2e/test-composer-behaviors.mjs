@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import * as ts from "@typescript/typescript6";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), "utf8");
@@ -18,8 +18,6 @@ const read = (path) => readFileSync(new URL(path, root), "utf8");
 // ──────────────────────────────────────────────────────────────────────────
 // Layer A — behavior: sessionDrafts module (importTs, runs the real TS).
 // ──────────────────────────────────────────────────────────────────────────
-const tsPath = join(process.cwd(), "frontend/node_modules/typescript/lib/typescript.js");
-const ts = await import(pathToFileURL(tsPath));
 async function importTs(path) {
   const source = readFileSync(path, "utf8");
   const js = ts.transpileModule(source, {

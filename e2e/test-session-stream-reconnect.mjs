@@ -6,10 +6,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
-import { pathToFileURL } from "node:url";
-
-// ── Module loader: recursively transpile TS to data URLs (react stubbed). ──
-const ts = await import(pathToFileURL(`${process.cwd()}/frontend/node_modules/typescript/lib/typescript.js`).href);
+import * as ts from "@typescript/typescript6";
 const REACT_STUB = "data:text/javascript;base64," + Buffer.from(
   "export function useSyncExternalStore(_s, getSnapshot){ return getSnapshot(); }",
 ).toString("base64");

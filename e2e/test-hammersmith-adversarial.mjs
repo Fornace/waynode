@@ -5,7 +5,7 @@ import express from "express";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import * as ts from "@typescript/typescript6";
 
 const root = mkdtempSync(join(tmpdir(), "waynode-hammersmith-adversarial-"));
 const repo = join(root, "repo");
@@ -242,7 +242,6 @@ assert.match(runtimeConfigText, /args_template = \["-p", "\{spec\}", "--no-sessi
 assert.doesNotMatch(runtimeConfigText, /@\{spec\}/, "the mention-triggering @ prefix never returns");
 assert.doesNotMatch(runtimeConfigText, /bash/, "no shell wrapper: hammersmith does not quote a multi-line spec");
 
-const ts = await import(pathToFileURL(join(process.cwd(), "frontend/node_modules/typescript/lib/typescript.js")));
 async function importTs(path) {
   const source = readFileSync(path, "utf8");
   const js = ts.transpileModule(source, {

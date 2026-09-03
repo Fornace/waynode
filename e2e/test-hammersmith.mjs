@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { pathToFileURL } from "node:url";
+import * as ts from "@typescript/typescript6";
 const root = mkdtempSync(join(tmpdir(), "waynode-hammersmith-test-"));
 const repo = join(root, "repo");
 mkdirSync(repo);
@@ -375,7 +375,6 @@ unsubscribe();
 assert.deepEqual(sseEvents.map((event) => event.type), ["hammersmith_run", "hammersmith_run"]);
 assert.equal(sseEvents[0].submission.id, "durable-submission");
 assert.equal(sseEvents[1].submission.job.passedTasks, 1, "SSE progress carries structured counters");
-const ts = await import(pathToFileURL(join(process.cwd(), "frontend/node_modules/typescript/lib/typescript.js")));
 const submissionsSource = readFileSync(join(process.cwd(), "frontend/src/lib/sessionSubmissions.ts"), "utf8");
 const submissionsJs = ts.transpileModule(submissionsSource, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
