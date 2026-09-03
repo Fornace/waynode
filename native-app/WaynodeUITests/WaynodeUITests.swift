@@ -128,7 +128,7 @@ final class WaynodeUITests: WaynodeUITestCase {
         let any = app.descendants(matching: .any)
         XCTAssertTrue(any["worktrees.list"].waitForExistence(timeout: 8))
         app.buttons["worktree.clone"].firstMatch.tap()
-        let summary = any["clone.organization.summary"]
+        let summary = app.staticTexts["clone.organization.summary"].firstMatch
         XCTAssertTrue(summary.waitForExistence(timeout: 4))
         XCTAssertTrue(summary.label.contains("Research Collective"))
         XCTAssertTrue(summary.label.contains("Viewer"))
