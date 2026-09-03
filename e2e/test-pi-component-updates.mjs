@@ -26,7 +26,8 @@ for (const arch of ["x86_64", "aarch64"]) {
 }
 
 assert.match(installer, /npm pack "\$\{pi_package\}@\$\{pi_version\}" --json/);
-assert.match(installer, /packed\.integrity !== value\.pi\.integrity/);
+assert.match(installer, /node "\$script_dir\/resolve-pi-pack\.mjs" "\$manifest" "\$pack_json" "\$pack_dir"/);
+assert.match(installer, /trap 'rm -rf "\$\{pack_dir:-\}"' EXIT/);
 assert.match(installer, /npm install -g --ignore-scripts "\$pi_tarball"/);
 assert.match(installer, /pi install "npm:\$\{package_name\}@\$\{package_version\}" --approve < \/dev\/null/);
 assert.match(installer, /lean-ctx\[\[:space:\]\]\+"\$lean_version"/);

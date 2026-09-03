@@ -59,8 +59,9 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 COPY config/pi-components.json /root/.pi/agent/pi-components.json
 COPY pi-extensions/ /root/.pi/agent/extensions/
 COPY scripts/install-pi-components.sh /tmp/install-pi-components.sh
+COPY scripts/resolve-pi-pack.mjs /tmp/resolve-pi-pack.mjs
 RUN bash /tmp/install-pi-components.sh /root/.pi/agent/pi-components.json && \
-    rm -f /tmp/install-pi-components.sh
+    rm -f /tmp/install-pi-components.sh /tmp/resolve-pi-pack.mjs
 WORKDIR /app
 
 # Git identity safety net. Real attribution comes per-commit (-c flags from

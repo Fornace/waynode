@@ -70,6 +70,7 @@ for (const [name, dockerfile] of [
     : /COPY config\/pi-components\.json \/tmp\/pi-components\.json/;
   assert.match(dockerfile, sharedPins);
   assert.match(dockerfile, /COPY scripts\/install-pi-components\.sh \/tmp\/install-pi-components\.sh/);
+  assert.match(dockerfile, /COPY scripts\/resolve-pi-pack\.mjs \/tmp\/resolve-pi-pack\.mjs/);
   assert.match(dockerfile, /bash \/tmp\/install-pi-components\.sh .*pi-components\.json/);
   assert.match(dockerfile, /hammersmith-0\.1\.0\+86a8308d\.tar\.gz/);
   assert.match(dockerfile, /1a8f44f26bf9d7cce0b7191c74fbfe8f2c3a96f7c01c0826c3ffba34964242c1/);

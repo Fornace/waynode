@@ -54,8 +54,9 @@ RUN git config --global user.name "Waynode" && \
 COPY config/pi-components.json /tmp/pi-components.json
 COPY pi-extensions/ /root/.pi/agent/extensions/
 COPY scripts/install-pi-components.sh /tmp/install-pi-components.sh
+COPY scripts/resolve-pi-pack.mjs /tmp/resolve-pi-pack.mjs
 RUN bash /tmp/install-pi-components.sh /tmp/pi-components.json && \
-    rm -f /tmp/install-pi-components.sh /tmp/pi-components.json
+    rm -f /tmp/install-pi-components.sh /tmp/resolve-pi-pack.mjs /tmp/pi-components.json
 
 # Fornace LLM provider. Endpoint is the WIREGUARD tunnel address on
 # 49.12.9.255 (10.200.0.1:4000) — reachable from the microVM only because the

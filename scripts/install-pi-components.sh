@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 manifest=${1:-/tmp/pi-components.json}
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 [[ -f "$manifest" ]] || { printf 'Missing pi component manifest: %s\n' "$manifest" >&2; exit 64; }
 [[ "$(node -p 'process.platform')" == "linux" ]] || {
   printf 'Pi image components must be installed in the target Linux environment.\n' >&2
@@ -33,21 +34,13 @@ IFS=$'\t' read -r pi_package pi_version < <(manifest_value pi)
 IFS=$'\t' read -r lean_version lean_tag lean_asset lean_sha256 < <(manifest_value lean)
 
 pack_dir=$(mktemp -d /tmp/waynode-pi-package.XXXXXX)
+trap 'rm -rf "${pack_dir:-}"' EXIT
 pack_json="$pack_dir/pack.json"
 npm pack "${pi_package}@${pi_version}" --json --pack-destination "$pack_dir" >"$pack_json"
-pi_tarball=$(MANIFEST_PATH="$manifest" PACK_JSON="$pack_json" PACK_DIR="$pack_dir" node -e '
-  const fs = require("node:fs");
-  const path = require("node:path");
-  const value = JSON.parse(fs.readFileSync(process.env.MANIFEST_PATH, "utf8"));
-  const packed = JSON.parse(fs.readFileSync(process.env.PACK_JSON, "utf8"))[0];
-  if (packed.name !== value.pi.package || packed.version !== value.pi.version) {
-    throw new Error("Packed Pi identity mismatch");
-  }
-  if (packed.integrity !== value.pi.integrity) throw new Error("Packed Pi integrity mismatch");
-  console.log(path.join(process.env.PACK_DIR, packed.filename));
-')
+pi_tarball=$(node "$script_dir/resolve-pi-pack.mjs" "$manifest" "$pack_json" "$pack_dir")
 npm install -g --ignore-scripts "$pi_tarball"
 rm -rf "$pack_dir"
+trap - EXIT
 [[ "$(pi --version)" == "$pi_version" ]] || { printf 'pi version mismatch\n' >&2; exit 1; }
 
 pi_root=$(npm root -g)

@@ -73,6 +73,8 @@ coverage supplied only by the component updater.
 The image installer verifies:
 
 - the packed pi npm artifact matches the manifest's version and SRI;
+- both npm 11 array metadata and npm 12 package-keyed object metadata are
+  normalized before identity and integrity validation;
 - every installed Pi package matches its exact version and npm lock integrity;
 - the standalone lean-ctx archive matches its official SHA-256 for the
   running architecture, and the daily workflow re-verifies every recorded
@@ -113,6 +115,8 @@ Sources reviewed on 2026-09-03:
   <https://github.com/nodejs/docker-node/blob/main/26/trixie-slim/Dockerfile>
 - npm 12.0.2 registry metadata:
   <https://registry.npmjs.org/npm/12.0.2>
+- npm CLI 12.0.2 `pack` implementation, which keys JSON output by package name:
+  <https://github.com/npm/cli/blob/v12.0.2/lib/commands/pack.js>
 - GitHub workflow token behavior:
   <https://docs.github.com/actions/using-workflows/triggering-a-workflow>
 

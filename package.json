@@ -12,7 +12,7 @@
     "typecheck": "cd frontend && npx tsc --noEmit",
     "test:auth": "node e2e/test-native-auth.mjs",
     "test:oauth-tokens": "node e2e/test-oauth-token-encryption.mjs",
-    "test:deploy-contract": "node e2e/test-deploy-contract.mjs && node e2e/test-pi-component-updates.mjs && node e2e/test-pi-component-seed.mjs",
+    "test:deploy-contract": "node e2e/test-deploy-contract.mjs && node e2e/test-pi-component-updates.mjs && node e2e/test-pi-pack-metadata.mjs && node e2e/test-pi-component-seed.mjs",
     "test:account-deletion": "node e2e/test-account-deletion.mjs",
     "test:billing": "node e2e/test-billing.mjs",
     "test:billing-reservations": "node e2e/test-billing-reservations.mjs",
