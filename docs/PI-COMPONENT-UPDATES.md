@@ -32,10 +32,10 @@ supports manual dispatch. It:
 6. records exact resolved versions and integrity metadata;
 7. runs the full Waynode test suite and frontend build;
 8. installs the set in a clean Linux target and verifies its checksums;
-10. builds both runtime images and loads `/goal` and `/lean-ctx` through Pi
-    RPC in each, and verifies every recorded release asset digest for all
-    architectures;
-11. creates and merges one update PR.
+9. builds both runtime images, loads `/goal` and `/lean-ctx` through Pi RPC in
+   each, checks the sandbox credential boundary, and verifies every recorded
+   release asset digest for all architectures;
+10. creates and merges one update PR.
 
 The PR merge uses the repository secret `PI_UPDATE_TOKEN`. GitHub suppresses
 workflow events caused by its built-in `GITHUB_TOKEN`, which would prevent the
@@ -57,9 +57,12 @@ Resolve updates locally without deploying:
 npm run update:pi-components
 ```
 
-If the manifest changes, run the regular validation suite. Production changes
-only after the resulting commit reaches `main` and the deployment workflow
-passes.
+If the manifest changes, run the regular validation suite. Production changes only after the resulting commit reaches `main` and the
+deployment workflow passes. Every `main` deployment independently builds and
+smoke-tests both the server and sandbox images before packaging the revision or
+opening an SSH deployment transaction. This makes image construction and the
+sandbox provider credential boundary mandatory deployment evidence rather than
+coverage supplied only by the component updater.
 
 ## Reproducibility
 
