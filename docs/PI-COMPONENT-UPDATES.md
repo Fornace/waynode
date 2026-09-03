@@ -13,6 +13,10 @@ The source of truth is `config/pi-components.json`:
 - `pi-codex-goal` 0.2.0
 - `pi-lean-ctx` 3.10.0
 - standalone `lean-ctx` 3.10.0 for Linux x86_64 and aarch64
+- Node.js 26.8.1 from the immutable official `node:26.8.1-slim` multi-platform
+  image index `sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146`
+- npm 12.0.2, installed by exact version and verified during every server and
+  sandbox image build
 
 The manifest records npm SRI values and the official GitHub release SHA-256
 values. Both `Dockerfile` and `sandbox/Dockerfile` consume the same manifest
@@ -103,6 +107,12 @@ Sources reviewed on 2026-09-03:
   <https://github.com/fitchmultz/pi-codex-goal/releases/tag/v0.2.0>
 - lean-ctx 3.10.0 release assets:
   <https://github.com/yvgude/lean-ctx/releases/tag/v3.10.0>
+- Node.js 26.8.1 release:
+  <https://nodejs.org/en/blog/release/v26.8.1>
+- official Node.js Docker image source:
+  <https://github.com/nodejs/docker-node/blob/main/26/trixie-slim/Dockerfile>
+- npm 12.0.2 registry metadata:
+  <https://registry.npmjs.org/npm/12.0.2>
 - GitHub workflow token behavior:
   <https://docs.github.com/actions/using-workflows/triggering-a-workflow>
 

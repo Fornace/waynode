@@ -1,5 +1,8 @@
 # ── Builder stage: compile frontend ──
-FROM node:26.0.0-slim@sha256:ccd1c33b2876c07564b3fae7f6a5815aa42f71163faf07d00a9907e398d48bdc AS builder
+FROM node:26.8.1-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS builder
+ARG NPM_VERSION=12.0.2
+RUN npm install --global --ignore-scripts "npm@${NPM_VERSION}" && \
+    test "$(npm --version)" = "$NPM_VERSION"
 
 WORKDIR /build
 
@@ -10,7 +13,10 @@ COPY frontend/ ./frontend/
 RUN cd frontend && npm run build
 
 # ── Runtime stage ──
-FROM node:26.0.0-slim@sha256:ccd1c33b2876c07564b3fae7f6a5815aa42f71163faf07d00a9907e398d48bdc AS runtime
+FROM node:26.8.1-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS runtime
+ARG NPM_VERSION=12.0.2
+RUN npm install --global --ignore-scripts "npm@${NPM_VERSION}" && \
+    test "$(npm --version)" = "$NPM_VERSION"
 
 ARG WAYNODE_REVISION=development
 LABEL org.opencontainers.image.revision=$WAYNODE_REVISION
