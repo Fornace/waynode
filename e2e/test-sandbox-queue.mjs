@@ -110,6 +110,27 @@ try {
   assert.equal((await retrying.sendPrompt("retry me", "message", "attempt-2")).status, "completed");
   assert.deepEqual(attempts, ["retry me", "retry me"], "an explicit new retry executes exactly once");
 
+  const live = deferred();
+  const stopAttempts = [];
+  const stopping = testHandle(async ({ prompt }) => {
+    await live.promise;
+    throw new Error("vm gone");
+  });
+  const stopped = stopping.sendPrompt("live", "message", "stop-1").catch(() => {});
+  await until(() => stopping.currentSubmission?.id === "stop-1");
+  stopping.activeSandbox = { stop: async () => { stopAttempts.push("fail"); throw new Error("vm stop failed"); } };
+  const failedStop = await stopping.abort();
+  assert.equal(failedStop.cancelled, false, "a rejected sandbox stop reports failure, not success");
+  assert.match(failedStop.reason, /vm stop failed/);
+  assert.equal(stopping.abortRequestedId, "stop-1", "failed stop keeps the abort marker so a late settle lands on cancelled");
+  stopping.activeSandbox = { stop: async () => { stopAttempts.push("ok"); } };
+  const okStop = await stopping.abort();
+  assert.equal(okStop.cancelled, true, "a succeeding stop reports cancellation");
+  assert.deepEqual(stopAttempts, ["fail", "ok"]);
+  live.resolve();
+  await stopped;
+  assert.equal(stopping.getSubmission("stop-1")?.status, "cancelled", "late settle honours the abort marker");
+
   console.log("sandbox queue: truth, goal, bounds, exact retry and deduplication PASS");
 } finally {
   rmSync(root, { recursive: true, force: true });

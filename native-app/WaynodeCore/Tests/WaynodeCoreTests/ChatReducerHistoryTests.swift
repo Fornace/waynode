@@ -272,7 +272,9 @@ struct SSEDecodingTests {
         let client = SSEClient(url: URL(string: "https://example.test/stream")!, token: nil)
         let collector = Task { () -> [SSEEvent.Kind] in
             var got: [SSEEvent.Kind] = []
-            for await event in client.events() { got.append(event) }
+            for await frame in client.events() {
+                if let event = frame.event { got.append(event) }
+            }
             return got
         }
         try await client.consume(LineStream(lines: lines))

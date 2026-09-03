@@ -359,13 +359,13 @@ assert.equal(terminal.lifecycle, "finished");
 assert.equal(terminal.passedTasks, 1);
 assert.equal(terminal.failedTasks, 0);
 assert.equal(terminal.monitorUrl, "https://monitor.example.test/run");
-const replay = createHammersmithJob({
-  id: randomUUID(), ownerId, sessionId, submissionId: "durable-submission", spaceId,
-  jobDescription: "must not replace the accepted description",
-  stateDir: join(root, "stored-replay"), manifestPath: join(root, "stored-replay", "manifest.json"),
-});
+const replay = createHammersmithJob({ id: randomUUID(), ownerId, sessionId, submissionId: "durable-submission", spaceId, jobDescription: description,
+  stateDir: join(root, "stored-replay"), manifestPath: join(root, "stored-replay", "manifest.json") });
 assert.equal(replay.id, jobOne.id, "terminal duplicate replay returns the original job");
-assert.equal(getHammersmithJobBySubmission(ownerId, sessionId, "durable-submission").job_description, description);
+assert.throws(() => createHammersmithJob({ id: randomUUID(), ownerId, sessionId, submissionId: "durable-submission", spaceId, jobDescription: "must not replace the accepted description",
+  stateDir: join(root, "stored-conflict"), manifestPath: join(root, "stored-conflict", "manifest.json")
+}), /another Hammersmith request/, "changed immutable payload is rejected");
+assert.equal(getHammersmithJobBySubmission("durable-submission").job_description, description);
 assert.equal(db.prepare("SELECT COUNT(*) AS count FROM hammersmith_jobs WHERE submission_id = ?").get("durable-submission").count, 1);
 const sseEvents = [];
 const unsubscribe = subscribeHammersmithJobs(sessionId, (event) => sseEvents.push(event));

@@ -25,7 +25,7 @@
     "test:terminal-capability": "node e2e/test-terminal-capability.mjs",
     "test:sandbox-terminal": "node e2e/test-sandbox-terminal.mjs",
     "test:sandbox-queue": "node e2e/test-sandbox-queue.mjs",
-    "test:agent-submissions": "node e2e/test-agent-submission-truth.mjs && node e2e/test-session-submission-state.mjs",
+    "test:agent-submissions": "node e2e/test-agent-submission-truth.mjs && node e2e/test-submission-claims.mjs && node e2e/test-submission-http-admission.mjs && node e2e/test-session-submission-state.mjs",
     "test:sandbox-security": "node e2e/test-sandbox-security.mjs",
     "test:hosted-git-credentials": "node e2e/test-hosted-git-credentials.mjs",
     "test:git-discard": "node e2e/test-git-discard.mjs",

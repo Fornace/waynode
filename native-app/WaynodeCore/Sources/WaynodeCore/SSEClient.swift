@@ -23,18 +23,29 @@ public actor SSEClient {
     /// the task (which would kill the continuation permanently).
     private var currentSession: URLSession?
     private var task: Task<Void, Never>?
-    private var continuation: AsyncStream<SSEEvent.Kind>.Continuation
+    private var continuation: AsyncStream<SSEFrame>.Continuation
 
     /// Number of times the heartbeat watchdog has been reset. Observability
     /// hook bumped on every received line, so a healthy-but-idle stream (SSE
     /// comment keep-alives) cannot trip the 90s watchdog. Internal for tests.
     private(set) var heartbeatResets: Int = 0
 
+    /// Last durable pi entry acknowledged by a decoded SSE event. Reconnects
+    /// send this as Last-Event-ID so the server can replay entries after it.
+    /// A pending `id:` line is committed only when its matching `data:` event
+    /// decodes successfully.
+    private(set) var lastEventId: String?
+    /// The first decoded frame that the application declined. Once set, later
+    /// frames cannot move the reconnect cursor past it, even if their own IDs
+    /// are understood. A reconnect replays from the last committed cursor.
+    private var acknowledgementBlocked = false
+    private var parser = SSEFrameParser()
+
     /// The AsyncStream of decoded events. The store consumes this.
-    public nonisolated func events() -> AsyncStream<SSEEvent.Kind> {
+    public nonisolated func events() -> AsyncStream<SSEFrame> {
         eventStream
     }
-    private let eventStream: AsyncStream<SSEEvent.Kind>
+    private let eventStream: AsyncStream<SSEFrame>
 
     /// A server decision that retrying the same request cannot repair.
     public struct ConnectionFailure: Sendable, Equatable {
@@ -105,10 +116,11 @@ public actor SSEClient {
     public nonisolated func stateChanges() -> AsyncStream<ConnectionState> { stateStream }
     private let stateStream: AsyncStream<ConnectionState>
 
-    public init(url: URL, token: String?) {
+    public init(url: URL, token: String?, lastEventId: String? = nil) {
         self.url = url
         self.token = token
-        let (es, ec) = AsyncStream.makeStream(of: SSEEvent.Kind.self)
+        self.lastEventId = lastEventId
+        let (es, ec) = AsyncStream.makeStream(of: SSEFrame.self)
         self.eventStream = es
         self.continuation = ec
         let (ss, sc) = AsyncStream.makeStream(of: ConnectionState.self)
@@ -117,6 +129,19 @@ public actor SSEClient {
     }
 
     // MARK: - Start / Stop
+
+    public var reconnectCursor: String? { lastEventId }
+
+    public func acknowledge(_ frame: SSEFrame, applied: Bool = true) {
+        guard applied else {
+            acknowledgementBlocked = true
+            return
+        }
+        guard !acknowledgementBlocked else { return }
+        if case .value(let eventId) = frame.eventIdField {
+            lastEventId = eventId
+        }
+    }
 
     public func start() {
         task?.cancel()
@@ -182,7 +207,8 @@ public actor SSEClient {
     }
 
     private func connectOnce() async throws {
-        let req = SSEWire.request(url: url, token: token)
+        resetForConnection()
+        let req = SSEWire.request(url: url, token: token, lastEventId: lastEventId)
 
         // Create a fresh session per connection so forceReconnect() can
         // invalidate it without affecting the task.
@@ -206,6 +232,13 @@ public actor SSEClient {
 
         try await consume(bytes.lines)
         // Stream ended (server closed). Let the caller loop decide to reconnect.
+    }
+
+    /// Per-connection reset. Kept separate from connectOnce() so the exact
+    /// reset contract is testable without opening a live URLSession.
+    func resetForConnection() {
+        parser = SSEFrameParser()
+        acknowledgementBlocked = false
     }
 
     /// Fold an async sequence of SSE wire lines into decoded events on the
@@ -245,8 +278,8 @@ public actor SSEClient {
             }
             heartbeatResets += 1
 
-            if let event = SSEWire.decode(line, as: SSEEvent.self)?.kind {
-                continuation.yield(event)
+            if let frame = parser.consume(line) {
+                continuation.yield(frame)
             }
         }
     }
@@ -283,37 +316,6 @@ private struct StreamHTTPError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         permanentFailure?.message ?? "Live connection failed (HTTP \(statusCode))."
-    }
-}
-
-// MARK: - SSE wire decoding
-
-/// Decodes one SSE wire line into a payload. The Waynode server writes every
-/// event as a single `data: <one-line JSON>` frame (JSON.stringify never emits
-/// raw newlines), so each `data:` line is one complete event. Non-data lines —
-/// comment keep-alives (`: ka`) and blank boundaries — decode to nil.
-///
-/// This exists because `URLSession.AsyncBytes.lines` silently drops empty
-/// lines, so the classic "accumulate until blank line" SSE parser never fires.
-/// Parse per line; never wait for a boundary.
-enum SSEWire {
-    static func decode<T: Decodable>(_ line: some StringProtocol, as type: T.Type) -> T? {
-        guard line.hasPrefix("data:") else { return nil }
-        let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
-        guard let data = payload.data(using: .utf8) else { return nil }
-        return try? JSONDecoder.api.decode(T.self, from: data)
-    }
-
-    /// Build the URLRequest for any Waynode SSE endpoint. The token travels in
-    /// the Authorization header (NOT the query string) to keep it out of proxy
-    /// access logs; the server's `sseAuth` middleware accepts the header on
-    /// every SSE route. Pure so it is unit-testable without a live URL session.
-    static func request(url: URL, token: String?) -> URLRequest {
-        var req = URLRequest(url: url)
-        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        return req
     }
 }
 

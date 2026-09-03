@@ -90,6 +90,29 @@ struct ChatSubmissionTests {
         #expect(object["submissionId"] as? String == "s1")
         #expect(object["submission_id"] == nil)
     }
+
+    @Test("Terminal accepted failure retries with a fresh id; transport loss keeps it")
+    func retryIdPolicy() {
+        var reducer = ChatReducer()
+        reducer.appendSubmission(SubmissionDraft(id: "s1", prompt: "Run", mode: .message, queued: false))
+        reducer.reconcileSubmission(
+            .init(id: "s1", prompt: "Run", mode: .message, status: .failed, error: "boom"),
+            accepted: true, queued: false
+        )
+        #expect(reducer.submissionState.failedDraft?.prompt == "Run")
+        #expect(reducer.submissionState.failedDraft?.id != "s1",
+                "terminal durable failure retries with a fresh submission id")
+
+        var lost = ChatReducer()
+        let draft = SubmissionDraft(id: "s2", prompt: "Run", mode: .message, queued: false)
+        lost.appendSubmission(draft)
+        lost.reconcileSubmission(
+            .init(id: "s2", prompt: "Run", mode: .message, status: .failed, error: "network"),
+            accepted: false, queued: false
+        )
+        #expect(lost.submissionState.failedDraft == draft,
+                "response-loss retry reuses the original id for idempotent admission")
+    }
 }
 
 @Suite("SessionStore submission transport", .serialized)

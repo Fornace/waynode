@@ -10,7 +10,7 @@ import {
   archiveSession,
   touchSession,
 } from "../lib/sessions.mjs";
-import { SUBMISSION_MODES } from "../lib/agent-submissions.mjs";
+import { SUBMISSION_MODES, SubmissionLedger } from "../lib/agent-submissions.mjs";
 import { isPiAvailable } from "../lib/pi-runner.mjs";
 import { readGoalStatus } from "../lib/pi-runner.mjs";
 import { getAgent, getAgentIfActive, stopAgent } from "../lib/agent-manager.mjs";
@@ -147,8 +147,20 @@ function resetOneShotMode(sessionId, mode) {
   }
 }
 
-function existingSubmission(handle, id) {
-  return handle?.getSubmission?.(id) || null;
+function assertSameSubmission(existing, { sessionId, prompt, mode }) {
+  if (!existing) return null;
+  const owned = existing.sessionId ?? sessionId;
+  if (owned === sessionId && existing.prompt === prompt && existing.mode === mode) return existing.submission ?? existing;
+  const error = new Error("submissionId already belongs to another request");
+  error.status = 409;
+  error.code = "SUBMISSION_OWNERSHIP_CONFLICT";
+  throw error;
+}
+
+function existingSubmission(sessionId, handle, request) {
+  const live = handle?.getSubmission?.(request.id) || null;
+  if (live) return assertSameSubmission(live, { sessionId, ...request });
+  return assertSameSubmission(SubmissionLedger.lookup(request.id), { sessionId, ...request });
 }
 
 router.get("/api/sessions/:sessionId", requireAuth, (req, res) => {
@@ -268,8 +280,6 @@ router.get("/api/sessions/:sessionId/stream", sseAuth, async (req, res) => {
     unsubHammersmith();
   });
 });
-// ── Send a message (fire-and-forget; events flow over /stream) ──
-
 router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
@@ -282,7 +292,9 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
   if (hasRunningHammersmithJob(session.space_id)) return res.status(409).json({ error: "A Hammersmith job is modifying this Space" });
   if (!isPiAvailable()) return res.status(503).json({ error: "pi is not installed" });
   if (isDraining()) return res.status(503).json({ error: "Server is restarting for a deploy. Interrupted turns resume automatically in a moment." });
-  const duplicate = existingSubmission(getAgentIfActive(session.id), submissionId);
+  let duplicate;
+  try { duplicate = existingSubmission(session.id, getAgentIfActive(session.id), submission); }
+  catch (error) { return res.status(error.status || 409).json({ error: error.message }); }
   if (duplicate) return res.json({ ok: true, submission: duplicate, duplicate: true });
   const admission = reserveHostedTurn(session, res);
   if (!admission.allowed) return;
@@ -303,17 +315,18 @@ router.post("/api/sessions/:sessionId/message", requireAuth, async (req, res) =>
     return res.status(409).json({ error: "busy" });
   }
 
-  const completion = handle
-    .sendPrompt(prompt, mode, submissionId)
+  let completion;
+  try { completion = handle.sendPrompt(prompt, mode, submissionId); }
+  catch (error) {
+    releaseTokenReservation(admission.reservation?.id);
+    return res.status(error.status || 500).json({ error: error.message });
+  }
+  completion
     .catch((err) => handle.broadcast({ type: "error", message: err.message }))
     .finally(() => reconcileHostedTurn(admission));
-
-  void completion;
   resetOneShotMode(session.id, mode);
   res.json({ ok: true, submission: handle.getSubmission(submissionId) });
 });
-
-// ── Queue a follow-up while a turn is running ──
 
 router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
@@ -327,7 +340,9 @@ router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   if (hasRunningHammersmithJob(session.space_id)) return res.status(409).json({ error: "A Hammersmith job is modifying this Space" });
   if (isDraining()) return res.status(503).json({ error: "Server is restarting for a deploy. Interrupted turns resume automatically in a moment." });
   const activeHandle = getAgentIfActive(session.id);
-  const duplicate = existingSubmission(activeHandle, submissionId);
+  let duplicate;
+  try { duplicate = existingSubmission(session.id, activeHandle, submission); }
+  catch (error) { return res.status(error.status || 409).json({ error: error.message }); }
   if (duplicate) return res.json({ ok: true, submission: duplicate, duplicate: true });
   const admission = reserveHostedTurn(session, res);
   if (!admission.allowed) return;
@@ -363,7 +378,6 @@ router.post("/api/sessions/:sessionId/queue", requireAuth, async (req, res) => {
   }
 });
 
-// ── Abort the current turn (agent stays alive) ──
 
 router.post("/api/sessions/:sessionId/abort", requireAuth, async (req, res) => {
   const session = ownSession(req, res);

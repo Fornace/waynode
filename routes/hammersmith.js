@@ -228,6 +228,16 @@ function sendExistingJob(res, job, userId) {
   return res.json({ ok: true, duplicate: true, submission: submissionFor(job, view), job: view });
 }
 
+function findOwnedSubmission(submissionId, session, userId, description) {
+  const existing = getHammersmithJobBySubmission(submissionId);
+  if (!existing) return null;
+  if (existing.owner_id === userId && existing.session_id === session.id
+      && existing.space_id === session.space_id && existing.job_description === description) return existing;
+  const error = new Error("submissionId already belongs to another Hammersmith request");
+  error.status = 409;
+  throw error;
+}
+
 router.post("/api/sessions/:sessionId/hammersmith", requireAuth, async (req, res) => {
   const session = ownSession(req, res);
   if (!session) return;
@@ -239,7 +249,9 @@ router.post("/api/sessions/:sessionId/hammersmith", requireAuth, async (req, res
     return res.status(400).json({ error: "submission_id must be a non-empty string of at most 128 characters" });
   }
   const submissionId = suppliedSubmissionId || randomUUID();
-  const existing = getHammersmithJobBySubmission(req.user.id, session.id, submissionId);
+  let existing;
+  try { existing = findOwnedSubmission(submissionId, session, req.user.id, description); }
+  catch (error) { return res.status(error.status || 409).json({ error: error.message }); }
   if (existing) return sendExistingJob(res, existing, req.user.id);
   const userSettings = settingsFor(req.user.id);
   const jobRunner = runners[userSettings.hostingMode];

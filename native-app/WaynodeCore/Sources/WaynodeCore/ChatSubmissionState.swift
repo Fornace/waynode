@@ -14,7 +14,9 @@ public struct ChatSubmissionState: Sendable, Equatable {
         queued: Bool = false
     ) {
         let index = items.firstIndex { item in
-            if case .user(let user) = item { return user.id == submission.id }
+            if case .user(let user) = item {
+                return user.id == submission.id || user.submissionId == submission.id
+            }
             return false
         } ?? items.lastIndex { item in
             guard case .user(let user) = item else { return false }
@@ -26,15 +28,21 @@ public struct ChatSubmissionState: Sendable, Equatable {
             if let index { items.remove(at: index) }
         } else {
             let sentAt: Date?
+            let userId: String
+            let durableSubmissionId: String?
             if let index, case .user(let existing) = items[index] {
                 sentAt = existing.sentAt
+                userId = existing.id
+                durableSubmissionId = existing.submissionId ?? submission.id
             } else {
                 sentAt = Date()
+                userId = submission.id
+                durableSubmissionId = nil
             }
             let user = ChatItem.user(.init(
-                id: submission.id, content: submission.prompt,
-                mode: submission.mode, submissionStatus: submission.status,
-                sentAt: sentAt
+                id: userId, submissionId: durableSubmissionId,
+                content: submission.prompt, mode: submission.mode,
+                submissionStatus: submission.status, sentAt: sentAt
             ))
             if let index { items[index] = user } else { items.append(user) }
         }
@@ -65,6 +73,7 @@ public struct ChatSubmissionState: Sendable, Equatable {
             }
             items[index] = .user(.init(
                 id: user.id,
+                submissionId: user.submissionId,
                 content: user.content,
                 mode: user.mode,
                 submissionStatus: .completed,

@@ -11,6 +11,7 @@ extension ChatReducer {
     public mutating func loadHistory(_ history: [HistoryItem]) {
         revision += 1
         for h in history {
+            guard !h.id.isEmpty, durableEntryIds.insert(h.id).inserted else { continue }
             switch h.role {
             case "user":
                 // The persisted transcript carries no submission mode — the
@@ -24,7 +25,14 @@ extension ChatReducer {
                     if let txt = h.content, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
                 }
                 if !blocks.isEmpty {
+                    let itemIndex = items.count
                     items.append(.assistant(.init(id: h.id, blocks: blocks, done: true, sentAt: h.sentAt)))
+                    msgIndex[h.id] = itemIndex
+                    for blockIndex in blocks.indices {
+                        if case .tool(let tool) = blocks[blockIndex] {
+                            toolIndex[tool.id] = ToolLocation(itemIdx: itemIndex, blockIdx: blockIndex)
+                        }
+                    }
                 }
             case "toolResult":
                 // Full-fidelity replay: attach durable output to the earlier
@@ -49,6 +57,7 @@ extension ChatReducer {
                 msgIndex[assistant.id] = items.count - 1
             }
         }
+        durableEntryIds.formUnion(staged.durableEntryIds)
         revision += 1
     }
 

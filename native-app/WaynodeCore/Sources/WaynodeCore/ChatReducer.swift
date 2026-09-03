@@ -23,6 +23,9 @@ public struct ChatReducer: Sendable, Equatable {
     public internal(set) var items: [ChatItem] = []
     // messageId → items array index (only assistant items tracked here).
     public internal(set) var msgIndex: [String: Int] = [:]
+    // Stable durable entry IDs across every role. This is separate from
+    // assistant routing because tool results may share an assistant row.
+    public internal(set) var durableEntryIds: Set<String> = []
     // toolCallId → location of the tool block inside items.
     public internal(set) var toolIndex: [String: ToolLocation] = [:]
     /// Monotonically increasing counter bumped on every content mutation.
@@ -45,7 +48,7 @@ public struct ChatReducer: Sendable, Equatable {
     // message_end. Used to resolve text_delta events that omit messageId
     // (defensive: the server always sends it, but the web client falls back
     // to "last assistant message").
-    public private(set) var currentAssistantId: String?
+    public internal(set) var currentAssistantId: String?
     public init() {}
 
     // MARK: - User message (optimistic, before sending)
@@ -81,7 +84,16 @@ public struct ChatReducer: Sendable, Equatable {
 
     @discardableResult
     public mutating func reduce(_ event: SSEEvent.Kind) -> Bool {
-        lastError = nil // reset on any new event (non-error events clear a stale error)
+        var candidate = self
+        guard candidate.apply(event) else { return false }
+        self = candidate
+        return true
+    }
+
+    /// Stage every event so an unapplied frame cannot leak revision, error, or
+    /// transcript/index mutations before the caller declines its SSE cursor.
+    private mutating func apply(_ event: SSEEvent.Kind) -> Bool {
+        lastError = nil // reset only when the complete event can be applied
         revision += 1
         switch event {
         case .start:
@@ -171,8 +183,11 @@ public struct ChatReducer: Sendable, Equatable {
             return true
 
         case .sync(let snapshot):
-            applySync(snapshot)
+            guard applySync(snapshot) else { return false }
             return true
+
+        case .entries(let entries):
+            return mergeDurableEntries(entries)
 
         case .sessionRenamed:
             // Handled by the store (title mutation on Session), not the reducer
@@ -272,111 +287,6 @@ public struct ChatReducer: Sendable, Equatable {
         currentAssistantId = nil
     }
 
-    // MARK: - Sync reconstruction
-
-    /// When reconnecting mid-turn, the server sends a `sync` event with the
-    /// partial transcript of the current turn. We reconstruct assistant items
-    /// from the snapshot. Existing history items are preserved.
-    private mutating func applySync(_ snapshot: SyncSnapshot) {
-        isStreaming = snapshot.streaming
-        for submission in snapshot.submissions { reconcileSubmission(submission) }
-        for wire in snapshot.items {
-            switch wire.role {
-            case "assistant":
-                // Build the block list for this wire item once.
-                var blocks: [Block] = []
-                if let txt = wire.text, !txt.isEmpty { blocks.append(.text(.init(text: txt))) }
-                if let th = wire.thinking, !th.isEmpty { blocks.append(.thinking(.init(text: th))) }
-                for wb in wire.blocks ?? [] {
-                    switch wb.type {
-                    case "text": if let t = wb.text { blocks.append(.text(.init(text: t))) }
-                    case "thinking": if let t = wb.text { blocks.append(.thinking(.init(text: t))) }
-                    case "tool":
-                        blocks.append(.tool(.init(
-                            id: wb.id ?? UUID().uuidString,
-                            name: wb.name ?? "",
-                            args: wb.args ?? "",
-                            output: wb.output ?? "",
-                            status: .init(rawValue: wb.status ?? "running") ?? .running
-                        )))
-                    default: break
-                    }
-                }
-                let done = !snapshot.streaming
-                if let mid = wire.id {
-                    // Known id: dedup against existing messages on reconnect.
-                    if msgIndex[mid] != nil { continue }
-                    appendSyncedAssistant(id: mid, blocks: blocks, done: done)
-                } else if let idx = inFlightAssistantIndex() {
-                    // No id but an assistant item is still streaming: reconcile
-                    // the sync partial text into it instead of appending a
-                    // duplicate row. The server's partial-text WireItem omits
-                    // id (Chat.swift decoder hardcodes id:nil), so the old code
-                    // minted a random UUID that could never match msgIndex —
-                    // the dedup guard never fired and a second assistant row
-                    // appeared on every reconnect alongside the original.
-                    if let txt = wire.text, !txt.isEmpty {
-                        reconcileAssistantText(at: idx, with: txt)
-                    }
-                } else {
-                    // No id and no in-flight assistant item: mint one (legacy
-                    // reconnect path where the client has nothing locally).
-                    appendSyncedAssistant(id: UUID().uuidString, blocks: blocks, done: done)
-                }
-            case "user":
-                let mid = wire.id ?? UUID().uuidString
-                items.append(.user(.init(id: mid, content: wire.content ?? "", mode: wire.mode ?? .message)))
-            case "system":
-                let mid = wire.id ?? UUID().uuidString
-                items.append(.system(.init(id: mid, content: wire.content ?? "", key: nil)))
-            default:
-                break
-            }
-        }
-    }
-
-    /// Index of the assistant item currently receiving a stream (the message
-    /// that is not yet done). Prefers currentAssistantId; falls back to the
-    /// last non-done assistant item.
-    private func inFlightAssistantIndex() -> Int? {
-        if let mid = currentAssistantId, let idx = msgIndex[mid],
-           case .assistant(let a) = items[idx], !a.done {
-            return idx
-        }
-        for i in stride(from: items.count - 1, through: 0, by: -1) {
-            if case .assistant(let a) = items[i], !a.done { return i }
-        }
-        return nil
-    }
-
-    /// Replace the streaming assistant item's text content with the sync
-    /// partial. The sync event carries the authoritative accumulated partial
-    /// for the current turn, so we overwrite (not append) the text block.
-    private mutating func reconcileAssistantText(at itemIdx: Int, with partial: String) {
-        guard case .assistant(var a) = items[itemIdx] else { return }
-        if let lastIdx = a.blocks.indices.last, case .text = a.blocks[lastIdx] {
-            a.blocks[lastIdx] = .text(.init(text: partial))
-        } else {
-            a.blocks.append(.text(.init(text: partial)))
-        }
-        items[itemIdx] = .assistant(a)
-    }
-
-    /// Append a reconstructed assistant item (from history/sync) and rebuild
-    /// the tool index for any tool blocks it carries.
-    private mutating func appendSyncedAssistant(id: String, blocks: [Block], done: Bool) {
-        let idx = items.count
-        items.append(.assistant(.init(id: id, blocks: blocks, done: done)))
-        msgIndex[id] = idx
-        if case .assistant(let a) = items[idx] {
-            for bi in a.blocks.indices {
-                if case .tool(let tb) = a.blocks[bi] {
-                    toolIndex[tb.id] = ToolLocation(itemIdx: idx, blockIdx: bi)
-                }
-            }
-        }
-    }
-
     // MARK: - Reset
 
     /// Reset transient turn state for a new session view (keeps loaded history).
@@ -393,6 +303,7 @@ public struct ChatReducer: Sendable, Equatable {
         revision += 1
         items.removeAll()
         msgIndex.removeAll()
+        durableEntryIds.removeAll()
         toolIndex.removeAll()
         submissionState.reset()
         resetTurn()

@@ -57,12 +57,19 @@ public enum ChatItem: Hashable, Identifiable, Sendable {
 
     public struct UserItem: Hashable, Sendable, Identifiable {
         public var id: String
+        /// Durable ledger identity, distinct from Pi's stable transcript ID.
+        public var submissionId: String?
         public var content: String
         public var mode: SubmissionMode
         public var submissionStatus: SubmissionStatus?
         public var sentAt: Date?
-        public init(id: String, content: String, mode: SubmissionMode = .message, submissionStatus: SubmissionStatus? = nil, sentAt: Date? = Date()) {
-            self.id = id; self.content = content; self.mode = mode
+        public init(
+            id: String, submissionId: String? = nil,
+            content: String, mode: SubmissionMode = .message,
+            submissionStatus: SubmissionStatus? = nil, sentAt: Date? = Date()
+        ) {
+            self.id = id; self.submissionId = submissionId
+            self.content = content; self.mode = mode
             self.submissionStatus = submissionStatus; self.sentAt = sentAt
         }
     }
@@ -148,6 +155,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case submission(Submission)
         case hammersmithRun(submission: Submission?, run: HammersmithRun)
         case sync(snapshot: SyncSnapshot)
+        case entries([DurableEntry])
         case sessionRenamed(title: String)
         case ping
         case unknown
@@ -212,20 +220,37 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
                 kind = .unknown
             }
         case "sync":
-            // v2 sync carries durable transcript in `items`, plus the in-flight
-            // assistant in legacy partialText. This gives native the same
-            // full-fidelity reload/cross-device view as web without parsing
-            // the web-only `entries` union.
-            var items = try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .items) ?? []
-            if let partial = try c.decodeIfPresent(String.self, forKey: .partialText), !partial.isEmpty {
-                items.append(SyncSnapshot.WireItem(role: "assistant", content: nil, id: nil, mode: nil, text: partial, thinking: nil, blocks: nil))
+            let entries = try c.decodeIfPresent([DurableEntry].self, forKey: .entries)
+            let fromStart = try c.decodeIfPresent(Bool.self, forKey: .fromStart) ?? true
+            let cursor = try c.decodeIfPresent(String.self, forKey: .cursor)
+            let leafId = try c.decodeIfPresent(String.self, forKey: .leafId)
+            let live = try c.decodeIfPresent(SyncSnapshot.LiveOverlay.self, forKey: .live)
+            // `items` remains the legacy shape; durable `entries` is canonical.
+            // Only fall back to legacy rows when the server omitted entries.
+            var items = entries == nil
+                ? try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .items) ?? []
+                : []
+            if entries == nil,
+               let partial = try c.decodeIfPresent(String.self, forKey: .partialText),
+               !partial.isEmpty {
+                items.append(SyncSnapshot.WireItem(
+                    role: "assistant", content: nil, id: nil, mode: nil,
+                    text: partial, thinking: nil, blocks: nil
+                ))
             }
-            if let tools = try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .tools) {
+            if entries == nil,
+               let tools = try c.decodeIfPresent([SyncSnapshot.WireItem].self, forKey: .tools) {
                 items.append(contentsOf: tools)
             }
             let submissions = try c.decodeIfPresent([Submission].self, forKey: .submissions) ?? []
             let streaming = try c.decodeIfPresent(Bool.self, forKey: .streaming) ?? false
-            kind = .sync(snapshot: SyncSnapshot(items: items, submissions: submissions, streaming: streaming))
+            kind = .sync(snapshot: SyncSnapshot(
+                items: items, entries: entries, submissions: submissions,
+                streaming: streaming, fromStart: fromStart,
+                cursor: cursor, leafId: leafId, live: live
+            ))
+        case "entries":
+            kind = .entries(try c.decodeIfPresent([DurableEntry].self, forKey: .entries) ?? [])
         case "session_renamed":
             let title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
             kind = .sessionRenamed(title: title)
@@ -239,6 +264,7 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
         case toolCallId = "toolCallId", toolInput = "toolInput"
         case message, text, snapshot, title
         case streaming, partialText, tools, submission, submissions, items
+        case entries, fromStart, cursor, leafId, live
         case args
         case isError = "isError"
     }
@@ -250,7 +276,20 @@ public struct SSEEvent: Decodable, Sendable, Equatable {
 
 /// The `sync` event carries the full transcript of the *current* turn so far.
 /// Used when the client connects mid-turn (reconnect, late subscribe).
-public struct SyncSnapshot: Codable, Equatable, Sendable {
+public struct SyncSnapshot: Decodable, Equatable, Sendable {
+    public struct LiveTool: Decodable, Equatable, Sendable {
+        public var toolCallId: String
+        public var name: String
+        public var args: JSONValue
+        public var output: String
+        public var state: String
+    }
+    public struct LiveOverlay: Decodable, Equatable, Sendable {
+        public var messageId: String?
+        public var text: String
+        public var thinking: String
+        public var tools: [LiveTool]
+    }
     public struct WireItem: Codable, Equatable, Sendable {
         public var role: String
         public var content: String?
@@ -270,12 +309,27 @@ public struct SyncSnapshot: Codable, Equatable, Sendable {
         public var status: String?
     }
     public var items: [WireItem]
+    public var entries: [DurableEntry]?
     public var submissions: [Submission] = []
     public var streaming: Bool
+    public var fromStart: Bool
+    public var cursor: String?
+    public var leafId: String?
+    public var live: LiveOverlay?
 
-    public init(items: [WireItem], submissions: [Submission] = [], streaming: Bool = true) {
+    public init(
+        items: [WireItem], entries: [DurableEntry]? = nil,
+        submissions: [Submission] = [], streaming: Bool = true,
+        fromStart: Bool = false, cursor: String? = nil,
+        leafId: String? = nil, live: LiveOverlay? = nil
+    ) {
         self.items = items
+        self.entries = entries
         self.submissions = submissions
         self.streaming = streaming
+        self.fromStart = fromStart
+        self.cursor = cursor
+        self.leafId = leafId
+        self.live = live
     }
 }

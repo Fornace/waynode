@@ -35,6 +35,14 @@ public final class SessionStore {
     private var closeTimer: Task<Void, Never>?
     private var viewerCount: Int = 0
     private var isRestartingStream: Bool = false
+    private var reconnectCursor: String?
+    private var streamCloseTask: Task<Void, Never>?
+    #if DEBUG
+    var testViewerCount: Int { viewerCount }
+    var testHasStream: Bool { sse != nil }
+    var testReconnectCursor: String? { reconnectCursor }
+    var testStreamCursor: String? { get async { await sse?.reconnectCursor } }
+    #endif
 
     // The reducer is the source of truth.
     public var reducer = ChatReducer()
@@ -125,6 +133,7 @@ public final class SessionStore {
         listenerTask = nil
         let previous = sse
         sse = nil
+        if let previous { reconnectCursor = await previous.reconnectCursor }
         await previous?.stop()
 
         guard viewerCount > 0 else {
@@ -135,10 +144,15 @@ public final class SessionStore {
     }
 
     private func connectStream() async {
+        // A release/reacquire can overlap the asynchronous actor hop needed to
+        // capture the previous client's cursor. Wait for that handoff before
+        // constructing the replacement request, or replay can start at nil.
+        if let closing = streamCloseTask { await closing.value }
+        guard sse == nil, viewerCount > 0 else { return }
         connectionState = .connecting
         let url = api.makeURL("/api/sessions/\(sessionId)/stream")
         let token = await api.currentToken()
-        let client = SSEClient(url: url, token: token)
+        let client = SSEClient(url: url, token: token, lastEventId: reconnectCursor)
         sse = client
         await client.start()
 
@@ -149,8 +163,9 @@ public final class SessionStore {
         listenerTask = Task { [weak self] in
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
-                    for await event in events {
-                        await self?.handle(event)
+                    for await frame in events {
+                        guard let self else { return }
+                        await self.processFrame(frame, from: client)
                     }
                 }
                 group.addTask {
@@ -169,10 +184,32 @@ public final class SessionStore {
         stateTask = nil
         runStateTask?.cancel()
         runStateTask = nil
-        Task { [sse] in await sse?.stop() }
+        let client = sse
         sse = nil
         connectionState = .disconnected
+        guard let client else { return }
+        // Keep one awaitable handoff barrier. connectStream() waits for this
+        // task, so immediate reacquisition cannot race ahead with a nil cursor.
+        guard streamCloseTask == nil else { return }
+        streamCloseTask = Task { [weak self] in
+            let cursor = await client.reconnectCursor
+            await client.stop()
+            guard let self else { return }
+            self.reconnectCursor = cursor
+            self.streamCloseTask = nil
+        }
     }
+
+    #if DEBUG
+    func installStreamForTest(_ client: SSEClient, viewerCount: Int) {
+        sse = client
+        self.viewerCount = viewerCount
+    }
+
+    func closeStreamForTest() { closeStream() }
+    func connectStreamForTest() async { await connectStream() }
+    func awaitCloseForTest() async { await streamCloseTask?.value }
+    #endif
 
     /// Force-close the SSE stream immediately (no 30s timer).
     /// Called by AppModel on logout, space deletion, or session deletion
@@ -187,17 +224,29 @@ public final class SessionStore {
 
     // MARK: - Event handling
 
-    private func handle(_ event: SSEEvent.Kind) {
+    /// Application-level SSE acknowledgement. Durable cursor movement happens
+    /// only after the reducer/store has represented the decoded event.
+    func processFrame(_ frame: SSEFrame, from client: SSEClient) async {
+        guard let event = frame.event else {
+            await client.acknowledge(frame, applied: false)
+            return
+        }
+        let applied = handle(event)
+        await client.acknowledge(frame, applied: applied)
+    }
+
+    @discardableResult
+    private func handle(_ event: SSEEvent.Kind) -> Bool {
         switch event {
         case .sessionRenamed(let title):
             sessionMeta?.title = title
-            return
+            return true
         case .status:
-            // Status update — also feed the reducer.
+            // Status update, also feed the reducer.
             _ = reducer.reduce(event)
             // Start goal polling if not already.
             if !isPollingGoal { startGoalPolling() }
-            return
+            return true
         case .submission(let submission):
             _ = reducer.reduce(event)
             if ![.completed, .failed, .cancelled].contains(submission.status) {
@@ -207,7 +256,7 @@ public final class SessionStore {
                 stopRunStatePolling()
                 Task { await self.refreshCompletedHistory() }
             }
-            return
+            return true
         case .end, .turnEnd:
             _ = reducer.reduce(event)
             if !isRunActive {
@@ -217,9 +266,9 @@ public final class SessionStore {
             }
             // Final fetch of goal status.
             Task { await self.refreshGoalStatus() }
-            return
+            return true
         default:
-            _ = reducer.reduce(event)
+            return reducer.reduce(event)
         }
     }
 
@@ -328,7 +377,7 @@ extension ChatReducer.HistoryItem {
             text: msg.text,
             thinking: msg.thinking,
             key: msg.key,
-            sentAt: msg.timestamp.flatMap { ISO8601DateFormatter().date(from: $0) },
+            sentAt: ISODate.parse(msg.timestamp),
             blocks: msg.blocks,
             toolCallId: msg.toolCallId,
             toolName: msg.toolName,

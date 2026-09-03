@@ -145,7 +145,9 @@ struct NativeEdgeCaseTests {
 
         let collector = Task { () -> [SSEEvent.Kind] in
             var got: [SSEEvent.Kind] = []
-            for await event in client.events() { got.append(event) }
+            for await frame in client.events() {
+                if let event = frame.event { got.append(event) }
+            }
             return got
         }
 
@@ -168,7 +170,67 @@ struct NativeEdgeCaseTests {
         #expect(events[3] == .textDelta(messageId: "m1", delta: "answer"))
     }
 
-    // MARK: Bug 6
+    @Test("SSE cursor commits with its decoded event and is reused on reconnect")
+    func sseCursorIsCommittedAndReused() async throws {
+        let url = URL(string: "https://example.test/stream")!
+        let client = SSEClient(url: url, token: "secret")
+        let collector = Task { () -> [SSEFrame] in
+            var got: [SSEFrame] = []
+            for await frame in client.events() { got.append(frame) }
+            return got
+        }
+
+        // The production server writes id before data. AsyncLineSequence omits
+        // blank boundaries, so consume() must associate adjacent wire lines.
+        try await client.consume(LineStream(lines: [
+            "id: entry-1",
+            #"data: {"type":"start"}"#,
+            "id: replay-me",
+            #"data: {malformed}"#,
+            "id: entry-2",
+            #"data: {"type":"end"}"#,
+        ]))
+
+        #expect(await client.lastEventId == nil)
+        await client.stop()
+        let frames = await collector.value
+        #expect(frames.map(\.event) == [.start, nil, .end])
+        await client.acknowledge(frames[0])
+        await client.acknowledge(frames[1], applied: false)
+        await client.acknowledge(frames[2])
+        let reconnect = SSEWire.request(
+            url: url,
+            token: "secret",
+            lastEventId: await client.lastEventId
+        )
+        #expect(reconnect.value(forHTTPHeaderField: "Last-Event-ID") == "entry-1")
+        #expect(reconnect.value(forHTTPHeaderField: "Authorization") == "Bearer secret")
+    }
+
+    @Test("Malformed SSE payload does not advance the durable cursor")
+    func malformedSSEPayloadDoesNotAdvanceCursor() async throws {
+        let client = SSEClient(url: URL(string: "https://example.test/stream")!, token: nil)
+        let collector = Task { () -> [SSEFrame] in
+            var frames: [SSEFrame] = []
+            for await frame in client.events() { frames.append(frame) }
+            return frames
+        }
+        try await client.consume(LineStream(lines: [
+            "id: safe-entry",
+            #"data: {"type":"start"}"#,
+            "id: unseen-entry",
+            #"data: {malformed}"#,
+            "id: later-entry",
+            #"data: {"type":"end"}"#,
+        ]))
+        await client.stop()
+        let frames = await collector.value
+        #expect(frames.count == 3)
+        await client.acknowledge(frames[0])
+        await client.acknowledge(frames[1], applied: false)
+        await client.acknowledge(frames[2])
+        #expect(await client.lastEventId == "safe-entry")
+    }
 
     // MARK: Bug 4 — Concurrent submit silently drops the draft. The old
     // `guard !isSending else { return }` returned with sendError==nil, and the

@@ -36,6 +36,7 @@ extension SessionStore {
                         ChatReducer.ToolLocation(itemIdx: $0.itemIdx + offset, blockIdx: $0.blockIdx)
                     }
                     reducer.items.insert(contentsOf: staged.items, at: 0)
+                    reducer.durableEntryIds.formUnion(staged.durableEntryIds)
                     reducer.revision += 1
                 }
                 didLoadHistory = true
