@@ -1,6 +1,6 @@
 # Pi component updates
 
-Reviewed: 2026-09-03
+Reviewed: 2026-09-05
 
 Waynode keeps pi and its runtime packages current through a daily, tested,
 reproducible update workflow. Production images never install floating versions.
@@ -9,7 +9,7 @@ reproducible update workflow. Production images never install floating versions.
 
 The source of truth is `config/pi-components.json`:
 
-- `@earendil-works/pi-coding-agent` 0.84.4
+- `@earendil-works/pi-coding-agent` 0.85.0
 - `pi-codex-goal` 0.2.0
 - `pi-lean-ctx` 3.10.0
 - standalone `lean-ctx` 3.10.0 for Linux x86_64 and aarch64
@@ -99,7 +99,7 @@ use the baked directory directly.
 
 ## Compatibility receipt
 
-Sources reviewed on 2026-09-03:
+Sources reviewed on 2026-09-05:
 
 - Pi packages and update commands:
   <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md>
