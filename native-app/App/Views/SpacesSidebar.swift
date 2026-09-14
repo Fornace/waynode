@@ -189,13 +189,22 @@ struct SpaceRow: View {
         return displayPath == space.repoName ? nil : displayPath
     }
 
+    // Stable per-repo color so the monogram tile distinguishes repos at a glance.
+    private var tileColor: Color {
+        var hash: UInt64 = 5381
+        for byte in space.repoName.utf8 {
+            hash = (hash << 5) &+ hash &+ UInt64(byte)
+        }
+        return Color(hue: Double(hash % 360) / 360, saturation: 0.5, brightness: 0.72)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "arrow.triangle.branch")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.tint)
+            Text(space.repoName.first.map { String($0).uppercased() } ?? "?")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(.tint.opacity(0.11), in: RoundedRectangle(cornerRadius: 9))
+                .background(tileColor, in: RoundedRectangle(cornerRadius: 9))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(space.repoName.isEmpty ? "Untitled" : space.repoName)
@@ -214,7 +223,7 @@ struct SpaceRow: View {
 
             VStack(alignment: .trailing, spacing: 4) {
                 if !space.branch.isEmpty {
-                    Label(space.branch, systemImage: "arrow.triangle.branch")
+                    Text(space.branch)
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
