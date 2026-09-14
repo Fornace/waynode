@@ -134,14 +134,17 @@ struct ComposerBar: View {
                                 .foregroundStyle(Color.secondary)
                         }
                     }
-                    .frame(width: 32, height: 32)
+                    // Inside the label with a contentShape so the Button's
+                    // hit area itself is 44pt; a plain-style button's hit
+                    // region is the content shape, not the layout frame.
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(isAttaching)
                 .accessibilityLabel("Attach files")
                 .accessibilityHint("Adds files to this workspace")
                 .accessibilityIdentifier("composer.attachment")
-                .frame(minWidth: 44, minHeight: 44)
 
                 // Auto-growing text field — the key fix.
                 // TextField(axis: .vertical) + lineLimit properly constrains
@@ -207,14 +210,13 @@ struct ComposerBar: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.accentColor)
                             .symbolEffect(.bounce, value: canSend)
-                            .frame(width: 32, height: 32)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(.plain)
                     .disabled(isSending)
                     .accessibilityLabel(mode == .goal ? "Queue goal" : "Queue message")
                     .accessibilityIdentifier("composer.queue")
                     .accessibilityHint("Adds this draft after the active run")
-                    .frame(minWidth: 44, minHeight: 44)
                 }
             Button(action: onAbort) {
                 Image(systemName: "stop.fill")
@@ -222,12 +224,12 @@ struct ComposerBar: View {
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(Color.red, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
             .transition(.scale.combined(with: .opacity))
             .accessibilityLabel(isGoalRunActive ? "Abort goal" : "Stop generation")
             .accessibilityIdentifier("composer.stop")
-            .frame(minWidth: 44, minHeight: 44)
             }
         } else {
             Button {
@@ -241,6 +243,7 @@ struct ComposerBar: View {
                         canSend ? Color.accentColor : Color.secondary.opacity(0.3),
                         in: Circle()
                     )
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
             .disabled(!canSend || isSending)
@@ -249,7 +252,6 @@ struct ComposerBar: View {
             .accessibilityIdentifier("composer.send")
             .accessibilityHint("Sends the current draft")
             .keyboardShortcut(.return, modifiers: .command)
-            .frame(minWidth: 44, minHeight: 44)
         }
     }
 

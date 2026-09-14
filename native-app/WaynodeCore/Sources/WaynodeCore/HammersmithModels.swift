@@ -209,11 +209,12 @@ public struct HammersmithRunView: View {
                             .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
                             .background(Color.red, in: Circle())
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Stop Hammersmith run")
                     .accessibilityIdentifier("hammersmith.run.stop")
-                    .frame(minWidth: 44, minHeight: 44)
                 }
             }
 

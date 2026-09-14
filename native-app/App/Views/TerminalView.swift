@@ -51,12 +51,13 @@ struct TerminalView: View {
                     } label: {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.caption2)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Fit terminal to 80×24")
                     .accessibilityLabel("Resize terminal")
                     .accessibilityIdentifier("terminal.resize")
-                    .frame(minWidth: 44, minHeight: 44)
                 }
 
                 Button {
@@ -73,12 +74,13 @@ struct TerminalView: View {
                         .foregroundStyle(showCopied ? .green : .secondary)
                         .symbolEffect(.bounce, value: showCopied)
                         .contentTransition(.symbolEffect(.replace))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(terminal.output.isEmpty)
                 .accessibilityLabel("Copy terminal output")
                 .accessibilityIdentifier("terminal.copy")
-                .frame(minWidth: 44, minHeight: 44)
 
                 Button {
                     terminal.clearScrollback()
@@ -86,12 +88,13 @@ struct TerminalView: View {
                 } label: {
                     Image(systemName: "trash")
                         .font(.caption2)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(terminal.output.isEmpty)
                 .accessibilityLabel("Clear terminal scrollback")
                 .accessibilityIdentifier("terminal.clear")
-                .frame(minWidth: 44, minHeight: 44)
 
                 if !isExited {
                     Button {
@@ -100,11 +103,12 @@ struct TerminalView: View {
                         Image(systemName: "arrow.clockwise")
                             .font(.caption2)
                             .symbolEffect(.rotate, value: isConnecting)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Reconnect terminal transport")
                     .accessibilityIdentifier("terminal.reconnect")
-                    .frame(minWidth: 44, minHeight: 44)
                     .disabled(isConnecting)
                 }
             }
