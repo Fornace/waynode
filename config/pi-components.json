@@ -1,34 +1,34 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-05",
+  "reviewedAt": "2026-09-27",
   "pi": {
     "package": "@earendil-works/pi-coding-agent",
-    "version": "0.85.0",
-    "integrity": "sha512-INxVkLAVfAMju5MojJpmyu/0bMP+r+ffZuS7UqVv32E2JwHBRbcHfELDfmFNvapEbgYfKN2r9OYO1p3TqDBR+g=="
+    "version": "0.87.1",
+    "integrity": "sha512-m8ArJUtVcQMSe1lLE/Ei7vX/JV7O39sWmWBsXV2NOU70F0qCp8GubA24pT3LnwTmM6LL2xV80/h6sQg85n69ew=="
   },
   "packages": [
     {
       "name": "pi-codex-goal",
-      "version": "0.2.0",
-      "integrity": "sha512-NCL7WJ1wLwMyiTlKlc9sTTTZdTQzSS2HJcuth3PYD8YWDjt9eVpNQdAGVW/sz7UjvCCpzlD9dAg7yRIt9H3t7g=="
+      "version": "0.4.1",
+      "integrity": "sha512-k9bRkYhraAPMMU2Av3pQAK02gj7Xqc308CM4x4rjk1g27f2sp5IDVlNsCrRK5tHLtYgoerZDPLVqQCRnDiUZHQ=="
     },
     {
       "name": "pi-lean-ctx",
-      "version": "3.10.0",
-      "integrity": "sha512-zykPq1hqS0ZT2pMYVmLmnYv5OKh24Tz+/HnF3BUp/9Q7rDq1OUcvIoLGojLbQXiIJ04ZYhAnCbLeCQS1q1JfGw=="
+      "version": "3.10.4",
+      "integrity": "sha512-UMNZ5huIrqU6Xf1Cjphn2r8X+tPhzunzImEDLYdP7kUaZFfGOVMrDiivk6EjqC1vk3XCCIU/n4yrTHxth0neZg=="
     }
   ],
   "leanCtx": {
-    "version": "3.10.0",
-    "releaseTag": "v3.10.0",
+    "version": "3.10.4",
+    "releaseTag": "v3.10.4",
     "assets": {
       "x86_64": {
         "name": "lean-ctx-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "940d529ddddf4bc321661c71c57c7284dedc58d6e2738b917243d53499381b28"
+        "sha256": "8a3d99c72de91edd2b68333e6e5c3ff84e2c54e2589610c749fc928beebfa54f"
       },
       "aarch64": {
         "name": "lean-ctx-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "8433afd42e185453250ef60985cc5566dcc19a589baff263e33c8336375a56e6"
+        "sha256": "d427a7e66637d16880aae6adc1733a5bd13a041056615789da5ba0efba51e10a"
       }
     }
   }

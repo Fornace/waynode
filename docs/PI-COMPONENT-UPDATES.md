@@ -1,6 +1,6 @@
 # Pi component updates
 
-Reviewed: 2026-09-05
+Reviewed: 2026-09-27
 
 Waynode keeps pi and its runtime packages current through a daily, tested,
 reproducible update workflow. Production images never install floating versions.
@@ -9,10 +9,10 @@ reproducible update workflow. Production images never install floating versions.
 
 The source of truth is `config/pi-components.json`:
 
-- `@earendil-works/pi-coding-agent` 0.85.0
-- `pi-codex-goal` 0.2.0
-- `pi-lean-ctx` 3.10.0
-- standalone `lean-ctx` 3.10.0 for Linux x86_64 and aarch64
+- `@earendil-works/pi-coding-agent` 0.87.1
+- `pi-codex-goal` 0.4.1
+- `pi-lean-ctx` 3.10.4
+- standalone `lean-ctx` 3.10.4 for Linux x86_64 and aarch64
 - Node.js 26.8.1 from the immutable official `node:26.8.1-slim` multi-platform
   image index `sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146`
 - npm 12.0.2, installed by exact version and verified during every server and
@@ -99,7 +99,7 @@ use the baked directory directly.
 
 ## Compatibility receipt
 
-Sources reviewed on 2026-09-05:
+Sources reviewed on 2026-09-27:
 
 - Pi packages and update commands:
   <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md>
@@ -107,8 +107,8 @@ Sources reviewed on 2026-09-05:
   <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/CHANGELOG.md>
 - pi-codex-goal 0.2.0 release source:
   <https://github.com/fitchmultz/pi-codex-goal/releases/tag/v0.2.0>
-- lean-ctx 3.10.0 release assets:
-  <https://github.com/yvgude/lean-ctx/releases/tag/v3.10.0>
+- lean-ctx 3.10.4 release assets:
+  <https://github.com/yvgude/lean-ctx/releases/tag/v3.10.4>
 - Node.js 26.8.1 release:
   <https://nodejs.org/en/blog/release/v26.8.1>
 - official Node.js Docker image source:
