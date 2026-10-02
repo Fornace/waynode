@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-01",
+  "reviewedAt": "2026-10-02",
   "pi": {
     "package": "@earendil-works/pi-coding-agent",
-    "version": "0.99.2",
-    "integrity": "sha512-6R1BZ2N77CrVcGf3eC2KovTz1Q4RYiAeydvVWQT546N2fi1nBc81aURlbOZCgruWoW9VY/UrLzDynF4YTolpoA=="
+    "version": "1.0.0",
+    "integrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw=="
   },
   "packages": [
     {
       "name": "pi-codex-goal",
-      "version": "0.4.1",
-      "integrity": "sha512-k9bRkYhraAPMMU2Av3pQAK02gj7Xqc308CM4x4rjk1g27f2sp5IDVlNsCrRK5tHLtYgoerZDPLVqQCRnDiUZHQ=="
+      "version": "0.6.0",
+      "integrity": "sha512-Vfb257T/294pFwBObvUa4g+pF6k+Fl2dLALk0XnlF98EMJH0ra2J3iyrY1uhkQe0C++R7a3UFkqGTNkazzQRPQ=="
     },
     {
       "name": "pi-lean-ctx",
