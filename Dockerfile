@@ -1,5 +1,5 @@
 # ── Builder stage: compile frontend ──
-FROM node:26.8.1-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS builder
+FROM node:26.12.1-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS builder
 ARG NPM_VERSION=12.0.2
 RUN npm install --global --ignore-scripts "npm@${NPM_VERSION}" && \
     test "$(npm --version)" = "$NPM_VERSION"
@@ -13,7 +13,7 @@ COPY frontend/ ./frontend/
 RUN cd frontend && npm run build
 
 # ── Runtime stage ──
-FROM node:26.8.1-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS runtime
+FROM node:26.12.1-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS runtime
 ARG NPM_VERSION=12.0.2
 RUN npm install --global --ignore-scripts "npm@${NPM_VERSION}" && \
     test "$(npm --version)" = "$NPM_VERSION"

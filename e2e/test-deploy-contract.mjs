@@ -60,7 +60,7 @@ assert.doesNotMatch(workflow, /actions\/setup-node@v\d/);
 for (const [name, dockerfile] of [
   ["server", serverDockerfile], ["sandbox", sandboxDockerfile],
 ]) {
-  assert.match(dockerfile, /node:26\.8\.1-slim@sha256:[0-9a-f]{64}/, `${name} base is immutable`);
+  assert.match(dockerfile, /node:26\.12\.1-slim@sha256:[0-9a-f]{64}/, `${name} base is immutable`);
   assert.match(dockerfile, /ARG NPM_VERSION=12\.0\.2/);
   assert.match(dockerfile, /npm install --global --ignore-scripts "npm@\$\{NPM_VERSION\}"/);
   assert.match(dockerfile, /test "\$\(npm --version\)" = "\$NPM_VERSION"/);
