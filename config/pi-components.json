@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-11-24",
+  "reviewedAt": "2026-11-26",
   "pi": {
     "package": "@earendil-works/pi-coding-agent",
-    "version": "1.6.0",
-    "integrity": "sha512-zX1BVEsshx7A2MRuQ6jfr3RJGWw4Wn+vLq5ZfmlvS1RskhRmByaSZVXH/zcwRrWHO7qPgs98pNCbPOEti/t0fQ=="
+    "version": "1.6.1",
+    "integrity": "sha512-+VSb95N4PB+G7TLceg7wkbJT31BEeIBnUT9500g9a1rOsCx78CUw1YFGtLcRhS6jj8pdfm0fFwrakrMLu6lVAQ=="
   },
   "packages": [
     {
