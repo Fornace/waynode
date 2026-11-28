@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-11-26",
+  "reviewedAt": "2026-11-28",
   "pi": {
     "package": "@earendil-works/pi-coding-agent",
-    "version": "1.6.1",
-    "integrity": "sha512-+VSb95N4PB+G7TLceg7wkbJT31BEeIBnUT9500g9a1rOsCx78CUw1YFGtLcRhS6jj8pdfm0fFwrakrMLu6lVAQ=="
+    "version": "1.7.0",
+    "integrity": "sha512-opRelA1oqV/o+cByICMYU87oiHuICeCkghHMqsZsDwDz9F6qo8HFhoH4J/wZkr6tBeFor7ryOSwEmpZsusYrbA=="
   },
   "packages": [
     {
@@ -14,21 +14,21 @@
     },
     {
       "name": "pi-lean-ctx",
-      "version": "3.12.7",
-      "integrity": "sha512-6EUvb/m/KaeChfo0nsxesasmS8bXI+uDE+YYSsUTIHksmoBNSlLBnCb94Iti2xMLogC+lUqIK6zPBaxLqBRvHQ=="
+      "version": "3.12.8",
+      "integrity": "sha512-MIZIMeVeLKkUzzi8pL9WbxGZglTkD6n4W1wYsNezI24yKk+OoruguWzm7lQUoz+Gdj4A6jJrI/qO1jxqBWP6Ug=="
     }
   ],
   "leanCtx": {
-    "version": "3.12.7",
-    "releaseTag": "v3.12.7",
+    "version": "3.12.8",
+    "releaseTag": "v3.12.8",
     "assets": {
       "x86_64": {
         "name": "lean-ctx-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "b8eed810bb7d5deb851cfde31251970d118c4377ebc27be10b99a11b516219f9"
+        "sha256": "46d40e6b06f4f71fd5a42705e216c39f3244af23116de3327444b8dc6b5f9382"
       },
       "aarch64": {
         "name": "lean-ctx-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "70dd95e70d3160993efba6c95e1da70b6347651b334b980ae4297976d90af0d2"
+        "sha256": "9b4c85a17d37b4ba025cd191247124b197c8ec25aa157669c71c2b17ef985fe0"
       }
     }
   }
